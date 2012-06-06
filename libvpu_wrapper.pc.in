@@ -1,0 +1,10 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@/imx-mm
+
+Name: VPU wrapper for imx vpu
+Description: Providing standard video encode/decode interface
+Version: @VERSION@
+Libs: -L${libdir} -lvpu_wrapper
+Cflags: -I${includedir}
