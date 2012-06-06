@@ -3,7 +3,7 @@ PROGRAM=test_dec_arm_elinux
 ENC_PROGRAM=test_enc_arm_elinux
 ENC_AUTO_TEST=enc_auto_test
 LIB=lib_vpu_wrapper
-LIBRARY=../../release/lib/$(LIB)
+LIBRARY=lib/$(LIB)
 SQLITE_LIBRARY=./sqlite/libsqlite3
 
 VERSION = .1.0
@@ -30,7 +30,7 @@ LN=gcc
 AS=as
 AR=ar
 
-CFLAGS= -O2 -Wall
+CFLAGS= -O2 -Wall -fPIC
 #CFLAGS+=-g
 AFLAGS=
 
