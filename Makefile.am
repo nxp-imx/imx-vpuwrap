@@ -6,7 +6,7 @@ lib_LTLIBRARIES = libvpu_wrapper.la
 
 libvpu_wrapper_la_SOURCES = vpu_wrapper.c
 
-libvpu_wrapperincludedir = $(includedir)/imx-mm
+libvpu_wrapperincludedir = $(includedir)/imx-mm/vpu
 
 libvpu_wrapperinclude_HEADERS = vpu_wrapper.h
 
