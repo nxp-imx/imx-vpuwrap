@@ -2,7 +2,7 @@
 
 COMPATNUM=@LIBTOOL_VERSION_INFO@
 
-lib_LTLIBRARIES = libvpu_wrapper.la
+lib_LTLIBRARIES = libvpu-wrapper.la
 
 libvpu_wrapper_la_SOURCES = vpu_wrapper.c
 
@@ -20,7 +20,7 @@ libvpu_wrapper_la_LDFLAGS = -version-info $(COMPATNUM)
 
 libvpu_wrapper_la_LIBTOOLFLAGS = --tag=CC
 
-pcverfile = libvpu_wrapper.pc
+pcverfile = libvpu-wrapper.pc
 
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = $(pcverfile)

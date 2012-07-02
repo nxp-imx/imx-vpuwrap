@@ -1,7 +1,7 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl Created by Anjuta application wizard.
 
-AC_INIT(vpu_wrapper, 1.0.17)
+AC_INIT(libvpu-wrapper, 1.0.17)
 m4_ifdef([AM_SILENT_RULES],[AM_SILENT_RULES([yes])])
 
 AM_INIT_AUTOMAKE(AC_PACKAGE_NAME, AC_PACKAGE_VERSION)
@@ -40,5 +40,5 @@ AC_SUBST(IMX_VPU_LIB)
 
 AC_OUTPUT([
 Makefile
-libvpu_wrapper.pc
+libvpu-wrapper.pc
 ])
