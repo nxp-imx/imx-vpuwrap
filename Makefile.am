@@ -2,25 +2,25 @@
 
 COMPATNUM=@LIBTOOL_VERSION_INFO@
 
-lib_LTLIBRARIES = libvpu-wrapper.la
+lib_LTLIBRARIES = libfslvpuwrap.la
 
-libvpu_wrapper_la_SOURCES = vpu_wrapper.c
+libfslvpuwrap_la_SOURCES = vpu_wrapper.c
 
-libvpu_wrapperincludedir = $(includedir)/imx-mm/vpu
+libfslvpuwrapincludedir = $(includedir)/imx-mm/vpu
 
-libvpu_wrapperinclude_HEADERS = vpu_wrapper.h
+libfslvpuwrapinclude_HEADERS = vpu_wrapper.h
 
-libvpu_wrapper_la_LIBADD = $(IMX_VPU_LIB)
+libfslvpuwrap_la_LIBADD = $(IMX_VPU_LIB)
 
-libvpu_wrapper_la_CFLAGS =
+libfslvpuwrap_la_CFLAGS =
 
-libvpu_wrapper_la_OBJCFLAGS =
+libfslvpuwrap_la_OBJCFLAGS =
 
-libvpu_wrapper_la_LDFLAGS = -version-info $(COMPATNUM)
+libfslvpuwrap_la_LDFLAGS = -version-info $(COMPATNUM)
 
-libvpu_wrapper_la_LIBTOOLFLAGS = --tag=CC
+libfslvpuwrap_la_LIBTOOLFLAGS = --tag=CC
 
-pcverfile = libvpu-wrapper.pc
+pcverfile = libfslvpuwrap.pc
 
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = $(pcverfile)

@@ -6,5 +6,5 @@ includedir=@includedir@/imx-mm/vpu
 Name: VPU wrapper for imx vpu
 Description: Providing standard video encode/decode interface
 Version: @VERSION@
-Libs: -L${libdir} -lvpu_wrapper
+Libs: -L${libdir} -lfslvpuwrap
 Cflags: -I${includedir}
