@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2012, Freescale Semiconductor, Inc.
+ * Copyright (c) 2010-2012, Freescale Semiconductor, Inc. All Rights Reserved.
  *
  */
 
@@ -41,7 +41,7 @@ extern "C" {
 /**************************** version info ***********************************/
 #define VPU_WRAPPER_VERSION(major, minor, release)	 \
 	(((major) << 16) + ((minor) << 8) + (release))
-#define VPU_WRAPPER_VERSION_CODE	VPU_WRAPPER_VERSION(1, 0, 17)
+#define VPU_WRAPPER_VERSION_CODE	VPU_WRAPPER_VERSION(1, 0, 18)
 
 /**************************** decoder part **********************************/
 
@@ -422,8 +422,8 @@ typedef struct
 
 typedef struct {
 	VpuFrameBuffer* pFrame;	/*point to the frame buffer. if it is NULL, it represent the frame is skipped by vpu, but the other length info are still valid*/
-	int nStuffLength;			/*stuff data length ahead of frame*/
-	int nFrameLength;		/*valid frame length*/
+	int nStuffLength;			/*stuff data length ahead of frame. If it is < 0, mean the config data contain some valid frames, user need to process this case carefully*/
+	int nFrameLength;		/*valid frame length: should be > 0*/
 	int nReserved[5];			/*reserved for recording other info*/
 }VpuDecFrameLengthInfo;
 

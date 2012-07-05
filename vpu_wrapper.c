@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2010-2012, Freescale Semiconductor, Inc.
+ *  Copyright (c) 2010-2012, Freescale Semiconductor, Inc. All Rights Reserved.
  *
  */
 
@@ -181,7 +181,7 @@ static int g_seek_dump=DUMP_ALL_DATA;	/*0: only dump data after seeking; otherwi
 //#define IMX6_BUFNOTENOUGH_WORKAROUND	//when buffer is not enough, vpu may return dispIndex=-1(EOS) directly, but not decIndex=-1
 //#define IMX6_INTER_DEBUG_RD_WR	//internal debug: rd wr register
 //#define IMX6_INTER_DEBUG	//internal debug
-#define IMX6_BITBUFSPACE_WORKAROUND	//the free sapce may be not correct for FW version 2.1.3 or later
+//#define IMX6_BITBUFSPACE_WORKAROUND	//the free sapce may be not correct for FW version 2.1.3 or later
 #endif
 /****************************** cpu version ***************************************/
 #define CPU_IS_MX5X  cpu_is_mx5x
@@ -451,8 +451,8 @@ typedef struct
 
 	/*management of consumed bytes: used to sync with frame boundary*/
 	int nDecFrameRptEnabled;			/*1:support frame reported; 0: not support*/
-	int nAccumulatedConsumedStufferBytes;/*stuffer size between frames*/
-	int nAccumulatedConsumedFrmBytes;	/*frame size*/
+	int nAccumulatedConsumedStufferBytes;/*stuffer size between frames: if it <0, indicate that some frames are contained in config data*/
+	int nAccumulatedConsumedFrmBytes;	/*frame size: >=0*/
 	int nAccumulatedConsumedBytes;		/*it should match with the input data size == nAccumulatedConsumedStufferBytes+nAccumulatedConsumedFrmBytes*/	
 	VpuFrameBuffer* pLastDecodedFrm;	/*the nearest decoded frame*/
 	int nAdditionalSeqBytes;				/*seq header inserted by wrapper itself , or config data */
@@ -1543,6 +1543,10 @@ int VpuAccumulateConsumedBytes(VpuDecObj* pObj, int nInSize, int type, unsigned 
 			{
 				pObj->nAccumulatedConsumedStufferBytes-=pObj->nAdditionalSeqBytes;
 				pObj->nAdditionalSeqBytes=0; //clear 0 !!!
+				if(pObj->nAccumulatedConsumedStufferBytes<0)
+				{
+					VPU_LOG("warning: some frames are packaged in the config data.\r\n");
+				}
 			}
 
 #if 0	//debug code
@@ -1562,6 +1566,7 @@ int VpuAccumulateConsumedBytes(VpuDecObj* pObj, int nInSize, int type, unsigned 
 			pObj->nAccumulatedConsumedFrmBytes+=nInSize;
 			/*adjust frame size: reduce the frame header inserted by vpu wrapper itself*/
 			pObj->nAccumulatedConsumedFrmBytes-=pObj->nAdditionalFrmHeaderBytes;
+			ASSERT(nInSize>pObj->nAdditionalFrmHeaderBytes);
 
 			/*total consumed bytes= stuffer size + frame size*/
 			pObj->nAccumulatedConsumedBytes=pObj->nAccumulatedConsumedStufferBytes+pObj->nAccumulatedConsumedFrmBytes;
@@ -1821,7 +1826,7 @@ int VpuQueryVpuHoldBufNum(VpuDecObj* pObj)
 }
 #endif
 	
-int VpuBitsBufIsEnough(DecHandle InVpuHandle,int nFillSize)
+int VpuBitsBufIsEnough(DecHandle InVpuHandle,unsigned int nFillSize)
 {
 	PhysicalAddress Rd;
 	PhysicalAddress Wr;
@@ -2043,7 +2048,7 @@ int VpuFillData(DecHandle InVpuHandle,VpuDecObj* pObj,unsigned char* pInVirt,uns
 int VpuSeqInit(DecHandle InVpuHandle, VpuDecObj* pObj ,VpuBufferNode* pInData,int* pOutRetCode,int * pNoErr) 
 {
 	RetCode ret;
-	DecInitialInfo initInfo = {0};
+	DecInitialInfo initInfo;
 
 	unsigned char* pHeader=NULL;
 	unsigned int headerLen=0;
@@ -2327,6 +2332,7 @@ int VpuSeqInit(DecHandle InVpuHandle, VpuDecObj* pObj ,VpuBufferNode* pInData,in
 	vpu_DecSetEscSeqInit(InVpuHandle, 1);
 	VPU_TRACE;	
 	VPU_API("calling vpu_DecGetInitialInfo() \r\n");
+	vpu_memset(&initInfo, 0, sizeof(DecInitialInfo));
 	ret = vpu_DecGetInitialInfo(InVpuHandle, &initInfo);
 	VPU_TRACE;
 	VPU_API("calling vpu_DecSetEscSeqInit(): 0, interlace: %d , errcode: 0x%X \r\n",initInfo.interlace,(unsigned int)initInfo.errorcode);
@@ -3601,7 +3607,7 @@ int VpuDecBuf(DecHandle InVpuHandle, VpuDecObj* pObj ,VpuBufferNode* pInData,int
 			//case (0!=pInData->nSize): avoid delay including no normal eos output at end of stream.
 			//case (0==pObj->filledEOS): avoid no normal eos output
 			if((((VPU_BITS_BUF_SIZE-nSpace)<VPU_MIN_UINT_SIZE)&&(0==pObj->filledEOS))
-				||((NotEnoughDecData(nSpace,pObj->streamBufDelaySize))&&(0!=pInData->nSize)))
+				||((NotEnoughDecData(nSpace,(unsigned long)pObj->streamBufDelaySize))&&(0!=pInData->nSize)))
 			{
 				//return directly without decoding
 				VPU_LOG("nSpace: %d, filled : %d \r\n",(int)nSpace, (int)(VPU_BITS_BUF_SIZE-nSpace));
@@ -4547,6 +4553,8 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
 			case VPU_V_DIVX56:
 			case VPU_V_XVID:
 			case VPU_V_MPEG4:
+			case VPU_V_AVC:				
+			case VPU_V_MPEG2:
 				pObj->nDecFrameRptEnabled=1;
 				break;
 			default:
@@ -6414,7 +6422,8 @@ int VpuEncFillHeader(EncHandle InHandle,VpuEncEncParam* pInParam, unsigned char*
 		//don't care mode 
 		if(CPU_IS_MX6X())
 		{
-			EncParamSet sEncJpgHdrParam = {0};
+			EncParamSet sEncJpgHdrParam;
+			vpu_memset(&sEncJpgHdrParam, 0, sizeof(EncParamSet));
 			sEncJpgHdrParam.size = pInParam->nInOutputBufLen;	//init one big enough size
 			sEncJpgHdrParam.pParaSet = pVirtPtr;//pPhyPtr;
 			vpu_EncGiveCommand(InHandle,ENC_GET_JPEG_HEADER, &sEncJpgHdrParam);
@@ -7093,7 +7102,9 @@ VpuEncRetCode VPU_EncRegisterFrameBuffer(VpuEncHandle InHandle,VpuFrameBuffer *p
 	unsigned int yBot[VPU_ENC_MAX_FRAME_INDEX];	//for field tile
 	unsigned int cbBot[VPU_ENC_MAX_FRAME_INDEX];	//for field tile
 	int i;
-	ExtBufCfg sScratch={0};
+	ExtBufCfg sScratch;
+	vpu_memset(&sScratch, 0, sizeof(ExtBufCfg));
+    
 	
 	if(InHandle==NULL) 
 	{
@@ -7164,7 +7175,8 @@ VpuEncRetCode VPU_EncRegisterFrameBuffer(VpuEncHandle InHandle,VpuFrameBuffer *p
 		VPU_ENC_LOG("register: num: %d, subsamp A: 0x%X, subsamp B: 0x%X, scratch: 0x%X(size: %d) \r\n",nNum,framebuf[nNum].bufY,framebuf[nNum+1].bufY,sScratch.bufferBase,sScratch.bufferSize);
 		if (CPU_IS_MX6X())
 		{
-			EncExtBufInfo extbufinfo = {0};
+			EncExtBufInfo extbufinfo;
+			vpu_memset(&extbufinfo, 0, sizeof(EncExtBufInfo));
 			extbufinfo.scratchBuf = sScratch;
 			ret = vpu_EncRegisterFrameBuffer(pVpuObj->handle,framebuf,nNum, framebuf[0].strideY, /*framebuf[0].strideY*/nSrcStride,framebuf[nNum].bufY,framebuf[nNum+1].bufY,&extbufinfo);
 		}
