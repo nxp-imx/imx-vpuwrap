@@ -20,10 +20,14 @@ libfslvpuwrap_la_LDFLAGS = -version-info $(COMPATNUM)
 
 libfslvpuwrap_la_LIBTOOLFLAGS = --tag=CC
 
+libfslvpuwrapdocdir = $(docdir)/imx-mm/vpu
+libfslvpuwrapdoc_DATA = \
+    docs/vpu/vpu_dec_datasheet.pdf    \
+    docs/vpu/vpu_enc_datasheet.pdf
+
 pcverfile = libfslvpuwrap.pc
 
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = $(pcverfile)
 
-EXTRA_DIST = autogen.sh
-
+EXTRA_DIST = autogen.sh $(libfslvpuwrapdoc_DATA)
