@@ -41,7 +41,7 @@ extern "C" {
 /**************************** version info ***********************************/
 #define VPU_WRAPPER_VERSION(major, minor, release)	 \
 	(((major) << 16) + ((minor) << 8) + (release))
-#define VPU_WRAPPER_VERSION_CODE	VPU_WRAPPER_VERSION(1, 0, 18)
+#define VPU_WRAPPER_VERSION_CODE	VPU_WRAPPER_VERSION(1, 0, 19)
 
 /**************************** decoder part **********************************/
 
@@ -343,7 +343,8 @@ typedef struct {
 	int nFrmWidth;			/*support dynamic resolution*/
 	int nFrmHeight;			/*support dynamic resolution*/
 	VpuRect FrmCropRect;	/*support dynamic resolution*/
-	int nReserved[10];		/*reserved for recording other info*/
+	unsigned int nQ16ShiftWidthDivHeightRatio;	/*support dynamic ratio, refer to definition in struct 'VpuDecInitInfo'*/
+	int nReserved[9];		/*reserved for recording other info*/
 }VpuFrameExtInfo;
 
 typedef struct {

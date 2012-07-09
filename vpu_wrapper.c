@@ -335,6 +335,7 @@ typedef struct
 	int width;
 	int height;
 	VpuRect frameCrop;
+	unsigned int Q16ShiftWidthDivHeightRatio;
 }VpuFrameBufInfo;
 
 typedef struct
@@ -458,7 +459,10 @@ typedef struct
 	int nAdditionalSeqBytes;				/*seq header inserted by wrapper itself , or config data */
 	int nAdditionalFrmHeaderBytes; 		/*frame header inserted by wrapper itself */
 	unsigned int nLastFrameEndPosPhy;	/*point to the previous frame tail: used to compute the stuff data length between frames*/
-	
+
+	/*profile/level info*/
+	int nProfile;
+	int nLevel;
 }VpuDecObj;
 
 typedef struct 
@@ -1601,6 +1605,7 @@ int VpuSaveDecodedFrameInfo(VpuDecObj* pObj, int index,DecOutputInfo * pCurDecFr
 
 	if(index>=0)	//valid decoded frame
 	{
+		int cropWidth,cropHeight;
 		//VPU_LOG("save index %d: pictype = %d \r\n",index,pCurDecFrameInfo->picType);
 		pDstInfo=&pObj->frameBufInfo[index];
 		pDstInfo->picType=pCurDecFrameInfo->picType;
@@ -1612,7 +1617,7 @@ int VpuSaveDecodedFrameInfo(VpuDecObj* pObj, int index,DecOutputInfo * pCurDecFr
 		pDstInfo->eFieldType=VpuConvertFieldType(pObj->CodecFormat,pCurDecFrameInfo);
 		pDstInfo->viewID=pCurDecFrameInfo->mvcPicInfo.viewIdxDecoded;
 
-		/*dynamic resolution*/
+		/*dynamic resolution and ratio*/
 		pDstInfo->width=pCurDecFrameInfo->decPicWidth;
 		pDstInfo->height=pCurDecFrameInfo->decPicHeight;
 		if(((0==pCurDecFrameInfo->decPicCrop.bottom)&&(0==pCurDecFrameInfo->decPicCrop.right))
@@ -1632,6 +1637,9 @@ int VpuSaveDecodedFrameInfo(VpuDecObj* pObj, int index,DecOutputInfo * pCurDecFr
 			pDstInfo->frameCrop.nRight=pCurDecFrameInfo->decPicCrop.right;
 			pDstInfo->frameCrop.nBottom=pCurDecFrameInfo->decPicCrop.bottom;
 		}
+		cropWidth=pDstInfo->frameCrop.nRight-pDstInfo->frameCrop.nLeft;
+		cropHeight=pDstInfo->frameCrop.nBottom-pDstInfo->frameCrop.nTop;		
+		pDstInfo->Q16ShiftWidthDivHeightRatio=VpuConvertAspectRatio(pObj->CodecFormat,(unsigned int)pCurDecFrameInfo->aspectRateInfo,cropWidth,cropHeight, pObj->nProfile,pObj->nLevel);
 	}
 
 	/*record the nearest decoded frame and accumulate the frame size reported by vpu*/
@@ -1661,11 +1669,12 @@ int VpuLoadDispFrameInfo(VpuDecObj* pObj, int index,VpuDecOutFrameInfo* pDispFra
 	pDispFrameInfo->eFieldType=pSrcInfo->eFieldType;
 	pDispFrameInfo->nMVCViewID=pSrcInfo->viewID;	
 
-	/*dynamic resolution*/
+	/*dynamic resolution and ratio*/
 	pDispFrameInfo->pExtInfo=&pObj->frmExtInfo;
 	pDispFrameInfo->pExtInfo->nFrmWidth=pSrcInfo->width;
 	pDispFrameInfo->pExtInfo->nFrmHeight=pSrcInfo->height;
 	pDispFrameInfo->pExtInfo->FrmCropRect=pSrcInfo->frameCrop;
+	pDispFrameInfo->pExtInfo->nQ16ShiftWidthDivHeightRatio=pSrcInfo->Q16ShiftWidthDivHeightRatio;
 	
 	//VPU_LOG("load index %d: pictype = %d \r\n",index,pSrcInfo->picType);	
 	return 1;
@@ -2429,10 +2438,13 @@ int VpuSeqInit(DecHandle InVpuHandle, VpuDecObj* pObj ,VpuBufferNode* pInData,in
 			pObj->initInfo.PicCropRect.nBottom=initInfo.picCropRect.bottom;
 		}
 
+		//record profile/level info
+		pObj->nProfile=initInfo.profile;
+		pObj->nLevel=initInfo.level;
 		//convert aspect ratio info
 		cropWidth=pObj->initInfo.PicCropRect.nRight-pObj->initInfo.PicCropRect.nLeft;
 		cropHeight=pObj->initInfo.PicCropRect.nBottom-pObj->initInfo.PicCropRect.nTop;
-		pObj->initInfo.nQ16ShiftWidthDivHeightRatio=VpuConvertAspectRatio(pObj->CodecFormat,(unsigned int)initInfo.aspectRateInfo,cropWidth,cropHeight, initInfo.profile, initInfo.level);
+		pObj->initInfo.nQ16ShiftWidthDivHeightRatio=VpuConvertAspectRatio(pObj->CodecFormat,(unsigned int)initInfo.aspectRateInfo,cropWidth,cropHeight, pObj->nProfile,pObj->nLevel);
 
 		//clear 0
 		total_size=0;
