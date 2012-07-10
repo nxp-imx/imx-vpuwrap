@@ -280,7 +280,13 @@ static int g_seek_dump=DUMP_ALL_DATA;	/*0: only dump data after seeking; otherwi
 #define FRAME_IS_KEY(type)	((type==VPU_IDR_PIC)||(type==VPU_I_PIC))
 #define FRAME_ISNOT_KEY(type)	((type!=VPU_IDR_PIC)&&(type!=VPU_I_PIC))
 
-#define FRAME_START_OFFSET	1	//register BIT_BYTE_POS_FRAME_START: [pBsBufPhyStart-1, pBsBufPhyEnd-2]
+#if 1
+#define FRAME_START_OFFSET	0	//start regiter point to : frame start
+#define FRAME_END_OFFSET		1	//end register point to : frame end + 1 
+#else
+#define FRAME_START_OFFSET	1	//start regiter point to : frame start -1
+#define FRAME_END_OFFSET		0	//end register point to : frame end
+#endif
 
 /*
 for stream: WVC1_stress_NoAudio_intensitycomp.wmv, the first frame(two fields) is defined as I/P
@@ -1475,7 +1481,7 @@ VpuFieldType VpuConvertFieldType(VpuCodStd InCodec,DecOutputInfo * pCurDecFrameI
 
 unsigned int VpuComputeValidSizeInRingBuf(unsigned int nStart,unsigned int nEnd,unsigned int nBufStart,unsigned int nBufEnd)
 {
-	if((nStart<nBufStart)||(nStart>=nBufEnd)||
+	if((nStart<nBufStart)||((nStart-FRAME_END_OFFSET)>=nBufEnd)||
 		(nEnd<nBufStart)||(nEnd>=nBufEnd))
 	{
 		VPU_ERROR("%s: address: [0x%X, 0x%X] out of range [0x%X, 0x%X] \r\n",__FUNCTION__,nStart,nEnd,nBufStart,nBufEnd);
@@ -1504,7 +1510,7 @@ int VpuAccumulateConsumedBytes(VpuDecObj* pObj, int nInSize, int type, unsigned 
 			type=1: invalid
 			type=2; indicate the range of the frame[beg,end] in the bitstream buffer
 	*/
-	unsigned int nStuffSize=0;
+	int nStuffSize=0;
 	if(pObj->nDecFrameRptEnabled==0)
 	{
 		return 0;
@@ -1536,9 +1542,10 @@ int VpuAccumulateConsumedBytes(VpuDecObj* pObj, int nInSize, int type, unsigned 
 			if(1)//if(nFrmStartPhy!=(pObj->nLastFrameEndPosPhy+1))
 			{
 				//two frames are not continuous, stuffer data is exist	
-				ASSERT(nFrmStartPhy!=pObj->nLastFrameEndPosPhy);	// empty or full ??
+				//ASSERT(nFrmStartPhy!=pObj->nLastFrameEndPosPhy);	// empty or full ??
 				nStuffSize=VpuComputeValidSizeInRingBuf(pObj->nLastFrameEndPosPhy, nFrmStartPhy,(unsigned int)pObj->pBsBufPhyStart,(unsigned int)pObj->pBsBufPhyEnd);
 				nStuffSize-=2;	//reduce start and end themselves
+				nStuffSize+=FRAME_END_OFFSET+FRAME_START_OFFSET;
 				VPU_LOG("last end: 0x%X, start: 0x%X, buf start: 0x%X, buf end: 0x%X, stuff size: %d \r\n",pObj->nLastFrameEndPosPhy, nFrmStartPhy,(unsigned int)pObj->pBsBufPhyStart,(unsigned int)pObj->pBsBufPhyEnd,nStuffSize);
 				pObj->nAccumulatedConsumedStufferBytes+=nStuffSize;
 			}
@@ -1644,8 +1651,8 @@ int VpuSaveDecodedFrameInfo(VpuDecObj* pObj, int index,DecOutputInfo * pCurDecFr
 
 	/*record the nearest decoded frame and accumulate the frame size reported by vpu*/
 	pObj->pLastDecodedFrm=pInFrameDecode;
-	VPU_LOG("one decoded frame: start: 0x%X, end: 0x%X \r\n",pCurDecFrameInfo->frameStartPos+FRAME_START_OFFSET,pCurDecFrameInfo->frameEndPos);
-	VpuAccumulateConsumedBytes(pObj,pCurDecFrameInfo->consumedByte,2,pCurDecFrameInfo->frameStartPos+FRAME_START_OFFSET,pCurDecFrameInfo->frameEndPos);
+	VPU_LOG("one decoded frame: start: 0x%X, end: 0x%X \r\n",pCurDecFrameInfo->frameStartPos,pCurDecFrameInfo->frameEndPos);
+	VpuAccumulateConsumedBytes(pObj,pCurDecFrameInfo->consumedByte,2,pCurDecFrameInfo->frameStartPos,pCurDecFrameInfo->frameEndPos);
 	
 	return 1;
 }
@@ -4580,7 +4587,7 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
 	pObj->pLastDecodedFrm=NULL;
 	pObj->nAdditionalSeqBytes=0;
 	pObj->nAdditionalFrmHeaderBytes=0;
-	pObj->nLastFrameEndPosPhy=(unsigned int)pObj->pBsBufPhyEnd-1;	//make sure we can compute the length of sequence/config before the first frame
+	pObj->nLastFrameEndPosPhy=(unsigned int)pObj->pBsBufPhyEnd-1+FRAME_END_OFFSET;	//make sure we can compute the length of sequence/config before the first frame
 
 	*pOutHandle=(VpuDecHandle)pVpuObj;	
 
@@ -5652,7 +5659,7 @@ FLUSH_FINISH:
 	pObj->nAccumulatedConsumedFrmBytes=0;
 	pObj->nAccumulatedConsumedBytes=0;
 	pObj->pLastDecodedFrm=NULL;
-	pObj->nLastFrameEndPosPhy=(unsigned int)pObj->pBsBufPhyEnd-1;
+	pObj->nLastFrameEndPosPhy=(unsigned int)pObj->pBsBufPhyEnd-1+FRAME_END_OFFSET;
 
 #ifdef VPU_WRAPPER_DUMP
 	g_seek_dump=1;
