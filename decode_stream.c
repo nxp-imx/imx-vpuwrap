@@ -1253,11 +1253,9 @@ RepeatPlay:
 		if(repeatNum>0)
 		{
 			repeatNum--;
-
-			// replay stream
-			//TODO: for VC1, we need to seek to frame boundary !!!
-			//ResetBitstream(pDecContxt,20);
-			ResetBitstream(pDecContxt,0);
+			//replay stream, for VC1/VP8/RV/DIVX3, we need to seek to frame boundary !!!
+			DEC_STREAM_PRINTF("repeat: seek to offset: %d(0x%X) bytes \r\n",pDecContxt->nOffset,pDecContxt->nOffset);
+			ResetBitstream(pDecContxt,pDecContxt->nOffset);
 			goto RepeatPlay;
 		}
 	}

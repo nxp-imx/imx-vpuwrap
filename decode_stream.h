@@ -56,7 +56,8 @@ typedef struct
 	int nDelayBufSize; /*<0: invalid*/
 
 	// internal testing for repeat
-	int nRepeatNum;	
+	int nRepeatNum;
+	int nOffset;
 	int nUnitDataSize;
 	int nUintDataNum;
 

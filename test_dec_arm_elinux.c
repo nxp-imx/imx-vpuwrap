@@ -62,6 +62,7 @@ typedef struct
 	int     fbno;			// -d
 
 	int     repeatnum;	// -r
+	int	 offset;		// -r
 	int     skipmode;		// -s
 
 	int     codec;			// -f
@@ -90,7 +91,7 @@ static void usage(char*program)
 		   "	-n <frame_num>	:decode max <frame_num> frames\n"
 		   "			[default: all frames will be decoded]\n"
 		   "	-d <fb_no>	:use frame buffer <fb_no> for render.\n"
-		   "	-r <rp_times>	:repeate <rp_times> times.(default:0)\n"
+		   "	-r num,offset	:repeate 'num' times, and seek to 'offset' bytes location for every repeat.(default:0,0)\n"
 		   "	-s <skip_mode>	:skip frames.(default:0) \n"
 		   "			skip PB:	1 \n"
 		   "			skip B:		2 \n"
@@ -212,10 +213,11 @@ static void GetUserInput(IOParams *pIO, int argc, char *argv[])
 			{
 				argc--;
 				argv++;
-				if (argv[0] != NULL)
+				if (sscanf(argv[0], "%d,%d", &pIO->repeatnum,&pIO->offset) != 2)
 				{
-					sscanf(argv[0], "%d", &pIO->repeatnum);
-				}			
+					usage(pIO->infile);
+				}
+				APP_DEBUG_PRINTF("repeat %d times, seek location %d(0x%X) \r\n",pIO->repeatnum,pIO->offset,pIO->offset);
 			}
 			CASE("-s")
 			{
@@ -360,8 +362,8 @@ REPEAT:
 		}
 	}
 
-	APP_DEBUG_PRINTF(" input bitstream : %s \r\n",ioParams.infile);
-	APP_DEBUG_PRINTF(" frame_number : %d, display: %d \r\n",ioParams.maxnum, ioParams.display);
+	APP_DEBUG_PRINTF("input bitstream : %s \r\n",ioParams.infile);
+	APP_DEBUG_PRINTF("max frame_number : %d, display: %d \r\n",ioParams.maxnum, ioParams.display);
 
 	//decode
 	decContxt.fin=fin;
@@ -375,6 +377,7 @@ REPEAT:
 	decContxt.nSkipMode=ioParams.skipmode;
 	decContxt.nDelayBufSize=ioParams.delaysize; 
 	decContxt.nRepeatNum=ioParams.repeatnum;
+	decContxt.nOffset=ioParams.offset;
 	decContxt.nUnitDataSize=ioParams.unitsize;
 	decContxt.nUintDataNum=ioParams.unitnum;
 	decContxt.nChromaInterleave=ioParams.interleave;

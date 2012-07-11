@@ -577,7 +577,7 @@ void WrapperFileDumpBitstrem(FILE** ppFp, unsigned char* pBits, unsigned int nSi
 
 void WrapperFileDumpYUV(FILE** ppFp, unsigned char*  pY,unsigned char*  pU,unsigned char*  pV, unsigned int nYSize,unsigned int nCSize,int nColorfmt)
 {
-	static unsigned int cnt=0;
+	static int cnt=0;
 	int nCScale=1;
 	
 	switch(nColorfmt)
@@ -3178,7 +3178,7 @@ int VpuBitFlush(VpuDecHandleInternal * pVpuObj, int location)
 	if(0==pVpuObj->obj.filemode)		
 	{
 		flush=1;
-		if(CPU_IS_MX6X())	//for iMX6: workaround for some codecs
+		if(0)//if(CPU_IS_MX6X())	//for iMX6: workaround for some codecs
 		{
 			switch (pVpuObj->obj.CodecFormat)
 			{
