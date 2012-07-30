@@ -24,7 +24,7 @@ libfslvpuwrapdocdir = $(docdir)/imx-mm/vpu
 libfslvpuwrapdoc_DATA = \
     docs/vpu_dec_datasheet.pdf    \
     docs/vpu_enc_datasheet.pdf    \
-    docs/EULA.txt
+    EULA.txt
 
 pcverfile = libfslvpuwrap.pc
 
