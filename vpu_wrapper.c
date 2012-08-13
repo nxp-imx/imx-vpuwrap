@@ -202,8 +202,8 @@ static int g_seek_dump=DUMP_ALL_DATA;	/*0: only dump data after seeking; otherwi
 #define VPU_MIN_DEC_SIZE		(64*1024)		//min required data size for decode
 
 #ifdef VPU_AVOID_DEAD_LOOP
-#define VPU_MAX_INIT_SIZE		(1024*1024)		//avoid dead loop for unsupported clips
-#define VPU_MAX_INIT_LOOP		(50)				//avoid dead loop for crashed files, including null file
+#define VPU_MAX_INIT_SIZE		(VPU_BITS_BUF_SIZE-256*1024)		//avoid dead loop for unsupported clips
+#define VPU_MAX_INIT_LOOP		(500)				//avoid dead loop for crashed files, including null file
 
 #define VPU_MAX_DEC_SIZE		(8*1024*1024)	//avoid dead loop in decode state for corrupted clips
 #define VPU_MAX_DEC_LOOP		(4000)			//avoid dead loop in decode state for corrupted clips
@@ -4113,7 +4113,7 @@ int VpuCheckDeadLoop(VpuDecObj* pObj ,VpuBufferNode* pInData,int* pOutRetCode,in
 	}
 
 #ifdef VPU_FILEMODE_QUICK_EXIT
-#define VPU_MAX_INIT_FILEMODE_LOOP	(100)	
+#define VPU_MAX_INIT_FILEMODE_LOOP	(200)	//I15_HT31_corrupted_header_keyframe_00.avi: the first 150 frames are corrupted
 	if((1==pObj->filemode) )
 	{
 		if(total_init_loop>VPU_MAX_INIT_FILEMODE_LOOP)
