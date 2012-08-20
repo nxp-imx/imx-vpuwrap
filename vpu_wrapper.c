@@ -4030,10 +4030,12 @@ int VpuCheckDeadLoop(VpuDecObj* pObj ,VpuBufferNode* pInData,int* pOutRetCode,in
 {
 	//*pNoErr=1;		//don't reset it !!!!: the *pNoErr already has one valid value.
 #ifdef VPU_AVOID_DEAD_LOOP
+#define VPU_MAX_NULL_LOOP (10000)	//gmplayer: cost about 60 seconds ?
 	static int total_init_size=0;		// avoid dead loop at init step
 	static int total_init_loop=0;	// avoid dead loop at init step 
 	static int total_dec_size=0;	// avoid dead loop at decode step
 	static int total_dec_loop=0;	// avoid dead loop at decode step
+	static int total_null_loop=0;	// avoid dead loop at null run at some unexpected cases
 	int size;
 	int cnt;
 	int noerr;
@@ -4056,8 +4058,9 @@ int VpuCheckDeadLoop(VpuDecObj* pObj ,VpuBufferNode* pInData,int* pOutRetCode,in
 		cnt=1;	//avoit deadloop for smaller clip:WVC1_APL4_16x16_30fps_46kbps_NoAudio_MA40263
 	}
 
+	total_null_loop++;
 
-	VPU_LOG("%s: total_dec_size: %d, total_dec_loop: %d \r\n",__FUNCTION__,total_dec_size,total_dec_loop);
+	VPU_LOG("%s: total_dec_size: %d, total_dec_loop: %d, total_null_loop: %d \r\n",__FUNCTION__,total_dec_size,total_dec_loop,total_null_loop);
 	switch (pObj->state)
 	{
 		case VPU_DEC_STATE_OPEN:
@@ -4075,6 +4078,7 @@ int VpuCheckDeadLoop(VpuDecObj* pObj ,VpuBufferNode* pInData,int* pOutRetCode,in
 			total_init_loop=0;
 			total_dec_size=0;
 			total_dec_loop=0;
+			total_null_loop=0;
 			break;
 	}
 #if 0	//dangerous !!
@@ -4092,7 +4096,7 @@ int VpuCheckDeadLoop(VpuDecObj* pObj ,VpuBufferNode* pInData,int* pOutRetCode,in
 		VPU_ERROR("decode dead loop: total_size: %d, total_cnt: %d \r\n",total_dec_size,total_dec_loop);
 	}
 #if 1	//dangerous !!
-	if((total_init_size>VPU_MAX_INIT_SIZE)||(total_init_loop>VPU_MAX_INIT_LOOP))
+	if((total_init_size>VPU_MAX_INIT_SIZE)||(total_init_loop>VPU_MAX_INIT_LOOP)||(total_null_loop>VPU_MAX_NULL_LOOP))
 #else
 	if((total_init_size>VPU_MAX_INIT_SIZE))
 #endif
@@ -4109,7 +4113,7 @@ int VpuCheckDeadLoop(VpuDecObj* pObj ,VpuBufferNode* pInData,int* pOutRetCode,in
 		{
 			noerr=0;
 		}
-		VPU_ERROR("seq init dead loop: total_size: %d, total_cnt: %d \r\n",total_init_size,total_init_loop);
+		VPU_ERROR("seq init dead loop: total_size: %d, total_cnt: %d, total null cnt: %d \r\n",total_init_size,total_init_loop,total_null_loop);
 	}
 
 #ifdef VPU_FILEMODE_QUICK_EXIT
@@ -4308,7 +4312,11 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
 		if(VPU_V_MJPG==pInParam->CodecFormat)
 		{
 			//for MJPG: linebuffer:1 similar with file mode; linebuffer:0 similar with stream mode
+#if 1		//for JPEG, only one frame is exist, we had better enable jpgLineBufferMode to decode the only frame in time.
+			sDecOpenParam.jpgLineBufferMode=1;
+#else
 			sDecOpenParam.jpgLineBufferMode=pInParam->nEnableFileMode;
+#endif
 		}
 		pInParam->nEnableFileMode=0;  // for iMX6: only support stream mode !!!
 		sDecOpenParam.bitstreamMode=1; //0-normal mode, 1-rollback mode
@@ -4757,7 +4765,7 @@ VpuDecRetCode VPU_DecDecodeBuf(VpuDecHandle InHandle, VpuBufferNode* pInDataNode
 #endif
 
 	//check NULL data, do nothing ? now, we need to NULL data to send EOS ?
-	if(1==pObj->filemode)
+	if((1==pObj->filemode)&&(0==pObj->firstData))
 	{
 		//improve performance: CT: 38701782: transformer 2 1080p_mpeg4.mkv
 		if((NULL==pInData->pVirAddr)&&(0==pInData->nSize))
@@ -4779,17 +4787,24 @@ VpuDecRetCode VPU_DecDecodeBuf(VpuDecHandle InHandle, VpuBufferNode* pInDataNode
 		{
 			if(NULL==pInData->pVirAddr)
 			{
-				*pOutRetCode=VPU_DEC_INPUT_USED;
+				if((1==pObj->filemode) &&(1==pObj->firstData)) //check 'firstData' for JPEG: only one frame is exist, and it may be feed to vpu already with config data together
+				{
+					//for JPEG(only one video frame + muti-frames audio), use may can't get video EOS immediately, we need to return the only video frame in time before EOS.					
+				}
+				else
+				{
+					*pOutRetCode=VPU_DEC_INPUT_USED;
 #ifdef VPU_SUPPORT_NO_INBUF		
-				*pOutRetCode=(*pOutRetCode)|VPU_DEC_NO_ENOUGH_INBUF;
+					*pOutRetCode=(*pOutRetCode)|VPU_DEC_NO_ENOUGH_INBUF;
 #endif
-				return VPU_DEC_RET_SUCCESS;
+					return VPU_DEC_RET_SUCCESS;
+				}
 			}
 			else
 			{
 				//for mjpg: in file mode, vpu seem don't return -1 after update 0.
 				//so, here we need to return eos manually !!!
-				if(1==pObj->filemode)
+				if((1==pObj->filemode)&&(0==pObj->firstData))  //check 'firstData' for JPEG: only one frame is exist, and it may be feed to vpu already with config data together
 				{
 					int index;
 					if(0==VpuSearchFreeFrameBuf(pObj, &index))
