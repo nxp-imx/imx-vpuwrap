@@ -1,18 +1,19 @@
-/*!
- *	CopyRight Notice:
- *	The following programs are the sole property of Freescale Semiconductor Inc.,
- *	and contain its proprietary and confidential information.
- *	Copyright (c) 2010-2011, Freescale Semiconductor Inc.,
- *	All Rights Reserved
+/*
+ *  Copyright (c) 2010-2012, Freescale Semiconductor Inc.,
+ *  All Rights Reserved.
  *
- *	History :
+ *  The following programs are the sole property of Freescale Semiconductor Inc.,
+ *  and contain its proprietary and confidential information.
+ *
+ */
+
+/*
+ *  fb_render.h
+ *	header file for fb_render.c 
  *	Date	(y.m.d)		Author			Version			Description
  *	2010-09-14		eagle zhou		0.1				Created
  */
 
-/** fb_render.h
- *	header file for fb_render.c 
- */
 
 #ifndef FB_RENDER_H
 #define FB_RENDER_H

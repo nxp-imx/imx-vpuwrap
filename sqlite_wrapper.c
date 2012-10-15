@@ -1,18 +1,20 @@
-/*!
- *	CopyRight Notice:
- *	The following programs are the sole property of Freescale Semiconductor Inc.,
- *	and contain its proprietary and confidential information.
- *	Copyright (c) 2010-2011, Freescale Semiconductor Inc.,
- *	All Rights Reserved
+/*
+ *  Copyright (c) 2010-2012, Freescale Semiconductor Inc.,
+ *  All Rights Reserved.
  *
+ *  The following programs are the sole property of Freescale Semiconductor Inc.,
+ *  and contain its proprietary and confidential information.
+ *
+ */
+
+/*
+ *  sqlite_log.c
+ *	insert item into sqlite database
  *	History :
  *	Date	(y.m.d)		Author			Version			Description
  *	2011-01-06		eagle zhou		0.1				Created
  */
 
-/** sqlite_log.c
- *	insert item into sqlite database
- */
 
 
 #include "stdio.h"

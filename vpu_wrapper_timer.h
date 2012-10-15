@@ -1,18 +1,20 @@
-/*!
- *	CopyRight Notice:
- *	The following programs are the sole property of Freescale Semiconductor Inc.,
- *	and contain its proprietary and confidential information.
- *	Copyright (c) 2010-2011, Freescale Semiconductor Inc.,
- *	All Rights Reserved
+/*
+ *  Copyright (c) 2010-2012, Freescale Semiconductor Inc.,
+ *  All Rights Reserved.
  *
+ *  The following programs are the sole property of Freescale Semiconductor Inc.,
+ *  and contain its proprietary and confidential information.
+ *
+ */
+
+/*
+ *  vpu_wrapper_timer.h
+ *	header file contain all related struct info in timer.c
  *	History :
  *	Date	(y.m.d)		Author			Version			Description
  *	2010-12-10		eagle zhou		0.1				Created
  */
 
-/** vpu_wrapper_timer.h
- *	header file contain all related struct info in timer.c
- */
 
 #ifndef VPU_WRAPPER_TIMER_H
 #define VPU_WRAPPER_TIMER_H

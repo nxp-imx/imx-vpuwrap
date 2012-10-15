@@ -1,18 +1,19 @@
-/*!
- *	CopyRight Notice:
- *	The following programs are the sole property of Freescale Semiconductor Inc.,
- *	and contain its proprietary and confidential information.
- *	Copyright (c) 2010-2011, Freescale Semiconductor Inc.,
- *	All Rights Reserved
+/*
+ *  Copyright (c) 2010-2012, Freescale Semiconductor Inc.,
+ *  All Rights Reserved.
  *
- *	History :
+ *  The following programs are the sole property of Freescale Semiconductor Inc.,
+ *  and contain its proprietary and confidential information.
+ *
+ */ 
+
+/* 
+ *  enc_auto_test.c
+ *	vpu encoder auto test application
  *	Date	(y.m.d)		Author			Version			Description
  *	2011-01-04		eagle zhou		0.1				Created
  */
 
-/** enc_auto_test.c
- *	vpu encoder auto test application
- */
 
 #include "stdio.h"
 #include "stdlib.h"
