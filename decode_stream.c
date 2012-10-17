@@ -96,9 +96,10 @@ static unsigned int g_filemode_curloc=0;
 #include <sys/time.h>
 #define TIME_DEC_ID	0
 #define TIME_TOTAL_ID	1
-static struct timeval time_beg[2];
-static struct timeval time_end[2];
-static unsigned long long total_time[2];
+#define TIME_RESOLUTION_ID	2
+static struct timeval time_beg[3];
+static struct timeval time_end[3];
+static unsigned long long total_time[3];
 
 static void time_init(int id)
 {
@@ -332,6 +333,39 @@ int ConvertSkipMode(int skip, VpuDecConfig* pConfig,int * pPara)
 	return 1;
 }
 
+int FreeMemBlockFrame(DecMemInfo* pDecMem, int nFrmNum)
+{
+	VpuMemDesc vpuMem;
+	VpuDecRetCode vpuRet;	
+	int cnt=0;
+	int retOk=1;
+	int i;
+
+	//free physical mem
+	for(i=pDecMem->nPhyNum-1;i>=0;i--)
+	{
+		vpuMem.nPhyAddr=pDecMem->phyMem_phyAddr[i];
+		vpuMem.nVirtAddr=pDecMem->phyMem_virtAddr[i];
+		vpuMem.nCpuAddr=pDecMem->phyMem_cpuAddr[i];
+		vpuMem.nSize=pDecMem->phyMem_size[i];
+		vpuRet=VPU_DecFreeMem(&vpuMem);
+		if(vpuRet!=VPU_DEC_RET_SUCCESS)
+		{
+			DEC_STREAM_PRINTF("%s: free vpu memory failure : ret=%d \r\n",__FUNCTION__,vpuRet);
+			retOk=0;
+		}
+		cnt++;
+		if(cnt==nFrmNum) break;
+	}
+	pDecMem->nPhyNum=pDecMem->nPhyNum-cnt;
+	if(cnt!=nFrmNum) 
+	{
+		DEC_STREAM_PRINTF("error: only freed %d frames, required frame numbers: %d \r\n",cnt,nFrmNum);
+		retOk=0;
+	}	
+	return retOk;
+}
+
 int FreeMemBlock(DecMemInfo* pDecMem)
 {
 	int i;
@@ -450,6 +484,7 @@ int OutputFrame(DecContxt * pDecContxt,VpuDecOutFrameInfo* pOutFrame,int width, 
 	VpuFrameBuffer sLinearFrame;
 	VpuMemDesc vpuMem;
 	int NeedConvert=0;
+	int wrlen;
 
 	/*DEC_STREAM_PRINTF("dynamic resolution: [width x height]=[%d x %d]: crop: [left, top, right, bottom]=[%d, %d, %d, %d] \r\n",
 		pOutFrame->pExtInfo->nFrmWidth,pOutFrame->pExtInfo->nFrmHeight,
@@ -478,7 +513,8 @@ int OutputFrame(DecContxt * pDecContxt,VpuDecOutFrameInfo* pOutFrame,int width, 
 			break;
 	}
 
-	if((pDecContxt->nMapType!=0) && (pDecContxt->nTile2LinearEnable==0))
+	if((pDecContxt->nMapType!=0) && (pDecContxt->nTile2LinearEnable==0)
+		&& (pDecContxt->fout || fbHandle))
 	{
 		NeedConvert=1;
 	}
@@ -504,15 +540,15 @@ int OutputFrame(DecContxt * pDecContxt,VpuDecOutFrameInfo* pOutFrame,int width, 
 			fp = fopen("temp_tile.tile", "ab");
 			if(pDecContxt->nMapType==2)		// tile field
 			{
-				fwrite(pFrame->pbufVirtY,1,ySize/2,fp);
-				fwrite(pFrame->pbufVirtY_tilebot,1,ySize/2,fp);
-				fwrite(pFrame->pbufVirtCb,1,uvSize,fp);
-				fwrite(pFrame->pbufVirtCb_tilebot,1,uvSize,fp);
+				wrlen=fwrite(pFrame->pbufVirtY,1,ySize/2,fp);
+				wrlen=fwrite(pFrame->pbufVirtY_tilebot,1,ySize/2,fp);
+				wrlen=fwrite(pFrame->pbufVirtCb,1,uvSize,fp);
+				wrlen=fwrite(pFrame->pbufVirtCb_tilebot,1,uvSize,fp);
 			}
 			else		// tile frame
 			{
-				fwrite(pFrame->pbufVirtY,1,ySize,fp);
-				fwrite(pFrame->pbufVirtCb,1,2*uvSize,fp);
+				wrlen=fwrite(pFrame->pbufVirtY,1,ySize,fp);
+				wrlen=fwrite(pFrame->pbufVirtCb,1,2*uvSize,fp);
 				//fwrite(pFrame->pbufVirtCr,1,uvSize,fp);				
 			}
 			fclose(fp);
@@ -533,9 +569,9 @@ int OutputFrame(DecContxt * pDecContxt,VpuDecOutFrameInfo* pOutFrame,int width, 
 	//output file
 	if(pDecContxt->fout)
 	{
-		fwrite(pFrame->pbufVirtY,1,ySize,pDecContxt->fout);
-		fwrite(pFrame->pbufVirtCb,1,uvSize,pDecContxt->fout);
-		fwrite(pFrame->pbufVirtCr,1,uvSize,pDecContxt->fout);
+		wrlen=fwrite(pFrame->pbufVirtY,1,ySize,pDecContxt->fout);
+		wrlen=fwrite(pFrame->pbufVirtCb,1,uvSize,pDecContxt->fout);
+		wrlen=fwrite(pFrame->pbufVirtCr,1,uvSize,pDecContxt->fout);
 	}
 	DEC_TRACE;
 	//display 
@@ -579,7 +615,35 @@ FAIL:
 	return 0;
 }
 
-int ProcessInitInfo(DecContxt * pDecContxt,VpuDecHandle handle,VpuDecInitInfo* pInitInfo,DecMemInfo* pDecMemInfo)
+int RenderInit(DecContxt * pDecContxt,VpuDecInitInfo* pInitInfo,int* pFbHandle)
+{
+	int ipu_ret=0;
+	//1 only support 4:2:0 !!!
+	//init dispaly device 
+	if(*pFbHandle)
+	{
+		//release before re-init
+		fb_render_uninit(*pFbHandle);
+	}
+	if(0)//if(InitInfo.nInterlace)
+	{
+		ipu_ret=fb_render_init(pFbHandle, pDecContxt->nFbNo, Align(pInitInfo->nPicWidth,FRAME_ALIGN),Align(pInitInfo->nPicHeight,2*FRAME_ALIGN));
+	}
+	else
+	{
+		ipu_ret=fb_render_init(pFbHandle, pDecContxt->nFbNo, Align(pInitInfo->nPicWidth,FRAME_ALIGN),Align(pInitInfo->nPicHeight,FRAME_ALIGN));
+	}
+	if(0==ipu_ret)
+	{	
+		DEC_STREAM_PRINTF("%s: init fb render failure: \r\n",__FUNCTION__);
+		//err=1;
+		//break;
+		*pFbHandle=(int)NULL;
+	}
+	return 1;
+}
+
+int ProcessInitInfo(DecContxt * pDecContxt,VpuDecHandle handle,VpuDecInitInfo* pInitInfo,DecMemInfo* pDecMemInfo, int*pOutFrmNum)
 {
 	VpuDecRetCode ret;
 	VpuFrameBuffer frameBuf[MAX_FRAME_NUM];
@@ -858,6 +922,7 @@ int ProcessInitInfo(DecContxt * pDecContxt,VpuDecHandle handle,VpuDecInitInfo* p
 		return 0;
 	}	
 
+	*pOutFrmNum=BufNum;
 	return 1;
 }
 
@@ -882,6 +947,7 @@ int DecodeLoop(VpuDecHandle handle,DecContxt * pDecContxt, unsigned char* pBitst
 	int capability=0;
 	VpuDecFrameLengthInfo decFrmLengthInfo;
 	unsigned int totalDecConsumedBytes;	//stuffer + frame
+	int nFrmNum;
 
 #ifdef CHECK_DEAD_LOOP
 	int NotUsedLoopCnt=0;
@@ -1081,6 +1147,8 @@ RepeatPlay:
 #endif
 		}
 		DEC_TRACE;
+		time_init(TIME_RESOLUTION_ID);
+		time_start(TIME_RESOLUTION_ID);		
 		time_start(TIME_DEC_ID);
 		ret=VPU_DecDecodeBuf(handle, &InData,&bufRetCode);
 		time_stop(TIME_DEC_ID);
@@ -1104,7 +1172,7 @@ RepeatPlay:
 		if(bufRetCode&VPU_DEC_INIT_OK)
 		{
 			//process init info
-			if(0==ProcessInitInfo(pDecContxt,handle,&InitInfo,pDecMemInfo))
+			if(0==ProcessInitInfo(pDecContxt,handle,&InitInfo,pDecMemInfo,&nFrmNum))
 			{
 				DEC_STREAM_PRINTF("%s: vpu process init info failure: \r\n",__FUNCTION__);
 				err=1;
@@ -1114,33 +1182,41 @@ RepeatPlay:
 
 			if(pDecContxt->nDisplay)
 			{
-				int ipu_ret=0;
-				//1 only support 4:2:0 !!!
-				//init dispaly device 
-				if(*pFbHandle)
-				{
-					//release before re-init
-					fb_render_uninit(*pFbHandle);
-				}
-				if(0)//if(InitInfo.nInterlace)
-				{
-					ipu_ret=fb_render_init(pFbHandle, pDecContxt->nFbNo, Align(InitInfo.nPicWidth,FRAME_ALIGN),Align(InitInfo.nPicHeight,2*FRAME_ALIGN));
-				}
-				else
-				{
-					ipu_ret=fb_render_init(pFbHandle, pDecContxt->nFbNo, Align(InitInfo.nPicWidth,FRAME_ALIGN),Align(InitInfo.nPicHeight,FRAME_ALIGN));
-				}
-				if(0==ipu_ret)
-				{	
-					DEC_STREAM_PRINTF("%s: init fb render failure: \r\n",__FUNCTION__);
-					//err=1;
-					//break;
-					*pFbHandle=(int)NULL;
-				}
+				RenderInit(pDecContxt, &InitInfo, pFbHandle);
 			}
-
 		}
 
+		//check resolution change
+		if(bufRetCode&VPU_DEC_RESOLUTION_CHANGED)
+		{
+			long long ts;
+			DEC_STREAM_PRINTF("receive resolution changed event, will release previous frames %d \r\n",nFrmNum);
+			//time_init(TIME_RESOLUTION_ID);
+			//time_start(TIME_RESOLUTION_ID);
+			//release previous frames
+			FreeMemBlockFrame(pDecMemInfo, nFrmNum);
+			//get new init info
+			if(0==ProcessInitInfo(pDecContxt,handle,&InitInfo,pDecMemInfo,&nFrmNum))
+			{
+				DEC_STREAM_PRINTF("%s: vpu process re-init info failure: \r\n",__FUNCTION__);
+				err=1;
+				break;
+			}
+			time_stop(TIME_RESOLUTION_ID);
+			ts=time_report(TIME_RESOLUTION_ID);
+			DEC_STREAM_PRINTF("%s: Re-Init OK, [width x height]=[%d x %d], Interlaced: %d, MinFrm: %d \r\n",__FUNCTION__,InitInfo.nPicWidth,InitInfo.nPicHeight,InitInfo.nInterlace,InitInfo.nMinFrameBufferCount);
+			DEC_STREAM_PRINTF("time for process of resolution change event is %lld(us) \r\n",ts);
+			if(pDecContxt->nDisplay)
+			{
+				RenderInit(pDecContxt, &InitInfo, pFbHandle);
+			}
+			if(pDecContxt->fout)
+			{
+				DEC_STREAM_PRINTF("seek to head of write file \r\n");
+				fseek(pDecContxt->fout,0,SEEK_SET);
+			}
+		}
+		
 		//check frame size
 		if(capability)
 		{

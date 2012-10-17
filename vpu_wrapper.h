@@ -28,7 +28,7 @@ extern "C" {
 /**************************** version info ***********************************/
 #define VPU_WRAPPER_VERSION(major, minor, release)	 \
 	(((major) << 16) + ((minor) << 8) + (release))
-#define VPU_WRAPPER_VERSION_CODE	VPU_WRAPPER_VERSION(1, 0, 24)
+#define VPU_WRAPPER_VERSION_CODE	VPU_WRAPPER_VERSION(1, 0, 25)
 
 /**************************** decoder part **********************************/
 
@@ -119,13 +119,16 @@ typedef enum
 	VPU_DEC_NO_ENOUGH_BUF=0x80,		/*no enough frame buffer*/
 	VPU_DEC_NO_ENOUGH_INBUF=0x100,	/*no enough input buffer: to avoid null run*/
 	/* bit[9]: init output info */
-	VPU_DEC_INIT_OK=0x200,
+	VPU_DEC_INIT_OK=0x200,			/*user need to call VPU_DecGetInitialInfo()*/
 	/* bit[10]: skip decode */
 	VPU_DEC_SKIP=0x400,				/*added for cases: need to get two time stamp*/
 										/*not decoded: interlace or corrupt: user need to get one time stamp*/
 	/*bit[11]: reserved to represent one frame is decoded*/
 	VPU_DEC_ONE_FRM_CONSUMED=0x800,/*added for case: need to get decoded(or skipped,corrupt...) frame length*/
 										/*user may call related api to get the decoded/skipped/.. frame related info*/
+	/*bit[12]: reolution changed*/	
+	VPU_DEC_RESOLUTION_CHANGED=0x1000,/*added for case: upward change in resolution*/
+										/*user need to release all frames, call VPU_DecGetInitialInfo() and re-allocation/register frames according to new bigger resolution*/	
 	/* bit[31]: flush is recommended */
 	VPU_DEC_FLUSH=0x80000000,			/*for some clisps, special for h.264 TS stream(may has no IDR at all), the random start/seek point may introduce unrecoverable mosaic*/
 }VpuDecBufRetCode;
@@ -134,6 +137,7 @@ typedef enum {
 	VPU_DEC_CAP_FILEMODE=0,	/* file mode is supported ? 0: not; 1: yes*/
 	VPU_DEC_CAP_TILE,			/* tile format is supported ? 0: not; 1: yes*/
 	VPU_DEC_CAP_FRAMESIZE,	/* reporting frame size  ? 0: not; 1: yes*/
+	VPU_DEC_CAP_RESOLUTION_CHANGE, /*resolution change notification ? 0: not; 1: yes*/
 }VpuDecCapability;
 
 typedef enum 

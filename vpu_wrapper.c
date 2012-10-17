@@ -106,38 +106,38 @@
 #include "vpu_util.h"
 #endif
 
-//#define VPU_WRAPPER_DEBUG
-#ifdef VPU_WRAPPER_DEBUG
+static int nVpuLogLevel=0;		//bit 0: api log; bit 1: raw dump; bit 2: yuv dump 
 #ifdef ANDROID_BUILD
 #include "Log.h"
 #define LOG_PRINTF LogOutput
+#define VPU_LOG_LEVELFILE "/data/vpu_log_level"
+#define VPU_DUMP_RAWFILE "/mnt/sdcard/temp_wrapper.bit"
+#define VPU_DUMP_YUVFILE "/mnt/sdcard/temp_wrapper.yuv"
 #else
 #define LOG_PRINTF printf
+#define VPU_LOG_LEVELFILE "/etc/vpu_log_level"
+#define VPU_DUMP_RAWFILE "temp_wrapper.bit"
+#define VPU_DUMP_YUVFILE "temp_wrapper.yuv"
 #endif
-#define VPU_LOG(...) //LOG_PRINTF
-//#define VPU_TRACE	LOG_PRINTF("%s: %d \r\n",__FUNCTION__,__LINE__)
-#define VPU_TRACE
-#define VPU_API  LOG_PRINTF 
-#define VPU_ERROR LOG_PRINTF
-#define VPU_ENC_API	LOG_PRINTF
-#define VPU_ENC_LOG(...)// LOG_PRINTF
-#define VPU_ENC_ERROR	LOG_PRINTF
-#define ASSERT(exp)	if(!(exp)) {LOG_PRINTF("%s: %d : assert condition !!!\r\n",__FUNCTION__,__LINE__);}
-//#define VPU_WRAPPER_DUMP
-#define MAX_YUV_FRAME  (0)
 typedef unsigned int UINT32;
+
+#define MAX_YUV_FRAME  (1000)
 #define DUMP_ALL_DATA		1
 static int g_seek_dump=DUMP_ALL_DATA;	/*0: only dump data after seeking; otherwise: dump all data*/
-#else
+
+//#define VPU_WRAPPER_DEBUG
+
 #define VPU_LOG(...)
 #define VPU_TRACE
-#define VPU_API(...) 
-#define VPU_ERROR(...)
-#define VPU_ENC_API(...)
+#define VPU_API(...) if(nVpuLogLevel&0x1) {LOG_PRINTF(__VA_ARGS__);}
+#define VPU_ERROR(...) if(nVpuLogLevel&0x1) {LOG_PRINTF(__VA_ARGS__);}
+#define VPU_ENC_API(...) if(nVpuLogLevel&0x1) {LOG_PRINTF(__VA_ARGS__);}
 #define VPU_ENC_LOG(...)
-#define VPU_ENC_ERROR(...)
-#define ASSERT(exp)
-#endif
+#define VPU_ENC_ERROR(...) if(nVpuLogLevel&0x1) {LOG_PRINTF(__VA_ARGS__);}
+#define ASSERT(exp) if((!(exp))&&(nVpuLogLevel&0x1)) {LOG_PRINTF("%s: %d : assert condition !!!\r\n",__FUNCTION__,__LINE__);}
+
+#define VPU_DUMP_RAW  (nVpuLogLevel&0x2)
+#define VPU_DUMP_YUV  (nVpuLogLevel&0x4)
 
 //#define VPU_RESET_TEST		//avoid reset board for every changing to FW
 
@@ -150,6 +150,8 @@ static int g_seek_dump=DUMP_ALL_DATA;	/*0: only dump data after seeking; otherwi
 
 #define vpu_memset	memset
 #define vpu_memcpy	memcpy
+#define vpu_malloc	malloc
+#define vpu_free		free
 
 #ifdef NULL
 #undef NULL
@@ -205,7 +207,7 @@ static int g_seek_dump=DUMP_ALL_DATA;	/*0: only dump data after seeking; otherwi
 #define VPU_MAX_INIT_SIZE		(VPU_BITS_BUF_SIZE-256*1024)		//avoid dead loop for unsupported clips
 #define VPU_MAX_INIT_LOOP		(500)				//avoid dead loop for crashed files, including null file
 
-#define VPU_MAX_DEC_SIZE		(8*1024*1024)	//avoid dead loop in decode state for corrupted clips
+#define VPU_MAX_DEC_SIZE		(200*1024*1024)//(8*1024*1024)	//avoid dead loop in decode state for corrupted clips
 #define VPU_MAX_DEC_LOOP		(4000)			//avoid dead loop in decode state for corrupted clips
 #endif
 
@@ -311,6 +313,7 @@ typedef enum
 	VPU_DEC_STATE_STARTFRAMEOK,	/*it is used for non-block mode*/
 	VPU_DEC_STATE_OUTOK,
 	VPU_DEC_STATE_EOS,
+	VPU_DEC_STATE_RESOLUTION_CHANGE,
 	VPU_DEC_STATE_CORRUPT,
 }VpuDecState;
 
@@ -455,12 +458,21 @@ typedef struct
 	/*profile/level info*/
 	int nProfile;
 	int nLevel;
+
+	/*resolution change*/
+	int nDecResolutionChangeEnabled;		/*1: support resolution change notification; 0: not support*/
+	int nOriWidth;	/*set in seqinit stage*/
+	int nOriHeight;	/*set in seqinit stage*/
+	int nResolutionChanged;	/*resolution change happen: checked in decoded stage*/
+	unsigned char* pSeqBak;	/*backup the sequence data*/
+	int nSeqBakLen;
+	DecOpenParam sDecOpenParam; /*backup the open parameters*/
 }VpuDecObj;
 
 typedef struct 
 {
 	DecHandle handle;
-	VpuDecObj obj;	
+	VpuDecObj obj;
 }VpuDecHandleInternal;
 
 #ifdef VPU_BACKDOOR
@@ -535,6 +547,7 @@ void printf_memory(unsigned char* addr, int width, int height, int stride)
 	VPU_LOG("\r\n");	
 	return;
 }
+#endif
 
 void WrapperFileDumpBitstrem(FILE** ppFp, unsigned char* pBits, unsigned int nSize)
 {
@@ -547,13 +560,13 @@ void WrapperFileDumpBitstrem(FILE** ppFp, unsigned char* pBits, unsigned int nSi
 	
 	if(*ppFp==NULL)
 	{
-		*ppFp=fopen("temp_wrapper.bit","wb");
+		*ppFp=fopen(VPU_DUMP_RAWFILE,"wb");
 		if(*ppFp==NULL)
 		{
-			VPU_LOG("open temp_wrapper.bit failure \r\n");
+			VPU_LOG("open %s failure \r\n",VPU_DUMP_RAWFILE);
 			return;
 		}
-		VPU_LOG("open temp_wrapper.bit OK \r\n");
+		VPU_LOG("open %s OK \r\n",VPU_DUMP_RAWFILE);
 	}
 
 	fwrite(pBits,1,nSize,*ppFp);
@@ -589,13 +602,13 @@ void WrapperFileDumpYUV(FILE** ppFp, unsigned char*  pY,unsigned char*  pU,unsig
 	
 	if(*ppFp==NULL)
 	{
-		*ppFp=fopen("temp_wrapper.yuv","wb");
+		*ppFp=fopen(VPU_DUMP_YUVFILE,"wb");
 		if(*ppFp==NULL)
 		{
-			VPU_LOG("open temp_wrapper.yuv failure \r\n");
+			VPU_LOG("open %s failure \r\n",VPU_DUMP_YUVFILE);
 			return;
 		}
-		VPU_LOG("open temp_wrapper.yuv OK \r\n");
+		VPU_LOG("open %s OK \r\n",VPU_DUMP_YUVFILE);
 	}
 
 	if(cnt<MAX_YUV_FRAME)
@@ -609,7 +622,37 @@ void WrapperFileDumpYUV(FILE** ppFp, unsigned char*  pY,unsigned char*  pU,unsig
 	
 	return;
 }
-#endif
+
+int VpuLogLevelParse(int * pLogLevel)
+{
+	int level=0;
+	FILE* fpVpuLog;
+	fpVpuLog=fopen(VPU_LOG_LEVELFILE,"r");
+	if (NULL==fpVpuLog){
+		//LOG_PRINTF("no vpu log level file: %s \r\n",VPU_LOG_LEVELFILE);
+	}	
+	else	{
+		char symbol;
+		int readLen = 0;
+
+		readLen = fread(&symbol,1,1,fpVpuLog);
+		if(feof(fpVpuLog) != 0){
+			//LOG_PRINTF("\n End of file reached.");
+		}
+		else	{
+			level=atoi(&symbol);
+			//LOG_PRINTF("vpu log level: %d \r\n",level);
+			if((level<0) || (level>255)){
+				level=0;
+			}
+		}
+		fclose(fpVpuLog);
+	}
+	nVpuLogLevel=level;
+	//*pLogLevel=level;	
+	return 1;
+}
+
 
 int VpuTiledAddressMapping(int nInMapType,unsigned int nInYTop,unsigned int nInYBot,unsigned int nInCbTop,unsigned int nInCbBot,
 			unsigned int* pOutY, unsigned int* pOutCb,unsigned int* pOutCr)
@@ -1097,7 +1140,10 @@ CODE	HEIGHT/WIDTH	COMMENT
 		11 				15:11 					480x480 4:3 frame with horizontal overscan
 		12 				64:33 					540x576 16:9 frame with horizontal overscan
 		13 				160:99 					540x480 16:9 frame with horizontal overscan
-		14..254 			Reserved
+		14 				4:3 						1440x1080 16:9 frame without horizontal overscan
+		15 				3:2 						1280x1080 16:9 frame without horizontal overscan                  
+		16 				2:1 						960x1080 16:9 frame without horizontal overscan
+		17..254 			Reserved		
 		255 				Extended_SAR	
 */			
 			tmp=(InRatio>>16)&0xFFFF;	//[31:16]
@@ -1158,6 +1204,18 @@ CODE	HEIGHT/WIDTH	COMMENT
 						OutWidth=FIXED_POINTED_1*160;
 						OutHeight=FIXED_POINTED_1*99;	
 						break;
+					case 0xE:	// 4:3
+						OutWidth=FIXED_POINTED_1*4;
+						OutHeight=FIXED_POINTED_1*3;
+						break;
+					case 0xF:	// 3:2
+						OutWidth=FIXED_POINTED_1*3;
+						OutHeight=FIXED_POINTED_1*2;
+						break;
+					case 0x10:	// 2:1
+						OutWidth=FIXED_POINTED_1*2;
+						OutHeight=FIXED_POINTED_1*1;
+						break;	
 					default:
 						VPU_ERROR("unsupported ration: 0x%X \r\n",InRatio);
 						break;
@@ -1465,6 +1523,27 @@ VpuFieldType VpuConvertFieldType(VpuCodStd InCodec,DecOutputInfo * pCurDecFrameI
 	return eField;
 }
 
+unsigned int VpuCopyValidSizeInRingBuf(unsigned char* pDst,unsigned int nStart,unsigned int nEnd,unsigned int nBufStart,unsigned int nBufEnd)
+{
+	if((nStart<nBufStart)||((nStart-FRAME_END_OFFSET)>=nBufEnd)||
+		(nEnd<nBufStart)||(nEnd>=nBufEnd))
+	{
+		VPU_ERROR("%s: address: [0x%X, 0x%X] out of range [0x%X, 0x%X] \r\n",__FUNCTION__,nStart,nEnd,nBufStart,nBufEnd);
+		//return 0;  //vpu register BIT_BYTE_POS_FRAME_START/BIT_BYTE_POS_FRAME_END may point to far away from correct buffer range
+	}
+	if(nStart<=nEnd)
+	{
+		vpu_memcpy(pDst,(void*)nStart,(nEnd-nStart+1));
+		return (nEnd-nStart+1);
+	}
+	else
+	{
+		vpu_memcpy(pDst,(void*)nStart,(nBufEnd-nStart));
+		vpu_memcpy(pDst+(nBufEnd-nStart),(void*)nBufStart,(nEnd-nBufStart+1));
+		return ((nBufEnd-nStart)+(nEnd-nBufStart+1));
+	}
+}
+
 unsigned int VpuComputeValidSizeInRingBuf(unsigned int nStart,unsigned int nEnd,unsigned int nBufStart,unsigned int nBufEnd)
 {
 	if((nStart<nBufStart)||((nStart-FRAME_END_OFFSET)>=nBufEnd)||
@@ -1633,6 +1712,14 @@ int VpuSaveDecodedFrameInfo(VpuDecObj* pObj, int index,DecOutputInfo * pCurDecFr
 		cropWidth=pDstInfo->frameCrop.nRight-pDstInfo->frameCrop.nLeft;
 		cropHeight=pDstInfo->frameCrop.nBottom-pDstInfo->frameCrop.nTop;		
 		pDstInfo->Q16ShiftWidthDivHeightRatio=VpuConvertAspectRatio(pObj->CodecFormat,(unsigned int)pCurDecFrameInfo->aspectRateInfo,cropWidth,cropHeight, pObj->nProfile,pObj->nLevel);
+
+		/*resolution change*/
+		if((pCurDecFrameInfo->decPicWidth>pObj->nOriWidth)||((pCurDecFrameInfo->decPicHeight>pObj->nOriHeight)))
+		{
+			pObj->nResolutionChanged=1;
+			//in such case, needn't record/accumulate frame info
+			return 1;
+		}
 	}
 
 	/*record the nearest decoded frame and accumulate the frame size reported by vpu*/
@@ -1896,10 +1983,10 @@ int VpuFillData(DecHandle InVpuHandle,VpuDecObj* pObj,unsigned char* pInVirt,uns
 	static int totalSize=0;
 #endif
 
-#ifdef VPU_WRAPPER_DUMP
+//#ifdef VPU_WRAPPER_DUMP
 	static FILE* fpBitstream=NULL;
 	//static int nDumpSize=0;
-#endif
+//#endif
 
 	//EOS:  pInVirt!=NULL && nSize==0
 	if(pInVirt==NULL)
@@ -2038,11 +2125,11 @@ int VpuFillData(DecHandle InVpuHandle,VpuDecObj* pObj,unsigned char* pInVirt,uns
 	}
 #endif
 
-#ifdef VPU_WRAPPER_DUMP
-	WrapperFileDumpBitstrem(&fpBitstream,pInVirt,nSize);
-	//nDumpSize+=nSize;
-	//LOG_PRINTF("dump size: %d \r\n",nDumpSize);
-#endif
+	if(VPU_DUMP_RAW){
+		WrapperFileDumpBitstrem(&fpBitstream,pInVirt,nSize);
+		//nDumpSize+=nSize;
+		//LOG_PRINTF("dump size: %d \r\n",nDumpSize);
+	}
 	
 	return 1;
 }
@@ -2071,7 +2158,7 @@ int VpuSeqInit(DecHandle InVpuHandle, VpuDecObj* pObj ,VpuBufferNode* pInData,in
 		case VPU_V_VC1:
 		case VPU_V_VC1_AP:
 			pHeader=aVC1Header;
-			if (0==pInData->sCodecData.nSize)
+			if ((0==pInData->sCodecData.nSize)||(0xFFFFFFFF==pInData->sCodecData.nSize))
 			{
 				//raw file: .rcv/.vc1
 				//do nothing
@@ -2216,7 +2303,7 @@ int VpuSeqInit(DecHandle InVpuHandle, VpuDecObj* pObj ,VpuBufferNode* pInData,in
 			else
 			{
 				//other formats
-				if (0==pInData->sCodecData.nSize)
+				if ((0==pInData->sCodecData.nSize)||(0xFFFFFFFF==pInData->sCodecData.nSize))
 				{
 					//raw data
 					//do nothing
@@ -2450,6 +2537,8 @@ int VpuSeqInit(DecHandle InVpuHandle, VpuDecObj* pObj ,VpuBufferNode* pInData,in
 			pObj->fieldDecoding=1;
 		}
 #endif
+		pObj->nOriHeight=pObj->initInfo.nPicHeight;
+		pObj->nOriWidth=pObj->initInfo.nPicWidth;
 		return 1;
 	}
 
@@ -2461,9 +2550,9 @@ int VpuGetOutput(DecHandle InVpuHandle, VpuDecObj* pObj,int* pOutRetCode,int InS
 	DecOutputInfo outInfo;
 	VpuFrameBuffer * pFrameDisp;
 	VpuFrameBuffer * pFrameDecode=NULL;	
-#ifdef VPU_WRAPPER_DUMP
+//#ifdef VPU_WRAPPER_DUMP
 	static FILE* fpYUV=NULL;
-#endif
+//#endif
 #ifdef VPU_FILEMODE_WORKAROUND
 	int disOrderOutput=0;		// the state of output buffer is error
 #endif
@@ -3009,13 +3098,13 @@ int VpuGetOutput(DecHandle InVpuHandle, VpuDecObj* pObj,int* pOutRetCode,int InS
 		{
 			TIMER_MARK(TIMER_MARK_GETOUTPUT_ID);
 			pObj->state=VPU_DEC_STATE_OUTOK;	// user should call get output
-#ifdef VPU_WRAPPER_DUMP
+			if(VPU_DUMP_YUV)
 			{
 #define FRAME_ALIGN	 (32) //(16) for gpu limitation 
-#define Align(ptr,align)	(((unsigned int)(ptr)+(align)-1)/(align)*(align))
+#define Alignment(ptr,align)	(((unsigned int)(ptr)+(align)-1)/(align)*(align))
 				int colorformat=0;
 				int nPadStride=0;
-				nPadStride = Align(pObj->picWidth,FRAME_ALIGN);
+				nPadStride = Alignment(pObj->picWidth,FRAME_ALIGN);
 				if(VPU_V_MJPG==pObj->CodecFormat)
 				{
 					colorformat=pObj->initInfo.nMjpgSourceFormat;
@@ -3025,7 +3114,7 @@ int VpuGetOutput(DecHandle InVpuHandle, VpuDecObj* pObj,int* pOutRetCode,int InS
 					pObj->frameInfo.pDisplayFrameBuf->pbufVirtCr,
 					nPadStride*pObj->picHeight,nPadStride*pObj->picHeight/4,colorformat);
 			}			
-#endif
+
 #if 1	//fix (-2,>0) case: 
 		//(1) for interlace/corrupt case: there is one valid output. eg. user will get two time stamps
 		//(2) for not codec case: [P B] chunk + not coded: only need to get one time stamps
@@ -3363,6 +3452,155 @@ if(CPU_IS_MX6X())
 
 }
 
+int VpuResolutionChangeResetGlobalVariables(VpuDecObj* pObj)
+{
+	vpu_memset(pObj->frameBuf,0,sizeof(pObj->frameBuf));
+	vpu_memset(pObj->frameBufInfo,0,sizeof(pObj->frameBufInfo));
+	vpu_memset(pObj->frameBufState,0,sizeof(pObj->frameBufState));
+
+	//pObj->nPrivateSeqHeaderInserted=0; //VC1_AP ???
+#ifdef VPU_SUPPORT_UNCLOSED_GOP
+	pObj->refCnt=0;				//for some .ts clips, we need to skip the first corrupt frames
+	pObj->dropBCnt=0;
+	pObj->keyCnt=0;				//for some .ts clips, we need to skip the first corrupt frames
+#endif	
+	pObj->keyDecCnt=0;
+
+#ifdef VPU_SEEK_ANYPOINT_WORKAROUND
+	pObj->seekKeyLoc=0;			//we consider the normal play (for .ts clips)
+	pObj->recommendFlush=0;
+#endif
+#ifdef VPU_SUPPORT_NO_ENOUGH_FRAME
+	pObj->dataUsedInFileMode=0;
+	pObj->lastDatLenInFileMode=0;
+	pObj->lastConfigMode=0;
+#endif
+	// setting related with file mode
+	pObj->firstData=1;
+	pObj->firstDataSize=0;
+#ifdef VPU_PROTECT_MULTI_INSTANCE
+	pObj->filledEOS=0;
+#endif
+	pObj->pbPacket=0;
+	pObj->pbClips=0;
+
+#ifdef VPU_FLUSH_BEFORE_DEC_WORKAROUND
+	pObj->realWork=0;
+#endif
+
+#ifdef VPU_FILEMODE_SUPPORT_INTERLACED_SKIPMODE
+	pObj->firstFrameMode=0;
+	pObj->fieldCnt=0;
+#endif
+
+#ifdef VPU_FILEMODE_MERGE_INTERLACE_DEBUG
+	//pObj->needMergeFields=VPU_FILEMODE_MERGE_FLAG;
+	pObj->lastFieldOffset=0;
+#endif
+
+#ifdef VPU_FILEMODE_INTERLACE_TIMESTAMP_ENHANCE
+	pObj->fieldDecoding=0;
+	pObj->oweFieldTS=0;
+#endif
+
+	pObj->mjpg_frmidx=0;
+
+	pObj->nAccumulatedConsumedStufferBytes=0;
+	pObj->nAccumulatedConsumedFrmBytes=0;
+	pObj->nAccumulatedConsumedBytes=0;
+	pObj->pLastDecodedFrm=NULL;
+	pObj->nAdditionalSeqBytes=0;
+	pObj->nAdditionalFrmHeaderBytes=0;
+	pObj->nLastFrameEndPosPhy=(unsigned int)pObj->pBsBufPhyEnd-1+FRAME_END_OFFSET;	//make sure we can compute the length of sequence/config before the first frame
+
+	return 1;
+}
+
+int VpuResolutionChangeProcess(DecHandle* pInOutVpuHandle, VpuDecObj* pObj)
+{
+	RetCode ret;
+	PhysicalAddress Rd;
+	PhysicalAddress Wr;
+	unsigned long nSpace;
+	int nBakLen;
+	unsigned int nBsBufVirtEnd;
+	unsigned int nStart,nEnd;
+	DecHandle InVpuHandle=*pInOutVpuHandle;
+	int seqOK=0;
+	VpuBufferNode InData;
+	int nOutRetCode=0;
+	int nNoErr=1;
+
+	/*backup sequence data*/
+	VPU_API("calling vpu_DecGetBitstreamBuffer() \r\n");
+	ret=vpu_DecGetBitstreamBuffer(InVpuHandle, &Rd, &Wr, &nSpace);
+	VPU_API("Wr: 0x%X, Rd: 0x%X, space: %d \r\n",(unsigned int)Wr,(unsigned int)Rd,(unsigned int)nSpace);
+	nBakLen=VpuComputeValidSizeInRingBuf(pObj->nLastFrameEndPosPhy, Wr,(unsigned int)pObj->pBsBufPhyStart,(unsigned int)pObj->pBsBufPhyEnd);
+	nBakLen-=2;	//reduce start and end themselves
+	nBakLen+=FRAME_END_OFFSET+FRAME_START_OFFSET;
+	if(nBakLen<=0)
+	{
+		VPU_ERROR("error last frame location !!! \r\n");
+		return 0;
+	}
+	if(pObj->pSeqBak)  //release previous buffer if exist
+	{
+		vpu_free(pObj->pSeqBak);
+	}
+	pObj->pSeqBak=vpu_malloc(nBakLen);
+	if(NULL==pObj->pSeqBak)
+	{
+		VPU_ERROR("malloc %d bytes failure \r\n",nBakLen);
+		return 0;
+	}
+	ASSERT(1==FRAME_END_OFFSET);	//we copy data from nLastFrameEndPosPhy, but not nLastFrameEndPosPhy-1
+	ASSERT(0==FRAME_START_OFFSET);
+	nBsBufVirtEnd=(unsigned int)pObj->pBsBufVirtStart+((unsigned int)pObj->pBsBufPhyEnd-(unsigned int)pObj->pBsBufPhyStart);
+	nStart=(unsigned int)pObj->pBsBufVirtStart+((unsigned int)pObj->nLastFrameEndPosPhy-(unsigned int)pObj->pBsBufPhyStart);
+	nEnd=(unsigned int)pObj->pBsBufVirtStart+((unsigned int)Wr-(unsigned int)pObj->pBsBufPhyStart);
+	pObj->nSeqBakLen=VpuCopyValidSizeInRingBuf(pObj->pSeqBak, nStart, nEnd, (unsigned int)pObj->pBsBufVirtStart,nBsBufVirtEnd);
+	pObj->nSeqBakLen--;  //remove the 'nEnd' itself
+	ASSERT(pObj->nSeqBakLen==nBakLen);
+	VPU_LOG("backup sequence info: %d bytes: virtual range: [0x%X,0x%X), phy range: [0x%X, 0x%X) \r\n",pObj->nSeqBakLen,nStart,nEnd,pObj->nLastFrameEndPosPhy,Wr);
+
+	/*close and re-open vpu */
+	VPU_API("calling vpu_DecClose() \r\n");
+	ret=vpu_DecClose(InVpuHandle);
+	ASSERT(ret==RETCODE_SUCCESS);
+
+	VPU_API("calling vpu_DecOpen() : filePlayEnable: %d , format: %d \r\n",pObj->sDecOpenParam.filePlayEnable,pObj->sDecOpenParam.bitstreamFormat);
+	ret= vpu_DecOpen(&InVpuHandle, &pObj->sDecOpenParam);
+	if(ret!=RETCODE_SUCCESS)
+	{
+		VPU_ERROR("%s: vpu open failure: ret=%d \r\n",__FUNCTION__,ret);
+		return -1;
+	}
+	*pInOutVpuHandle=InVpuHandle;  //update the vpu handle
+
+	/*clear related global variables*/
+	VpuResolutionChangeResetGlobalVariables(pObj);
+
+	/*re-seqinit*/
+	InData.nSize=pObj->nSeqBakLen;
+	InData.pPhyAddr=NULL;
+	InData.pVirAddr=pObj->pSeqBak;
+	InData.sCodecData.pData=NULL;
+	InData.sCodecData.nSize=0xFFFFFFFF; //regard as raw data
+	seqOK=VpuSeqInit(InVpuHandle, pObj, &InData, &nOutRetCode,&nNoErr);
+	if(0==seqOK)
+	{
+		VPU_ERROR("resolution change: seqinit fail \r\n");
+		return -1;
+	}
+	ASSERT(nOutRetCode==(VPU_DEC_INIT_OK|VPU_DEC_INPUT_USED));
+	ASSERT(pObj->state==VPU_DEC_STATE_INITOK);
+	
+	/*will wait re-register frames*/
+	//pObj->state=VPU_DEC_STATE_RESOLUTION_CHANGE;
+
+	return 1;
+}
+
 int VpuWaitBusy(int needWait)
 {
 	static int busy_cnt=0;
@@ -3459,7 +3697,7 @@ int VpuWaitBusy(int needWait)
 	return 1;	//not busy
 }	
 
-int VpuDecBuf(DecHandle InVpuHandle, VpuDecObj* pObj ,VpuBufferNode* pInData,int* pOutRetCode,int* pNoErr,int* pOutInStreamModeEnough) 
+int VpuDecBuf(DecHandle* pVpuHandle, VpuDecObj* pObj ,VpuBufferNode* pInData,int* pOutRetCode,int* pNoErr,int* pOutInStreamModeEnough) 
 {
 	RetCode ret;
 	VpuDecBufRetCode bufUseState=VPU_DEC_INPUT_USED;
@@ -3474,6 +3712,7 @@ int VpuDecBuf(DecHandle InVpuHandle, VpuDecObj* pObj ,VpuBufferNode* pInData,int
 	int needWait;
 	static int skipframeMode=0;
 	int frmDecoded=0;	/*whether one frame is decoded by vpu*/
+	DecHandle InVpuHandle=*pVpuHandle;
 
 	*pOutRetCode=(VpuDecBufRetCode)0x0;
 	*pNoErr=1;	// set OK
@@ -3955,7 +4194,41 @@ AfterGetOuput:
 		*pOutRetCode=(*pOutRetCode)|VPU_DEC_ONE_FRM_CONSUMED;
 	}
 
-	return 1;	
+	/*check whether resolution change happen*/
+	if((pObj->nDecResolutionChangeEnabled!=0)&&(frmDecoded==1))
+	{
+		if(pObj->nResolutionChanged)
+		{
+			int retChange;
+			switch(pObj->state)
+			{
+				case VPU_DEC_STATE_OUTOK:
+				case VPU_DEC_STATE_DEC:
+					retChange=VpuResolutionChangeProcess(pVpuHandle, pObj);
+					if(retChange<0) //reopen vpu fail
+					{
+						return -1;  
+					}
+					else if (retChange>0) //ok
+					{
+						*pOutRetCode=(VpuDecBufRetCode)0x0;  //clear other flags first !!!
+						*pOutRetCode=(*pOutRetCode)|bufUseState;
+						*pOutRetCode=(*pOutRetCode)|VPU_DEC_RESOLUTION_CHANGED;
+					}
+					else	 // memory resource not enough 
+					{
+						//ignore this event
+					}
+					break;
+				case VPU_DEC_STATE_EOS:
+				default:
+					//impossible enter here !!
+					break;
+			}
+			pObj->nResolutionChanged=0; //clear it
+		}
+	}
+	return 1;
 }
 
 #ifdef VPU_FILEMODE_PBCHUNK_FLUSH_WORKAROUND
@@ -4030,7 +4303,7 @@ int VpuCheckDeadLoop(VpuDecObj* pObj ,VpuBufferNode* pInData,int* pOutRetCode,in
 {
 	//*pNoErr=1;		//don't reset it !!!!: the *pNoErr already has one valid value.
 #ifdef VPU_AVOID_DEAD_LOOP
-#define VPU_MAX_NULL_LOOP (10000)	//gmplayer: cost about 60 seconds ?
+#define VPU_MAX_NULL_LOOP (500000)//set big enough, it is just used to avoid dead
 	static int total_init_size=0;		// avoid dead loop at init step
 	static int total_init_loop=0;	// avoid dead loop at init step 
 	static int total_dec_size=0;	// avoid dead loop at decode step
@@ -4166,6 +4439,10 @@ int VpuCheckDeadLoop(VpuDecObj* pObj ,VpuBufferNode* pInData,int* pOutRetCode,in
 VpuDecRetCode VPU_DecLoad()
 {
 	RetCode ret;
+
+	/*parser log level*/
+	VpuLogLevelParse(NULL);
+	
 	VPU_TRACE;
 	VPU_API("calling vpu_Init() \r\n");	
 	ret=vpu_Init(NULL);
@@ -4557,6 +4834,7 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
 	}
 
 	pObj->nDecFrameRptEnabled=0;
+	pObj->nDecResolutionChangeEnabled=0;
 	if(CPU_IS_MX6X())
 	{
 		switch(pObj->CodecFormat)
@@ -4569,9 +4847,11 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
 			case VPU_V_AVC:				
 			case VPU_V_MPEG2:
 				pObj->nDecFrameRptEnabled=1;
+				pObj->nDecResolutionChangeEnabled=1;
 				break;
 			default:
 				pObj->nDecFrameRptEnabled=0;
+				pObj->nDecResolutionChangeEnabled=0;
 				break;
 		}
 	}
@@ -4583,7 +4863,11 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
 	pObj->nAdditionalFrmHeaderBytes=0;
 	pObj->nLastFrameEndPosPhy=(unsigned int)pObj->pBsBufPhyEnd-1+FRAME_END_OFFSET;	//make sure we can compute the length of sequence/config before the first frame
 
-	*pOutHandle=(VpuDecHandle)pVpuObj;	
+	pObj->pSeqBak=NULL;
+	pObj->nSeqBakLen=0;
+	pObj->sDecOpenParam=sDecOpenParam; /*backup open parameters*/
+	
+	*pOutHandle=(VpuDecHandle)pVpuObj;
 
 	return VPU_DEC_RET_SUCCESS;
 }
@@ -4618,6 +4902,14 @@ VpuDecRetCode VPU_DecGetCapability(VpuDecHandle InHandle,VpuDecCapability eInCap
 				return VPU_DEC_RET_INVALID_PARAM;
 			}
 			*pOutCapbility=pObj->nDecFrameRptEnabled;
+			break;
+		case VPU_DEC_CAP_RESOLUTION_CHANGE:
+			if(pObj==NULL)
+			{
+				VPU_ERROR("%s: get capability(%d) failure: vpu hasn't been opened \r\n",__FUNCTION__,eInCapability);
+				return VPU_DEC_RET_INVALID_PARAM;
+			}
+			*pOutCapbility=pObj->nDecResolutionChangeEnabled;			
 			break;
 		default:
 			VPU_ERROR("%s: unknown capability: 0x%X \r\n",__FUNCTION__,eInCapability);
@@ -4872,7 +5164,7 @@ RepeatDec:
 			//verify clear flag 
 			VpuVerifyClearFlag(pVpuObj->handle,pObj);
 #endif
-			if(-1==VpuDecBuf(pVpuObj->handle,pObj,pInData,pOutRetCode,&noerr,&streamModeEnough))
+			if(-1==VpuDecBuf(&pVpuObj->handle,pObj,pInData,pOutRetCode,&noerr,&streamModeEnough))
 			{
 				VPU_ERROR("%s: time out \r\n",__FUNCTION__);	
 				pObj->state=VPU_DEC_STATE_CORRUPT;
@@ -4940,6 +5232,7 @@ RepeatDec:
 			// do nothing, wait calling VPU_Reset(), and then reload vpu again
 			*pOutRetCode=VPU_DEC_INPUT_NOT_USED;
 			break;
+		case VPU_DEC_STATE_RESOLUTION_CHANGE:
 		default:
 			VPU_ERROR("%s: failure: error state: %d \r\n",__FUNCTION__,pObj->state);
 			return VPU_DEC_RET_INVALID_PARAM;
@@ -5189,6 +5482,7 @@ VpuDecRetCode VPU_DecOutFrameDisplayed(VpuDecHandle InHandle, VpuFrameBuffer* pI
 	switch(pVpuObj->obj.state)
 	{
 		case VPU_DEC_STATE_CORRUPT:
+		case VPU_DEC_STATE_RESOLUTION_CHANGE:
 			//skip calling vpu api
 			return VPU_DEC_RET_SUCCESS;
 		default:
@@ -5272,6 +5566,7 @@ VpuDecRetCode VPU_DecFlushAll(VpuDecHandle InHandle)
 		case VPU_DEC_STATE_EOS:
 			break;
 		case VPU_DEC_STATE_CORRUPT:
+		case VPU_DEC_STATE_RESOLUTION_CHANGE:
 			//do nothing
 			return VPU_DEC_RET_SUCCESS;
 		default:
@@ -5662,9 +5957,10 @@ FLUSH_FINISH:
 	pObj->pLastDecodedFrm=NULL;
 	pObj->nLastFrameEndPosPhy=(unsigned int)pObj->pBsBufPhyEnd-1+FRAME_END_OFFSET;
 
-#ifdef VPU_WRAPPER_DUMP
-	g_seek_dump=1;
-#endif
+	if(VPU_DUMP_RAW || VPU_DUMP_YUV){
+		g_seek_dump=1;
+	}
+
 	return VPU_DEC_RET_SUCCESS;
 }
 
@@ -5719,6 +6015,14 @@ VpuDecRetCode VPU_DecClose(VpuDecHandle InHandle)
 		}	
 	}
 #endif	
+
+	/*release seq bak buffer*/
+	if(pVpuObj->obj.pSeqBak)
+	{
+		vpu_free(pVpuObj->obj.pSeqBak);
+		pVpuObj->obj.pSeqBak=NULL;
+		pVpuObj->obj.nSeqBakLen=0;
+	}
 
 	//normal close
 	VPU_TRACE;
@@ -7357,11 +7661,11 @@ VpuEncRetCode VPU_EncEncodeFrame(VpuEncHandle InHandle, VpuEncEncParam* pInOutPa
 	VpuEncBufRetCode bufRet=VPU_ENC_INPUT_NOT_USED;
 	int nHeaderLen=0;
 	int nPadLen=0;
-#ifdef VPU_WRAPPER_DUMP
+//#ifdef VPU_WRAPPER_DUMP
 	static FILE* fpYUV=NULL;	//input
 	int nPhy_virt_offset=0;
 	static FILE* fpBitstream=NULL;	//output 
-#endif
+//#endif
 	if(InHandle==NULL)
 	{
 		VPU_ENC_ERROR("%s: failure: handle is null \r\n",__FUNCTION__);		
@@ -7485,8 +7789,7 @@ VpuEncRetCode VPU_EncEncodeFrame(VpuEncHandle InHandle, VpuEncEncParam* pInOutPa
 			//sEncParam.picStreamBufferAddr=(PhysicalAddress)pVpuObj->obj.pPhyBitstream;
 		}
 
-#ifdef VPU_WRAPPER_DUMP
-		{
+		if(VPU_DUMP_YUV){
 			int colorformat=0;
 			//if(VPU_V_MJPG==pObj->CodecFormat)
 			//{
@@ -7495,7 +7798,6 @@ VpuEncRetCode VPU_EncEncodeFrame(VpuEncHandle InHandle, VpuEncEncParam* pInOutPa
 			nPhy_virt_offset=pInOutParam->nInVirtInput-pInOutParam->nInPhyInput;
 			WrapperFileDumpYUV(&fpYUV, (unsigned char*)sEncParam.sourceFrame->bufY+nPhy_virt_offset, (unsigned char*)sEncParam.sourceFrame->bufCb+nPhy_virt_offset, (unsigned char*)sEncParam.sourceFrame->bufCr+nPhy_virt_offset, sEncParam.sourceFrame->strideY*pInOutParam->nPicHeight, sEncParam.sourceFrame->strideC*pInOutParam->nPicHeight/2,colorformat);
 		}	
-#endif
 
 		if(pVpuObj->obj.nMapType!=0)
 		{
@@ -7566,9 +7868,9 @@ VpuEncRetCode VPU_EncEncodeFrame(VpuEncHandle InHandle, VpuEncEncParam* pInOutPa
 #endif
 	}
 
-#ifdef VPU_WRAPPER_DUMP
-	WrapperFileDumpBitstrem(&fpBitstream,(unsigned char*)pInOutParam->nInVirtOutput,pInOutParam->nOutOutputSize);
-#endif
+	if(VPU_DUMP_RAW){
+		WrapperFileDumpBitstrem(&fpBitstream,(unsigned char*)pInOutParam->nInVirtOutput,pInOutParam->nOutOutputSize);
+	}
 
 	//ASSERT(pInOutParam->nOutOutputSize<=(int)pInOutParam->nInOutputBufLen);
 	return VPU_ENC_RET_SUCCESS;
