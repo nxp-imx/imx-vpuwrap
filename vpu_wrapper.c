@@ -196,7 +196,7 @@ static int g_seek_dump=DUMP_ALL_DATA;	/*0: only dump data after seeking; otherwi
 #else
 #define VPU_BITS_BUF_SIZE		(1024*1024)
 #endif
-#define VPU_SLICE_SAVE_SIZE	0x2D800
+#define VPU_SLICE_SAVE_SIZE	0x17E800		//worst slice buffer size: 1920*1088*1.5/2= 1.5MB
 #define VPU_PS_SAVE_SIZE		0x80000
 #define VPU_VP8_MBPARA_SIZE	0x87780			//68 * (1920 * 1088 / 256)=0x87780;
 
