@@ -10,6 +10,8 @@
 /** fb_render.c
  *	this file is responsible for rendering video frame through ipu's fb
  */
+
+#ifdef IMX5
 #include <fcntl.h>
 #include "stdio.h"
 #include "stdlib.h"
@@ -334,5 +336,27 @@ int fb_render_drawYUVframe(int handle,unsigned char* pY,unsigned char* pU,unsign
 	return 1;
 	
 }
+#else
 
+int fb_render_init(int* pHandle,int fb_num,int width , int height)
+{
+	printf("%s: not implemented ! \r\n",__FUNCTION__);
+	return 1;
+}
+
+
+int fb_render_uninit(int handle)
+{
+	printf("%s: not implement ! \r\n");
+	return 1;
+}
+
+int fb_render_drawYUVframe(int handle,unsigned char* pY,unsigned char* pU,unsigned char* pV,
+	int width,int height)
+{
+	printf("%s: not implement ! \r\n");
+	return 1;
+}
+
+#endif
 
