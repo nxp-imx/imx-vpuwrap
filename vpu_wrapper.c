@@ -95,7 +95,7 @@
 
 #define VPU_ENC_OUTFRAME_ALIGN	//vpu limitation: 4(or 8?) bytes alignment for output frame address
 #define VPU_ENC_GUESS_OUTLENGTH	//no size in SetOutputBuffer(), so we guess one value
-#define VPU_ENC_ALIGN_LIMITATION	//vpu encoder has 16 pixels alignment limitation: vpu will cut down to 16-aligned pixels automatically
+//#define VPU_ENC_ALIGN_LIMITATION	//vpu encoder has 16 pixels alignment limitation: vpu will cut down to 16-aligned pixels automatically
 #define VPU_ENC_SEQ_DATA_SEPERATE	//output sequence header and data seperately, otherwise, only our vpu decoder can play it
 
 #define VPU_FILEMODE_MERGE_FLAG	1
@@ -7066,17 +7066,48 @@ VpuEncRetCode VPU_EncOpen(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEn
 			sEncOpenParam.EncStdParam.avcParam.avc_audEnable = pInParam->VpuEncStdParam.avcParam.avc_audEnable;
 			if (CPU_IS_MX6X()) 
 			{
+				int nWidthDiff=0;
+				int nHeightDiff=0;
 				sEncOpenParam.EncStdParam.avcParam.avc_frameCroppingFlag = 0;
 				sEncOpenParam.EncStdParam.avcParam.avc_frameCropLeft = 0;
 				sEncOpenParam.EncStdParam.avcParam.avc_frameCropRight = 0;
 				sEncOpenParam.EncStdParam.avcParam.avc_frameCropTop = 0;
 				sEncOpenParam.EncStdParam.avcParam.avc_frameCropBottom = 0;
-				if (pInParam->nRotAngle != 90 && pInParam->nRotAngle != 270 && sEncOpenParam.picHeight == 1080)
-				{
-					//only for 1080 ?
+				nWidthDiff=nValidWidth%16;
+				nHeightDiff=nValidHeight%16;
+				if(nHeightDiff>0){
 					sEncOpenParam.EncStdParam.avcParam.avc_frameCroppingFlag = 1;
-					sEncOpenParam.EncStdParam.avcParam.avc_frameCropBottom = 8;
+					switch(pInParam->nRotAngle){
+						case 0:
+							sEncOpenParam.EncStdParam.avcParam.avc_frameCropBottom=nHeightDiff;break;
+						case 90:
+							sEncOpenParam.EncStdParam.avcParam.avc_frameCropRight=nHeightDiff;break;
+						case 180:
+							sEncOpenParam.EncStdParam.avcParam.avc_frameCropTop=nHeightDiff;break;
+						case 270:
+							sEncOpenParam.EncStdParam.avcParam.avc_frameCropLeft=nHeightDiff;break;
+						default:
+							VPU_ENC_ERROR("unsupported rotation: %d \r\n",pInParam->nRotAngle);	break;
+					}
 				}
+				if(nWidthDiff>0){
+					sEncOpenParam.EncStdParam.avcParam.avc_frameCroppingFlag = 1;
+					switch(pInParam->nRotAngle){
+						case 0:
+							sEncOpenParam.EncStdParam.avcParam.avc_frameCropRight=nWidthDiff;break;
+						case 90:
+							sEncOpenParam.EncStdParam.avcParam.avc_frameCropTop=nWidthDiff;break;
+						case 180:
+							sEncOpenParam.EncStdParam.avcParam.avc_frameCropLeft=nWidthDiff;break;
+						case 270:
+							sEncOpenParam.EncStdParam.avcParam.avc_frameCropBottom=nWidthDiff;break;
+						default:
+							VPU_ENC_ERROR("unsupported rotation: %d \r\n",pInParam->nRotAngle);	break;
+					}
+				}
+				VPU_ENC_LOG("[width,heigh]=[%d,%d]: enable AVC crop flag: rot: %d, [top,bot,left,right]: [%d,%d,%d,%d]\r\n",nValidWidth,nValidHeight,pInParam->nRotAngle,
+						sEncOpenParam.EncStdParam.avcParam.avc_frameCropTop,sEncOpenParam.EncStdParam.avcParam.avc_frameCropBottom,
+						sEncOpenParam.EncStdParam.avcParam.avc_frameCropLeft,sEncOpenParam.EncStdParam.avcParam.avc_frameCropRight);
 				/* will be supported on imx6 in future ?
 				sEncOpenParam.EncStdParam.avcParam.avc_fmoEnable = pInParam->VpuEncStdParam.avcParam.avc_fmoEnable;
 				sEncOpenParam.EncStdParam.avcParam.avc_fmoType = pInParam->VpuEncStdParam.avcParam.avc_fmoType;

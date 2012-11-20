@@ -347,14 +347,14 @@ int fb_render_init(int* pHandle,int fb_num,int width , int height)
 
 int fb_render_uninit(int handle)
 {
-	printf("%s: not implement ! \r\n");
+	printf("%s: not implemented ! \r\n",__FUNCTION__);
 	return 1;
 }
 
 int fb_render_drawYUVframe(int handle,unsigned char* pY,unsigned char* pU,unsigned char* pV,
 	int width,int height)
 {
-	printf("%s: not implement ! \r\n");
+	printf("%s: not implemented ! \r\n",__FUNCTION__);
 	return 1;
 }
 
