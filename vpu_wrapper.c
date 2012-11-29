@@ -92,6 +92,8 @@
 #define VPU_FILEMODE_INTERLACE_TIMESTAMP_ENHANCE	//for field decoding: move "pop of timestampe" from decode order to display order
 													//for some interlaced clips with deep dpb, original design may introduce much bigger timestamp(about 0.5 seconds): technicolor/332_dec.ts
 #define VPU_NOT_RETURN_ALLBUF_AFTER_FLUSH	//we don't want to return all frame buffers after flush operation
+#define VPU_IMX6_VC1AP_RANGEMAP_BUF_WORKAROUND  //some buffers ared used for rangmap, and the buffer numbers will be accumulated for every flush operation. so we need to clear them explicitly after every flush operation
+#define VPU_IMX6_MULTIINSTANCE_FRAMESTART_WORKAROUND //for multi-instance, frame start may point to memory space in another instance.
 
 #define VPU_ENC_OUTFRAME_ALIGN	//vpu limitation: 4(or 8?) bytes alignment for output frame address
 #define VPU_ENC_GUESS_OUTLENGTH	//no size in SetOutputBuffer(), so we guess one value
@@ -1674,6 +1676,32 @@ int VpuSaveDecodedFrameInfo(VpuDecObj* pObj, int index,DecOutputInfo * pCurDecFr
 		//overflow !!!		
 		return 0;
 	}	
+
+#ifdef VPU_IMX6_MULTIINSTANCE_FRAMESTART_WORKAROUND
+	/*
+	for single instance: start/end pointer may point illegal memory space
+					in such case, start and end have the same offset, and the frame size is correct, so we needn't rectify it
+	for multi-instance: start pointer may point illegal memory space(belong to another instance).
+					in such case, we need to rectify it with last frame end.
+	*/
+	if(pObj->nDecFrameRptEnabled){
+		if(((unsigned int)pCurDecFrameInfo->frameEndPos > (unsigned int)pObj->pBsBufPhyEnd)||((unsigned int)pCurDecFrameInfo->frameEndPos < (unsigned int)pObj->pBsBufPhyStart)){
+			VPU_ERROR("warning: frame end (0x%X) is out of range: [0x%X, 0x%X] \r\n",pCurDecFrameInfo->frameEndPos,pObj->pBsBufPhyStart,pObj->pBsBufPhyEnd);
+		}
+		if((((unsigned int)pCurDecFrameInfo->frameStartPos > (unsigned int)pObj->pBsBufPhyEnd)||((unsigned int)pCurDecFrameInfo->frameStartPos < (unsigned int)pObj->pBsBufPhyStart))
+			&& ((unsigned int)pCurDecFrameInfo->frameStartPos!=pObj->nLastFrameEndPosPhy)
+			&& (pObj->nLastFrameEndPosPhy!=(unsigned int)pObj->pBsBufPhyEnd-1+FRAME_END_OFFSET)){
+			unsigned int nFrmSize;
+			nFrmSize=VpuComputeValidSizeInRingBuf(pObj->nLastFrameEndPosPhy,pCurDecFrameInfo->frameEndPos,(unsigned int)pObj->pBsBufPhyStart,(unsigned int)pObj->pBsBufPhyEnd);
+			nFrmSize-=1;
+			VPU_ERROR("error: frame start is out of range[0x%X, 0x%X], rectify frame info [consumed, start, end] from [%d, 0x%X, 0x%X] to [%d, 0x%X, 0x%X] !\r\n",pObj->pBsBufPhyStart,pObj->pBsBufPhyEnd,
+				pCurDecFrameInfo->consumedByte,pCurDecFrameInfo->frameStartPos,pCurDecFrameInfo->frameEndPos,
+				nFrmSize,pObj->nLastFrameEndPosPhy,pCurDecFrameInfo->frameEndPos);
+			pCurDecFrameInfo->frameStartPos=pObj->nLastFrameEndPosPhy;
+			pCurDecFrameInfo->consumedByte=nFrmSize;
+		}
+	}
+#endif
 
 	if(index>=0)	//valid decoded frame
 	{
@@ -3362,6 +3390,13 @@ int VpuDecClearOperationEOStoDEC(VpuDecHandle InHandle)
 				}
 				VpuClearDispFrame(i, pVpuObj->obj.frameBufState);
 			}
+#ifdef VPU_IMX6_VC1AP_RANGEMAP_BUF_WORKAROUND
+			else if((pVpuObj->obj.CodecFormat==VPU_V_VC1_AP) &&(pVpuObj->obj.frameBufState[i]==VPU_FRAME_STATE_FREE)){
+				VPU_API("%s: workaround for VC1 AP rangemap: calling vpu_DecClrDispFlag(): %d \r\n",__FUNCTION__,i);
+				vpu_DecClrDispFlag(pVpuObj->handle,i);
+			}
+#endif
+			
 		}	
 	}
 	/*FIXME: add process "else if(CPU_IS_MX5X){}" for iMX5X
