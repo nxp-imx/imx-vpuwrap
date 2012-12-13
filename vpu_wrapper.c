@@ -1742,11 +1742,12 @@ int VpuSaveDecodedFrameInfo(VpuDecObj* pObj, int index,DecOutputInfo * pCurDecFr
 		pDstInfo->Q16ShiftWidthDivHeightRatio=VpuConvertAspectRatio(pObj->CodecFormat,(unsigned int)pCurDecFrameInfo->aspectRateInfo,cropWidth,cropHeight, pObj->nProfile,pObj->nLevel);
 
 		/*resolution change*/
-		if((pCurDecFrameInfo->decPicWidth>pObj->nOriWidth)||((pCurDecFrameInfo->decPicHeight>pObj->nOriHeight)))
-		{
-			pObj->nResolutionChanged=1;
-			//in such case, needn't record/accumulate frame info
-			return 1;
+		if(pObj->nDecResolutionChangeEnabled!=0){
+			if((pCurDecFrameInfo->decPicWidth!=pObj->nOriWidth)||((pCurDecFrameInfo->decPicHeight!=pObj->nOriHeight))){
+				pObj->nResolutionChanged=1;
+				//in such case, needn't record/accumulate frame info
+				return 1;
+			}
 		}
 	}
 
@@ -4948,6 +4949,35 @@ VpuDecRetCode VPU_DecGetCapability(VpuDecHandle InHandle,VpuDecCapability eInCap
 			break;
 		default:
 			VPU_ERROR("%s: unknown capability: 0x%X \r\n",__FUNCTION__,eInCapability);
+			return VPU_DEC_RET_INVALID_PARAM;
+	}
+	return VPU_DEC_RET_SUCCESS;
+}
+
+VpuDecRetCode VPU_DecDisCapability(VpuDecHandle InHandle,VpuDecCapability eInCapability)
+{
+	VpuDecHandleInternal * pVpuObj=NULL;
+	VpuDecObj* pObj=NULL;
+	if (InHandle==NULL)	{
+		return VPU_DEC_RET_INVALID_PARAM;
+	}
+	pVpuObj=(VpuDecHandleInternal *)InHandle;
+	pObj=&pVpuObj->obj;
+	if(pObj==NULL){
+		VPU_ERROR("%s: get capability(%d) failure: vpu hasn't been opened \r\n",__FUNCTION__,eInCapability);
+		return VPU_DEC_RET_INVALID_PARAM;
+	}	
+	switch(eInCapability)	{
+		case VPU_DEC_CAP_FRAMESIZE:
+			pObj->nDecFrameRptEnabled=0;
+			break;
+		case VPU_DEC_CAP_RESOLUTION_CHANGE:
+			/* if user always allocate enough frames(size/count), 
+			    vpu needn't trigger resolution change event which will lead to some additional payload (close/open vpu and re-regiser frames) */
+			pObj->nDecResolutionChangeEnabled=0;
+			break;
+		default:
+			VPU_ERROR("%s: unsupported capability: 0x%X \r\n",__FUNCTION__,eInCapability);
 			return VPU_DEC_RET_INVALID_PARAM;
 	}
 	return VPU_DEC_RET_SUCCESS;
