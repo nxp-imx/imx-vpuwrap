@@ -1223,6 +1223,12 @@ CODE	HEIGHT/WIDTH	COMMENT
 						break;
 				}
 			}
+#if 0		//added for special case
+			else if(0xFFFFFFFF==InRatio){
+				//unspecified
+				return 0xFFFFFFFF;
+			}
+#endif
 			else
 			{
 				//extended SAR: => sar_width: sar_height ??
@@ -2469,6 +2475,10 @@ int VpuSeqInit(DecHandle InVpuHandle, VpuDecObj* pObj ,VpuBufferNode* pInData,in
 				//shouldn't return error
 				pObj->nPrivateSeqHeaderInserted=0; //need to re-fill the header next round
 			}
+		}
+		//check some special case: and report error to let application exist directly
+		if(ret==RETCODE_NOT_SUPPORTED){
+			*pNoErr=0;
 		}
 		return 0;
 	}
