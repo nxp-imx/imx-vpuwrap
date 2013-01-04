@@ -469,6 +469,8 @@ typedef struct
 	unsigned char* pSeqBak;	/*backup the sequence data*/
 	int nSeqBakLen;
 	DecOpenParam sDecOpenParam; /*backup the open parameters*/
+
+	int initDataCountThd;
 }VpuDecObj;
 
 typedef struct 
@@ -4415,7 +4417,7 @@ int VpuCheckDeadLoop(VpuDecObj* pObj ,VpuBufferNode* pInData,int* pOutRetCode,in
 		VPU_ERROR("decode dead loop: total_size: %d, total_cnt: %d \r\n",total_dec_size,total_dec_loop);
 	}
 #if 1	//dangerous !!
-	if((total_init_size>VPU_MAX_INIT_SIZE)||(total_init_loop>VPU_MAX_INIT_LOOP)||(total_null_loop>VPU_MAX_NULL_LOOP))
+	if((total_init_size>VPU_MAX_INIT_SIZE)||(total_init_loop>pObj->initDataCountThd)||(total_null_loop>VPU_MAX_NULL_LOOP))
 #else
 	if((total_init_size>VPU_MAX_INIT_SIZE))
 #endif
@@ -4912,6 +4914,8 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
 	pObj->pSeqBak=NULL;
 	pObj->nSeqBakLen=0;
 	pObj->sDecOpenParam=sDecOpenParam; /*backup open parameters*/
+
+	pObj->initDataCountThd=VPU_MAX_INIT_LOOP;
 	
 	*pOutHandle=(VpuDecHandle)pVpuObj;
 
@@ -5065,6 +5069,13 @@ VpuDecRetCode VPU_DecConfig(VpuDecHandle InHandle, VpuDecConfig InDecConf, void*
 		case VPU_DEC_CONF_BUFDELAY:
 			para=*((int*)pInParam);
 			pObj->streamBufDelaySize=para;
+			break;
+		case VPU_DEC_CONF_INIT_CNT_THRESHOLD:
+			para=*((int*)pInParam);
+			if(para<=0){
+				return VPU_DEC_RET_INVALID_PARAM;
+			}
+			pObj->initDataCountThd=para;
 			break;
 		default:
 			VPU_ERROR("%s: failure: invalid setting \r\n",__FUNCTION__);	

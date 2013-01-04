@@ -28,7 +28,7 @@ extern "C" {
 /**************************** version info ***********************************/
 #define VPU_WRAPPER_VERSION(major, minor, release)	 \
 	(((major) << 16) + ((minor) << 8) + (release))
-#define VPU_WRAPPER_VERSION_CODE	VPU_WRAPPER_VERSION(1, 0, 30)
+#define VPU_WRAPPER_VERSION_CODE	VPU_WRAPPER_VERSION(1, 0, 31)
 
 /**************************** decoder part **********************************/
 
@@ -88,6 +88,7 @@ typedef enum {
 	//VPU_DEC_CONF_NONEBLOCK,
 	VPU_DEC_CONF_BUFDELAY,		/*for stream mode:
 									    parameter represent buf size(unit: bytes), buffer size==0 indicate no any delay*/
+	VPU_DEC_CONF_INIT_CNT_THRESHOLD,  /*at seqinit stage: vpu will report error if data count reach the threshold*/
 } VpuDecConfig;
 
 typedef enum 
