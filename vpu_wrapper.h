@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2010-2012, Freescale Semiconductor Inc.,
+ *  Copyright (c) 2010-2013, Freescale Semiconductor Inc.,
  *  All Rights Reserved.
  *
  *  The following programs are the sole property of Freescale Semiconductor Inc.,
@@ -28,7 +28,7 @@ extern "C" {
 /**************************** version info ***********************************/
 #define VPU_WRAPPER_VERSION(major, minor, release)	 \
 	(((major) << 16) + ((minor) << 8) + (release))
-#define VPU_WRAPPER_VERSION_CODE	VPU_WRAPPER_VERSION(1, 0, 31)
+#define VPU_WRAPPER_VERSION_CODE	VPU_WRAPPER_VERSION(1, 0, 32)
 
 /**************************** decoder part **********************************/
 
@@ -44,6 +44,12 @@ typedef unsigned int VpuDecHandle;
 //typedef DecBufInfo VpuDecBufInfo;
 //typedef CodecCommand VpuCodecCommand;
 //typedef DecParam VpuDecParam;
+
+typedef enum {
+	VPU_DEC_ERR_UNFOUND=0,
+	VPU_DEC_ERR_NOT_SUPPORTED, /*the profile/level/features/... outrange the vpu's capability*/
+	VPU_DEC_ERR_CORRUPT, /*some syntax errors are detected*/
+}VpuDecErrInfo;
 
 typedef enum {
 	VPU_V_MPEG4 = 0,
@@ -648,7 +654,7 @@ VpuDecRetCode VPU_DecClose(VpuDecHandle InHandle);
 VpuDecRetCode VPU_DecUnLoad();
 
 VpuDecRetCode VPU_DecReset(VpuDecHandle InHandle);
-
+VpuDecRetCode VPU_DecGetErrInfo(VpuDecHandle InHandle,VpuDecErrInfo* pErrInfo);
 
 VpuDecRetCode VPU_DecGetMem(VpuMemDesc* pInOutMem);
 VpuDecRetCode VPU_DecFreeMem(VpuMemDesc* pInMem);

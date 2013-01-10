@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2010-2012, Freescale Semiconductor Inc.,
+ *  Copyright (c) 2010-2013, Freescale Semiconductor Inc.,
  *  All Rights Reserved.
  *
  *  The following programs are the sole property of Freescale Semiconductor Inc.,
@@ -471,6 +471,7 @@ typedef struct
 	DecOpenParam sDecOpenParam; /*backup the open parameters*/
 
 	int initDataCountThd;
+	VpuDecErrInfo nLastErrorInfo;  /*it record the last error info*/
 }VpuDecObj;
 
 typedef struct 
@@ -555,6 +556,7 @@ void printf_memory(unsigned char* addr, int width, int height, int stride)
 
 void WrapperFileDumpBitstrem(FILE** ppFp, unsigned char* pBits, unsigned int nSize)
 {
+	int nWriteSize=0;
 	if(nSize==0)
 	{
 		return;
@@ -573,7 +575,7 @@ void WrapperFileDumpBitstrem(FILE** ppFp, unsigned char* pBits, unsigned int nSi
 		VPU_LOG("open %s OK \r\n",VPU_DUMP_RAWFILE);
 	}
 
-	fwrite(pBits,1,nSize,*ppFp);
+	nWriteSize=fwrite(pBits,1,nSize,*ppFp);
 	fflush(*ppFp);
 	return;
 }
@@ -582,6 +584,7 @@ void WrapperFileDumpYUV(FILE** ppFp, unsigned char*  pY,unsigned char*  pU,unsig
 {
 	static int cnt=0;
 	int nCScale=1;
+	int nWriteSize=0;
 	
 	switch(nColorfmt)
 	{
@@ -617,9 +620,9 @@ void WrapperFileDumpYUV(FILE** ppFp, unsigned char*  pY,unsigned char*  pU,unsig
 
 	if(cnt<MAX_YUV_FRAME)
 	{
-		fwrite(pY,1,nYSize,*ppFp);
-		fwrite(pU,1,nCSize*nCScale,*ppFp);
-		fwrite(pV,1,nCSize*nCScale,*ppFp);
+		nWriteSize=fwrite(pY,1,nYSize,*ppFp);
+		nWriteSize=fwrite(pU,1,nCSize*nCScale,*ppFp);
+		nWriteSize=fwrite(pV,1,nCSize*nCScale,*ppFp);
 		fflush(*ppFp);
 		cnt++;
 	}
@@ -1694,7 +1697,7 @@ int VpuSaveDecodedFrameInfo(VpuDecObj* pObj, int index,DecOutputInfo * pCurDecFr
 	*/
 	if(pObj->nDecFrameRptEnabled){
 		if(((unsigned int)pCurDecFrameInfo->frameEndPos > (unsigned int)pObj->pBsBufPhyEnd)||((unsigned int)pCurDecFrameInfo->frameEndPos < (unsigned int)pObj->pBsBufPhyStart)){
-			VPU_ERROR("warning: frame end (0x%X) is out of range: [0x%X, 0x%X] \r\n",pCurDecFrameInfo->frameEndPos,pObj->pBsBufPhyStart,pObj->pBsBufPhyEnd);
+			VPU_ERROR("warning: frame end (0x%X) is out of range: [0x%X, 0x%X] \r\n",pCurDecFrameInfo->frameEndPos,(unsigned int)pObj->pBsBufPhyStart,(unsigned int)pObj->pBsBufPhyEnd);
 		}
 		if((((unsigned int)pCurDecFrameInfo->frameStartPos > (unsigned int)pObj->pBsBufPhyEnd)||((unsigned int)pCurDecFrameInfo->frameStartPos < (unsigned int)pObj->pBsBufPhyStart))
 			&& ((unsigned int)pCurDecFrameInfo->frameStartPos!=pObj->nLastFrameEndPosPhy)
@@ -1702,7 +1705,7 @@ int VpuSaveDecodedFrameInfo(VpuDecObj* pObj, int index,DecOutputInfo * pCurDecFr
 			unsigned int nFrmSize;
 			nFrmSize=VpuComputeValidSizeInRingBuf(pObj->nLastFrameEndPosPhy,pCurDecFrameInfo->frameEndPos,(unsigned int)pObj->pBsBufPhyStart,(unsigned int)pObj->pBsBufPhyEnd);
 			nFrmSize-=1;
-			VPU_ERROR("error: frame start is out of range[0x%X, 0x%X], rectify frame info [consumed, start, end] from [%d, 0x%X, 0x%X] to [%d, 0x%X, 0x%X] !\r\n",pObj->pBsBufPhyStart,pObj->pBsBufPhyEnd,
+			VPU_ERROR("error: frame start is out of range[0x%X, 0x%X], rectify frame info [consumed, start, end] from [%d, 0x%X, 0x%X] to [%d, 0x%X, 0x%X] !\r\n",(unsigned int)pObj->pBsBufPhyStart,(unsigned int)pObj->pBsBufPhyEnd,
 				pCurDecFrameInfo->consumedByte,pCurDecFrameInfo->frameStartPos,pCurDecFrameInfo->frameEndPos,
 				nFrmSize,pObj->nLastFrameEndPosPhy,pCurDecFrameInfo->frameEndPos);
 			pCurDecFrameInfo->frameStartPos=pObj->nLastFrameEndPosPhy;
@@ -2171,6 +2174,117 @@ int VpuFillData(DecHandle InVpuHandle,VpuDecObj* pObj,unsigned char* pInVirt,uns
 	return 1;
 }
 
+int VpuUpdateErrInfo(VpuDecObj* pObj,DecInitialInfo * pInitInfo)
+{
+	unsigned int nMask_NotSupported=0;
+	unsigned int nMask_Corrupt=0xFFFFFFFF;
+	if(pInitInfo->errorcode==0){
+		return 1; //no error
+	}
+	
+	//now, only mapping errcode for iMX6
+	if(CPU_IS_MX6X()){
+		switch(pObj->CodecFormat){
+		case VPU_V_MPEG4:
+		case VPU_V_DIVX3:
+		case VPU_V_DIVX4:
+		case VPU_V_DIVX56:
+		case VPU_V_XVID:
+		case VPU_V_H263:
+			/*
+			bit[0..31]:
+			Mpeg4: short header
+				3	MP4ERR_MP4ERR_ANNEXD
+				4	MP4ERR_MP4ERR _ANNEXEFG
+				7	MP4ERR_ANNEXD_PLUSPTYPE
+				8	MP4ERR_ANNEXEF_PLUSPTYPE
+				9	MP4ERR_ANNEXNRS_PLUSPTYPE
+				11	MP4ERR_ANNEXPQ_MPPTYPE
+			Mpeg4:VOL VOS
+				1	MP4ERR_VIDEO_OBJECT_LAYER_VERID
+				4	MP4ERR_CHROMA_FORMAT
+				6	MP4ERR_VIDEO_OBJECT_LAYER_SHAPE
+				9	MP4ERR_OBMC_DISABLE
+				10	MP4ERR_SPRITE_ENABLE
+				11	MP4ERR_NOT_8_BIT
+				12	MP4ERR_COMPLEXITY_EST_DISABLE
+				13	MP4ERR_SCALABILITY
+			*/
+#if 0		//vpu may not set 'mp4_shortVideoHeader' correctly when returning error
+			if(pInitInfo->mp4_shortVideoHeader){
+#else
+			if((VPU_V_H263==pObj->CodecFormat) ||pInitInfo->mp4_shortVideoHeader){
+#endif
+				nMask_NotSupported=(1<<3)|(1<<4)|(1<<7)|(1<<8)|(1<<9)|(1<<11);
+			}
+			else{
+				nMask_NotSupported=(1<<1)|(1<<4)|(1<<6)|(1<<9)|(1<<10)|(1<<11)|(1<<12)|(1<<13);
+			}
+			break;
+		case VPU_V_AVC:
+		case VPU_V_AVC_MVC:
+			/*
+			bit[0..31]:
+				5	AVCERR_BIT_DEPTH_LUMA_MINUS8
+				6	AVCERR_BIT_DEPTH_CHROMA_MINUS8
+				17	AVCERR_OVER_MAX_MB_SIZE
+				18	AVCERR_NOT_SUPPORT_PROFILEIDC
+				19	AVCERR_NOT_SUPPORT_LEVELIDC
+			*/
+			nMask_NotSupported=(1<<5)|(1<<6)|(1<<17)|(1<<18)|(1<<19);
+			break;
+		case VPU_V_VC1:
+		case VPU_V_VC1_AP:
+			/*
+			bit[0..31]:
+				3	VC1ERR_COMPLEX_PROFILE
+				4	VC1ERR_YUV411
+				5	VC1ERR_SPRITE
+			*/
+			nMask_NotSupported=(1<<3)|(1<<4)|(1<<5);
+			break;
+		case VPU_V_MPEG2:
+			/*
+			bit[0..31]:
+				8	MP2ERR_CHROMA_FORMAT.
+				16	MP2ERR_NOT_SUPPORTED_PROFILE
+			*/
+			nMask_NotSupported=(1<<8)|(1<<16);
+			break;
+		case VPU_V_AVS:
+			/*
+			bit[0..31]:
+				1	AVSERR_PROFILE
+			*/
+			nMask_NotSupported=(1<<1);
+			break;
+		case VPU_V_RV:
+		case VPU_V_MJPG:
+		case VPU_V_VP8:
+		default:
+			VPU_LOG("ignore error info for format: %d \r\n",pObj->CodecFormat);
+			break;
+		}
+	}
+	else{
+		VPU_LOG("ignore error info for non-IMX6 platform \r\n");
+	}
+
+	if(pInitInfo->errorcode & nMask_NotSupported){
+		pObj->nLastErrorInfo=VPU_DEC_ERR_NOT_SUPPORTED;
+		VPU_ERROR("not supported : errorcode: 0x%X \r\n",(unsigned int)pInitInfo->errorcode);
+	}
+	else if(pInitInfo->errorcode & nMask_Corrupt){
+		pObj->nLastErrorInfo=VPU_DEC_ERR_CORRUPT;
+		VPU_ERROR("corrupt : errorcode: 0x%X \r\n",(unsigned int)pInitInfo->errorcode);
+	}
+	else{
+		//nothing
+	}
+	
+	return 1;
+}
+
 int VpuSeqInit(DecHandle InVpuHandle, VpuDecObj* pObj ,VpuBufferNode* pInData,int* pOutRetCode,int * pNoErr) 
 {
 	RetCode ret;
@@ -2478,9 +2592,11 @@ int VpuSeqInit(DecHandle InVpuHandle, VpuDecObj* pObj ,VpuBufferNode* pInData,in
 				pObj->nPrivateSeqHeaderInserted=0; //need to re-fill the header next round
 			}
 		}
+		VpuUpdateErrInfo(pObj,&initInfo);
 		//check some special case: and report error to let application exist directly
 		if(ret==RETCODE_NOT_SUPPORTED){
 			*pNoErr=0;
+			pObj->nLastErrorInfo=VPU_DEC_ERR_NOT_SUPPORTED;
 		}
 		return 0;
 	}
@@ -4916,7 +5032,7 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
 	pObj->sDecOpenParam=sDecOpenParam; /*backup open parameters*/
 
 	pObj->initDataCountThd=VPU_MAX_INIT_LOOP;
-	
+	pObj->nLastErrorInfo=VPU_DEC_ERR_UNFOUND;
 	*pOutHandle=(VpuDecHandle)pVpuObj;
 
 	return VPU_DEC_RET_SUCCESS;
@@ -6235,6 +6351,18 @@ VpuDecRetCode VPU_DecReset(VpuDecHandle InHandle)
 	
 }
 
+VpuDecRetCode VPU_DecGetErrInfo(VpuDecHandle InHandle,VpuDecErrInfo* pErrInfo)
+{
+	/*it return the last error info*/
+	VpuDecHandleInternal * pVpuObj;	
+	if(InHandle==NULL){
+		VPU_ERROR("%s: failure: handle is null \r\n",__FUNCTION__);
+		return VPU_DEC_RET_INVALID_HANDLE;
+	}
+	pVpuObj=(VpuDecHandleInternal *)InHandle;
+	*pErrInfo=pVpuObj->obj.nLastErrorInfo;
+	return VPU_DEC_RET_SUCCESS;
+}
 
 VpuDecRetCode VPU_DecGetMem(VpuMemDesc* pInOutMem)
 {

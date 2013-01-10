@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2010-2012, Freescale Semiconductor Inc.,
+ *  Copyright (c) 2010-2013, Freescale Semiconductor Inc.,
  *  All Rights Reserved.
  *
  *  The following programs are the sole property of Freescale Semiconductor Inc.,
@@ -337,7 +337,7 @@ int fb_render_drawYUVframe(int handle,unsigned char* pY,unsigned char* pU,unsign
 	
 }
 #else
-
+#include "stdio.h"
 int fb_render_init(int* pHandle,int fb_num,int width , int height)
 {
 	printf("%s: not implemented ! \r\n",__FUNCTION__);
