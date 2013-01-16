@@ -28,7 +28,7 @@ extern "C" {
 /**************************** version info ***********************************/
 #define VPU_WRAPPER_VERSION(major, minor, release)	 \
 	(((major) << 16) + ((minor) << 8) + (release))
-#define VPU_WRAPPER_VERSION_CODE	VPU_WRAPPER_VERSION(1, 0, 32)
+#define VPU_WRAPPER_VERSION_CODE	VPU_WRAPPER_VERSION(1, 0, 33)
 
 /**************************** decoder part **********************************/
 
@@ -619,6 +619,7 @@ typedef enum {
 	//VPU_DEC_CONF_ISEARCH,
 	//VPU_DEC_CONF_BLOCK,
 	//VPU_DEC_CONF_NONEBLOCK,
+	VPU_ENC_CONF_BIT_RATE,  /*parameter: kbps*/
 } VpuEncConfig;
 
 

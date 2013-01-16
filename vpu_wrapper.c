@@ -7873,6 +7873,7 @@ VpuEncRetCode VPU_EncConfig(VpuEncHandle InHandle, VpuEncConfig InEncConf, void*
 {
 	VpuEncHandleInternal * pVpuObj;
 	VpuEncObj* pObj;
+	int para;
 	if(InHandle==NULL)
 	{
 		VPU_ENC_ERROR("%s: failure: handle is null \r\n",__FUNCTION__);		
@@ -7887,6 +7888,14 @@ VpuEncRetCode VPU_EncConfig(VpuEncHandle InHandle, VpuEncConfig InEncConf, void*
 		//case VPU_DEC_CONF_SKIPNONE:
 		//	break;
 		case VPU_ENC_CONF_NONE:
+			break;
+		case VPU_ENC_CONF_BIT_RATE:
+			para=*((int*)pInParam);
+			if(para<0){
+				VPU_ENC_ERROR("%s: invalid bit rate parameter: %d \r\n",__FUNCTION__,para);
+				return VPU_ENC_RET_INVALID_PARAM;
+			}
+			vpu_EncGiveCommand(pVpuObj->handle, ENC_SET_BITRATE, &para);
 			break;
 		default:
 			VPU_ENC_ERROR("%s: failure: invalid setting \r\n",__FUNCTION__);	
