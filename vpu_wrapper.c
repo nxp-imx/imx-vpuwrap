@@ -5808,15 +5808,21 @@ VpuDecRetCode VPU_DecFlushAll(VpuDecHandle InHandle)
 #ifdef VPU_FLUSH_BEFORE_DEC_WORKAROUND
 	if(0==pObj->realWork)
 	{
-		//FIXME: for stream mode, it is still unsure !!!!!
-		ASSERT(pObj->filemode==1);
-		if(pObj->filemode==0)
-		{
-			//should skip calling bit flush in VpuDecClearOperationEOStoDEC() ???
-			return VPU_DEC_RET_SUCCESS;
+		if(CPU_IS_MX6X()){
+			//fix ENGR242394: need to flush buffer to avoid get unexpected output
+			VPU_LOG(" flush before starting working \r\n");
 		}
-		//must skip update 0, otherwise, vpu always return -1(EOS) even feed it with valid data later
-		goto FLUSH_FINISH;
+		else{
+			//FIXME: for stream mode, it is still unsure !!!!!
+			ASSERT(pObj->filemode==1);
+			if(pObj->filemode==0)
+			{
+				//should skip calling bit flush in VpuDecClearOperationEOStoDEC() ???
+				return VPU_DEC_RET_SUCCESS;
+			}
+			//must skip update 0, otherwise, vpu always return -1(EOS) even feed it with valid data later
+			goto FLUSH_FINISH;
+		}
 	}
 #endif
 
