@@ -102,6 +102,8 @@
 
 #define VPU_FILEMODE_MERGE_FLAG	1
 
+//#define VPU_USE_UNSPECIFIED_RATIO  //added for special case
+
 //#define VPU_BACKDOOR	//use some special backdoor
 #ifdef VPU_BACKDOOR
 #define IMX6Q	//only for compiler vpu_reg.h
@@ -1228,7 +1230,7 @@ CODE	HEIGHT/WIDTH	COMMENT
 						break;
 				}
 			}
-#if 0		//added for special case
+#ifdef VPU_USE_UNSPECIFIED_RATIO  //added for special case
 			else if(0xFFFFFFFF==InRatio){
 				//unspecified
 				return 0xFFFFFFFF;
@@ -1512,8 +1514,11 @@ VpuFieldType VpuConvertFieldType(VpuCodStd InCodec,DecOutputInfo * pCurDecFrameI
 			if (pCurDecFrameInfo->interlacedFrame
 				|| !pCurDecFrameInfo->progressiveFrame)
 			{
-				if (pCurDecFrameInfo->pictureStructure == 1) eField= VPU_FIELD_TOP;
-				else if (pCurDecFrameInfo->pictureStructure == 2) eField= VPU_FIELD_BOTTOM;
+				/* pictureStructure: 1 => current struct represent the top info, the bottom info has been written. e.g. decode order: bottom  + top
+				     pictureStructure: 2 => current struct represent the bottom info, the top info has been written. e.g. decode order: top + bottom
+				*/
+				if (pCurDecFrameInfo->pictureStructure == 1) eField=VPU_FIELD_BT ;//VPU_FIELD_TOP;
+				else if (pCurDecFrameInfo->pictureStructure == 2) eField= VPU_FIELD_TB;//VPU_FIELD_BOTTOM;
 				else if (pCurDecFrameInfo->pictureStructure == 3)
 				{
 					if (pCurDecFrameInfo->topFieldFirst) eField = VPU_FIELD_TB;
@@ -1770,7 +1775,7 @@ int VpuSaveDecodedFrameInfo(VpuDecObj* pObj, int index,DecOutputInfo * pCurDecFr
 	return 1;
 }
 
-int VpuLoadDispFrameInfo(VpuDecObj* pObj, int index,VpuDecOutFrameInfo* pDispFrameInfo)
+int VpuLoadDispFrameInfo(VpuDecObj* pObj, int index,VpuDecOutFrameInfo* pDispFrameInfo,DecOutputInfo * pCurDisFrameInfo)
 {
 	VpuFrameBufInfo * pSrcInfo;
 	
@@ -1787,6 +1792,27 @@ int VpuLoadDispFrameInfo(VpuDecObj* pObj, int index,VpuDecOutFrameInfo* pDispFra
 	//pDispFrameInfo->nRepeatFirstField=pSrcInfo->repeatFirstField;
 	//pDispFrameInfo->nConsumedByte=pSrcInfo->consumedBytes;
 	pDispFrameInfo->eFieldType=pSrcInfo->eFieldType;
+	if((pObj->CodecFormat==VPU_V_AVC)&&(pDispFrameInfo->eFieldType!=VPU_FIELD_NONE)){
+		/*	h264Npf: Field information based on display frame index
+			0 - paired field
+			1 - bottom (top-field missing)
+			2 - top (bottom-field missing)
+			3 - none (top-bottom missing)
+		*/
+		switch(pCurDisFrameInfo->h264Npf){
+			case 0: //ignore
+				break;
+			case 1:
+				pDispFrameInfo->eFieldType=VPU_FIELD_BOTTOM;
+				break;
+			case 2:
+				pDispFrameInfo->eFieldType=VPU_FIELD_TOP;
+				break;
+			case 3:  //ignore
+			default:
+				break;
+		}
+	}
 	pDispFrameInfo->nMVCViewID=pSrcInfo->viewID;	
 
 	/*dynamic resolution and ratio*/
@@ -2315,6 +2341,9 @@ int VpuSeqInit(DecHandle InVpuHandle, VpuDecObj* pObj ,VpuBufferNode* pInData,in
 				//do nothing
 				//1 for identify raw data ( .rcv/.vc1), user should not clear sCodecData.nSize before seqinit finished !!!
 			}
+			else if(pInData->nSize==0){
+				//do nothing for invalid data
+			}
 			else if(pObj->nPrivateSeqHeaderInserted==0)
 			{
 				//insert private data
@@ -2374,6 +2403,9 @@ int VpuSeqInit(DecHandle InVpuHandle, VpuDecObj* pObj ,VpuBufferNode* pInData,in
 				//do nothing
 				//1 for identify raw data , user should set 0xFFFFFFF to sCodecData.nSize before seqinit finished !!!
 			}
+			else if(pInData->nSize==0){
+				//do nothing for invalid data
+			}
 			else
 			{
 				if(pObj->nPrivateSeqHeaderInserted==0)
@@ -2417,6 +2449,9 @@ int VpuSeqInit(DecHandle InVpuHandle, VpuDecObj* pObj ,VpuBufferNode* pInData,in
 					//raw data ??
 					//do nothing
 					//1 for identify raw data , user should set 0xFFFFFFF to sCodecData.nSize before seqinit finished !!!
+				}
+				else if(pInData->nSize==0){
+					//do nothing for invalid data
 				}
 				else
 				{
@@ -3125,7 +3160,7 @@ int VpuGetOutput(DecHandle InVpuHandle, VpuDecObj* pObj,int* pOutRetCode,int InS
 					pObj->frameInfo.pDisplayFrameBuf=pFrameDisp;
 					//load current display frame info
 					ASSERT(pObj->frameBufInfo[index].viewID==outInfo.mvcPicInfo.viewIdxDisplay);
-					VpuLoadDispFrameInfo(pObj,index,&pObj->frameInfo);
+					VpuLoadDispFrameInfo(pObj,index,&pObj->frameInfo,&outInfo);
 				}
 				picType=pObj->frameInfo.ePicType;
 				if((pObj->CodecFormat==VPU_V_VC1_AP) && (outInfo.indexFrameRangemap>=0))
@@ -7091,6 +7126,10 @@ int VpuEncGetIntraQP(VpuEncOpenParamSimp * pInParam)
 VpuEncRetCode VPU_EncLoad()
 {
 	RetCode ret;
+
+	/*parser log level*/
+	VpuLogLevelParse(NULL);	
+
 	VPU_ENC_API("calling vpu_Init() \r\n");	
 	ret=vpu_Init(NULL);
 	if(RETCODE_SUCCESS !=ret)
