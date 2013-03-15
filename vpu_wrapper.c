@@ -5846,6 +5846,23 @@ VpuDecRetCode VPU_DecFlushAll(VpuDecHandle InHandle)
 		if(CPU_IS_MX6X()){
 			//fix ENGR242394: need to flush buffer to avoid get unexpected output
 			VPU_LOG(" flush before starting working \r\n");
+#if 1 //flush_before_start_workaround
+			/*	for some codec, such as AVC: [SPS + PPS] + Frame + Frame + Frame
+				(1) seqinit: vpu only read SPS;
+				(2) start the first frame: vpu will read PPS and decode frame
+				If bitstream buffer is flushed between (1) and (2), and no PPS feed to vpu later, 
+				vpu won't have opportunity to parse PPS info again, as result, no any valid frame are decoded until EOS.
+				so, we need to call vpu_DecStartOneFrame()/vpu_DecGetOutputInfo() to push vpu parse PPS info before vpu_DecBitBufferFlush().
+			*/
+			if(startFrameOK==0){
+				VPU_API("calling vpu_DecStartOneFrame \r\n");
+				ret = vpu_DecStartOneFrame(pVpuObj->handle, &decParam);
+				if(ret!=RETCODE_SUCCESS){
+					VPU_ERROR("vpu_DecStartOneFrame fail: %d !!!!!!!!!!!!\r\n",ret);
+				}
+				startFrameOK=1;
+			}
+#endif //flush_before_start_workaround
 		}
 		else{
 			//FIXME: for stream mode, it is still unsure !!!!!
@@ -5930,6 +5947,13 @@ VpuDecRetCode VPU_DecFlushAll(VpuDecHandle InHandle)
 					}
 					//clear frame state
 					VpuClearDispFrame(outInfo.indexFrameDisplay, pObj->frameBufState);						
+				}
+				if(outInfo.indexFrameDecoded>=0){
+					VPU_API("%s: calling vpu_DecClrDispFlag() to clear decoded index: %d \r\n",__FUNCTION__,outInfo.indexFrameDecoded);
+					ret=vpu_DecClrDispFlag(pVpuObj->handle,outInfo.indexFrameDecoded);
+					if(RETCODE_SUCCESS!=ret){
+						VPU_ERROR("%s: vpu clear display frame failure, index=0x%X, ret=%d \r\n",__FUNCTION__,outInfo.indexFrameDecoded,ret);
+					}
 				}
 			}
 		}
