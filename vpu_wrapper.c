@@ -174,6 +174,7 @@ static int g_seek_dump=DUMP_ALL_DATA;	/*0: only dump data after seeking; otherwi
 //#define IMX6_INTER_DEBUG_RD_WR	//internal debug: rd wr register
 //#define IMX6_INTER_DEBUG	//internal debug
 //#define IMX6_BITBUFSPACE_WORKAROUND	//the free sapce may be not correct for FW version 2.1.3 or later
+#define IMX6_WRONG_EOS_WORKAROUND //for mpeg4, vpu may report disIndx=-1(EOS) in the middle of clip after seeking
 #endif
 /****************************** cpu version ***************************************/
 #define CPU_IS_MX5X  cpu_is_mx5x
@@ -2948,6 +2949,13 @@ int VpuGetOutput(DecHandle InVpuHandle, VpuDecObj* pObj,int* pOutRetCode,int InS
 				}
 				//pObj->mjpg_frmidx=(pObj->mjpg_frmidx+1)%pObj->frameNum;
 			}
+
+#ifdef IMX6_WRONG_EOS_WORKAROUND
+			if((CPU_IS_MX6X()) && (outInfo.indexFrameDecoded>=0) && (outInfo.indexFrameDisplay==VPU_OUT_DIS_INDEX_EOS)){
+				VPU_ERROR("warning: vpu report wrong EOS flag, rectify disIndx from -1 to -3 \r\n");
+				outInfo.indexFrameDisplay=VPU_OUT_DIS_INDEX_NODIS;
+			}
+#endif
 
 			//update state
 			//pObj->state=VPU_DEC_STATE_OUTOK;
