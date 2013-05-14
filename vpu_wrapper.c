@@ -6537,7 +6537,8 @@ typedef struct
 	int nMapType;
 	int nLinear2TiledEnable;
 	//int nChromaInterleave;
-	VpuColorFormat eColor;		// only for MJPEG non-420 color format	
+	VpuColorFormat eColor;		// only for MJPEG non-420 color format
+	int nInsertSPSPPSToIDR;		// SPS/PPS is requred for every IDR, including the first IDR.
 }VpuEncObj;
 
 typedef struct 
@@ -7506,6 +7507,8 @@ VpuEncRetCode VPU_EncOpen(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEn
 	pObj->nOutputHeaderCnt=0;
 #endif
 
+	pObj->nInsertSPSPPSToIDR=0;
+
 	*pOutHandle=(VpuEncHandle)pVpuObj;	
 
 	return VPU_ENC_RET_SUCCESS;
@@ -7540,7 +7543,7 @@ VpuEncRetCode VPU_EncOpenSimp(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,V
 	sEncOpenParamMore.nInitialDelay=0;
 	sEncOpenParamMore.nVbvBufferSize=0;
 
-	sEncOpenParamMore.nIntraRefresh = 0;
+	sEncOpenParamMore.nIntraRefresh = pInParam->nIntraRefresh;
 	//sEncOpenParamMore.nRcIntraQp = -1;
 	sEncOpenParamMore.nRcIntraQp =VpuEncGetIntraQP(pInParam);
 
@@ -7974,6 +7977,23 @@ VpuEncRetCode VPU_EncConfig(VpuEncHandle InHandle, VpuEncConfig InEncConf, void*
 			}
 			vpu_EncGiveCommand(pVpuObj->handle, ENC_SET_BITRATE, &para);
 			break;
+		case VPU_ENC_CONF_INTRA_REFRESH:
+			para=*((int*)pInParam);
+			if(para<0){
+				VPU_ENC_ERROR("%s: invalid intra refresh parameter: %d \r\n",__FUNCTION__,para);
+				return VPU_ENC_RET_INVALID_PARAM;
+			}
+			VPU_ENC_LOG("%s: intra fresh number: %d \r\n",__FUNCTION__,para);
+			vpu_EncGiveCommand(pVpuObj->handle, ENC_SET_INTRA_MB_REFRESH_NUMBER, &para);
+			break;
+		case VPU_ENC_CONF_ENA_SPSPPS_IDR:
+			/*	nInsertSPSPPSToIDR
+				0: sequence header(SPS/PPS) + IDR +P +P +...+ (SPS/PPS)+IDR+....
+				1: sequence header(SPS/PPS) + (SPS/PPS)+IDR +P +P +...+ (SPS/PPS)+IDR+....
+			*/
+			VPU_ENC_LOG("%s: enable SPS/PPS for IDR frames %d \r\n",__FUNCTION__);
+			pObj->nInsertSPSPPSToIDR=1;
+			break;
 		default:
 			VPU_ENC_ERROR("%s: failure: invalid setting \r\n",__FUNCTION__);	
 			return VPU_ENC_RET_INVALID_PARAM;
@@ -8009,7 +8029,7 @@ VpuEncRetCode VPU_EncEncodeFrame(VpuEncHandle InHandle, VpuEncEncParam* pInOutPa
 	if((1==pVpuObj->obj.nHeaderNeeded)||((VPU_V_AVC==pInOutParam->eFormat)&&(0!=pInOutParam->nForceIPicture)))
 	{
 #ifdef VPU_ENC_SEQ_DATA_SEPERATE	
-		if(1==pVpuObj->obj.nJustOutputOneHeader)
+		if((1==pVpuObj->obj.nJustOutputOneHeader)&&(pVpuObj->obj.nInsertSPSPPSToIDR==0))
 		{
 			//avoid dead loop in filling header
 		}
