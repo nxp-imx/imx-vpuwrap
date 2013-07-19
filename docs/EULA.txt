@@ -3,7 +3,7 @@ LA_OPT27 v4 June 2013
 FREESCALE SEMICONDUCTOR SOFTWARE LICENSE AGREEMENT
  
 IMPORTANT. Read the following Freescale Semiconductor Software License 
-Agreement ("Agreement? completely. By selecting the "I Accept" button at the 
+Agreement ("Agreement") completely. By selecting the "I Accept" button at the 
 end of this page, you indicate that you accept the terms of this Agreement. You 
 may then download the file. 
  
@@ -57,7 +57,7 @@ Section 2.                Licenses
 granted in this Section 2, are as identified on Appendix A.
 
 2.2              For Freescale Licensed Software, Freescale grants you a world-wide, personal, non-
-transferable, non-exclusive, license, under Freescale’s Intellectual Property Rights:
+transferable, non-exclusive, license, under Freescale's Intellectual Property Rights:
 
 (a)                to use, only as part of, or integrated within, Authorized Systems and not on a 
 stand alone basis, the Licensed Software;
@@ -79,7 +79,7 @@ integrated.
  
 2.3              For Freescale Licensed Software provided to you in source code form (human readable), 
 Freescale further grants to you a worldwide, personal, non-transferable, non-exclusive, license, 
-under Freescale’s Intellectual Property Rights:
+under Freescale's Intellectual Property Rights:
 
 (a)                to prepare derivative works, only as part of, or integrated within, Authorized 
 Systems and not on a stand alone basis, of the Licensed Software;
@@ -94,7 +94,7 @@ Systems.
 2.4              You may use subcontractors on your premises to exercise your rights under Section 2.2 
 and 2.3 so long as you have an agreement in place with the subcontractor containing 
 confidentiality restrictions no less stringent than those contained in this Agreement.  You will 
-remain liable for your subcontractors?adherence to the terms of this Agreement and for any and 
+remain liable for your subcontractors' adherence to the terms of this Agreement and for any and 
 all acts and omissions of such subcontractors with respect to this Agreement and the Licensed 
 Software.
 
@@ -117,7 +117,7 @@ Software except to the extent applicable law specifically prohibits such restric
 prohibit your sub-licensees from translating, reverse engineering, decompiling, or disassembling 
 the Licensed Software except to the extent applicable law specifically prohibits such restriction.
 
-2.9              You must reproduce any and all of Freescale's (or its third party licensor’s) copyright 
+2.9              You must reproduce any and all of Freescale's (or its third party licensor's) copyright 
 notices and other proprietary legends on copies of Licensed Software. 
 
 2.10          If you distribute the Licensed Software to the United States Government, then the 
@@ -141,7 +141,7 @@ charge.
  
 Section 3.                Intellectual Property Rights
 
-3.1              Subject to Freescale’s ownership interest in the underlying Licensed Software, all 
+3.1              Subject to Freescale's ownership interest in the underlying Licensed Software, all 
 intellectual property rights associated with, and title to, your Authorized System will be retained 
 by or will vest in you.   
 
@@ -153,7 +153,7 @@ preserve or enforce such right.  Further, you agree to waive all moral rights re
 modifications to the Licensed Software, including, without limitation, any and all rights of 
 identification of authorship and any and all rights of approval, restriction, or limitation on use or 
 subsequent modification.  Notwithstanding the foregoing, you will have the license rights 
-granted in Section 2 hereto to any such modifications made by you or your licensor’s.
+granted in Section 2 hereto to any such modifications made by you or your licensor's.
 
 
 Section 4.                Patent Covenant not to Sue
@@ -200,7 +200,7 @@ archival copies to be used solely for dispute resolution purposes, in whole or i
 of the Licensed Software have been destroyed.
 
 5.7              Notwithstanding the termination of this Agreement for any reason, the terms of Sections 
-1, 2.5 ?2.12, 3, 4, 5.6, 5.7, 7 and 8 will survive.
+1, 2.5 - 2.12, 3, 4, 5.6, 5.7, 7 and 8 will survive.
 
 
 Section 6.                Warranty
@@ -235,9 +235,9 @@ BE DISCLAIMED BY LAW.
 Section 7.                Indemnification
 
 7.1              You will defend, indemnify and hold harmless Freescale from any and all damages 
-claims, liabilities, and costs (including reasonable attorney’s fees) related to your (including 
-contractor’s and licensee’s) use of the Licensed Software and/or (2) your (including contractor’s 
-and licensee’s) violation of the terms and conditions of this Agreement.  You are excused from 
+claims, liabilities, and costs (including reasonable attorney's fees) related to your (including 
+contractor's and licensee's) use of the Licensed Software and/or (2) your (including contractor's 
+and licensee's) violation of the terms and conditions of this Agreement.  You are excused from 
 this obligation to the extent any such claim arises solely from the Licensed Software as provided 
 by Freescale.
 
@@ -284,7 +284,7 @@ INCIDENTAL, SPECIAL, INDIRECT, CONSEQUENTIAL OR PUNITIVE DAMAGES,
 INCLUDING, BUT NOT LIMITED TO, DAMAGES FOR ANY LOSS OF USE, LOSS OF 
 TIME, INCONVENIENCE, COMMERCIAL LOSS, OR LOST PROFITS, SAVINGS, OR 
 REVENUES, TO THE FULL EXTENT SUCH MAY BE DISCLAIMED BY LAW.  
-FREESCALE’S TOTAL LIABILITY FOR ANY AND ALL COSTS, DAMAGES, CLAIMS, 
+FREESCALE'S TOTAL LIABILITY FOR ANY AND ALL COSTS, DAMAGES, CLAIMS, 
 OR LOSSES WHATSOEVER ARISING OUT OF OR IN CONNECTION WITH THIS 
 AGREEMENT OR PRODUCT(S) SUPPLIED UNDER THIS AGREEMENT IS LIMITED 
 TO THE AGGREGATE AMOUNT PAID BY YOU TO FREESCALE IN CONNECTION 
@@ -319,7 +319,7 @@ unenforceable the remaining provisions of this Agreement will be unimpaired and,
 modification or replacement of the invalid or unenforceable provision is further held to deprive a 
 party of a material benefit, in which case the Agreement will immediately terminate, the invalid 
 or unenforceable provision will be replaced with a provision that is valid and enforceable and that 
-comes closest to the parties?intention underlying the invalid or unenforceable provision.
+comes closest to the parties' intention underlying the invalid or unenforceable provision.
 
 8.10          Succession and Assignment.   This Agreement will be binding upon and inure to the 
 benefit of the parties and their permitted successors and assigns.  Neither party may assign this 
@@ -336,7 +336,7 @@ in which a product failure could cause personal injury or death.  If you permit 
 uses of Licensed Software for these unintended or unauthorized uses, you will 
 fully indemnify, defend, and hold harmless Freescale, its Affiliates, subsidiaries, 
 officers and directors, employees, and distributors from all liability related to such 
-use, including attorneys?fees and costs.
+use, including attorneys' fees and costs.
 
 8.12          Export.              If, at the time or times of Freescale's performance hereunder, an export 
 license is required for Freescale to lawfully export Licensed Software, then the issuance of the 
@@ -407,8 +407,9 @@ Software from Microsoft.
 Microsoft does not provide support services for the components provide to you 
 through this Agreement.  If you have any questions or require technical assistance, 
 please contact Freescale.  Microsoft Corporation is a third party beneficiary to this 
-Agreement with the right to enforce the terms of this Agreement.  TO THE 
-MAXIMUM EXTENT PERMITTED BY LAW, MICROSOFT AND ITS 
+Agreement with the right to enforce the terms of this Agreement.  
+
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, MICROSOFT AND ITS 
 AFFILIATES DISCLAIM ANY WARRANTIES FOR THE MICROSOFT 
 UNDERLYING SOFTWARE.  TO THE MAXIMUM EXTENT PERMITTED BY 
 LAW, NEITHER MICROSOFT NOR ITS AFFILIATES WILL BE LIABLE, 
