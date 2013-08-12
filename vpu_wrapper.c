@@ -2723,7 +2723,7 @@ int VpuSeqInit(DecHandle InVpuHandle, VpuDecObj* pObj ,VpuBufferNode* pInData,in
 		total_size=0;
 		total_loop=0;
 
-		VPU_API("%s:vpu init OK: [width x heigh]=[%d x %d] \r\n",__FUNCTION__,initInfo.picWidth,initInfo.picHeight);
+		VPU_API("%s:vpu init OK: [width x heigh]=[%d x %d] , mini count: %d \r\n",__FUNCTION__,initInfo.picWidth,initInfo.picHeight,initInfo.minFrameBufferCount);
 #ifdef VPU_FILEMODE_INTERLACE_TIMESTAMP_ENHANCE
 		if((1==pObj->filemode)&&(1==initInfo.interlace)&&(VPU_V_AVC==pObj->CodecFormat))	//FIXME: now only process for H.264 ???
 		{
@@ -7581,7 +7581,7 @@ VpuEncRetCode VPU_EncOpenSimp(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,V
 			sEncOpenParamMore.VpuEncStdParam.avcParam.avc_disableDeblk = 0;
 			sEncOpenParamMore.VpuEncStdParam.avcParam.avc_deblkFilterOffsetAlpha = 6;
 			sEncOpenParamMore.VpuEncStdParam.avcParam.avc_deblkFilterOffsetBeta = 0;
-			sEncOpenParamMore.VpuEncStdParam.avcParam.avc_chromaQpOffset = 10;
+			sEncOpenParamMore.VpuEncStdParam.avcParam.avc_chromaQpOffset = 0;
 			sEncOpenParamMore.VpuEncStdParam.avcParam.avc_audEnable = 0;
 			sEncOpenParamMore.VpuEncStdParam.avcParam.avc_fmoEnable = 0;
 			sEncOpenParamMore.VpuEncStdParam.avcParam.avc_fmoType = 0;
