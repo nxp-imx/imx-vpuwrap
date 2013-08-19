@@ -3754,7 +3754,7 @@ int VpuResolutionChangeProcess(DecHandle* pInOutVpuHandle, VpuDecObj* pObj)
 	{
 		vpu_free(pObj->pSeqBak);
 	}
-	pObj->pSeqBak=vpu_malloc(nBakLen);
+	pObj->pSeqBak=vpu_malloc(nBakLen+16);//+16 since there will be one additonal byte copied into this buffer
 	if(NULL==pObj->pSeqBak)
 	{
 		VPU_ERROR("malloc %d bytes failure \r\n",nBakLen);
