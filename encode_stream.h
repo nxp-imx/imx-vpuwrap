@@ -97,6 +97,8 @@ typedef struct
 	EncOneFrame* pfOneFrameBeg;
 	EncOneFrame* pfOneFrameEnd;
 
+	int nEncFps;
+	int nTotalFps;
 	// internal testing for repeat
 	int nRepeatNum;		
 }EncContxt;

@@ -7171,6 +7171,7 @@ VpuEncRetCode VPU_EncLoad()
 		return VPU_ENC_RET_FAILURE;
 	}
 
+	//TIMER_INIT;
 	return VPU_ENC_RET_SUCCESS;
 }
 
@@ -7193,6 +7194,7 @@ VpuEncRetCode VPU_EncUnLoad()
 
 	VPU_ENC_API("calling vpu_UnInit() \r\n");
 	vpu_UnInit();
+	//TIMER_REPORT(...);
 	return VPU_ENC_RET_SUCCESS;	
 }
 
@@ -8166,6 +8168,7 @@ VpuEncRetCode VPU_EncEncodeFrame(VpuEncHandle InHandle, VpuEncEncParam* pInOutPa
 			(UINT32)sEncParam.sourceFrame->bufY,(UINT32)sEncParam.sourceFrame->bufCb,(UINT32)sEncParam.sourceFrame->bufCr,
 			(UINT32)sEncParam.sourceFrame->strideY,(UINT32)sEncParam.sourceFrame->strideC,(UINT32)pInOutParam->nInInputSize);
 		VPU_ENC_API("calling vpu_EncStartOneFrame(): dynamic buff: 0x%X , size: %d \r\n",(UINT32)sEncParam.picStreamBufferAddr,sEncParam.picStreamBufferSize);
+		//TIMER_START(...);
 		ret = vpu_EncStartOneFrame(pVpuObj->handle, &sEncParam);
 		if (ret != RETCODE_SUCCESS)
 		{
@@ -8188,6 +8191,7 @@ VpuEncRetCode VPU_EncEncodeFrame(VpuEncHandle InHandle, VpuEncEncParam* pInOutPa
 			VPU_ENC_ERROR("vpu_EncGetOutputInfo failed Err code: %d \r\n",ret);
 			return VPU_ENC_RET_FAILURE;
 		}
+		//TIMER_STOP(...);
 		VPU_ENC_LOG("out frame: type: %d, addr: 0x%X, size: %d \r\n",(UINT32)sEncOutInfo.picType,(UINT32)sEncOutInfo.bitstreamBuffer,(UINT32)sEncOutInfo.bitstreamSize);
 
 		if(sEncOutInfo.skipEncoded)

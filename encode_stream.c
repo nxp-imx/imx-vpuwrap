@@ -23,6 +23,8 @@
 #include "encode_stream.h"
 #include "unistd.h"		//for usleep()
 
+#define ENC_USE_SIMPLEOPEN_API
+
 #ifdef ENC_STREAM_DEBUG
 #define ENC_STREAM_PRINTF printf
 #else
@@ -47,6 +49,41 @@ typedef struct
 	unsigned int phyMem_cpuAddr[VPU_ENC_MAX_NUM_MEM_REQS];
 	unsigned int phyMem_size[VPU_ENC_MAX_NUM_MEM_REQS];	
 }EncMemInfo;
+
+#if 1 // timer related part
+#include <sys/time.h>
+#define TIME_ENC_ID	0
+#define TIME_TOTAL_ID	1
+static struct timeval time_beg[2];
+static struct timeval time_end[2];
+static unsigned long long total_time[2];
+
+static void time_init(int id)
+{
+	total_time[id]=0;
+}
+
+static void time_start(int id)
+{
+	gettimeofday(&time_beg[id], 0);
+}
+
+static void time_stop(int id)
+{
+	unsigned int tm_1, tm_2;
+	gettimeofday(&time_end[id], 0);
+
+	tm_1 = time_beg[id].tv_sec * 1000000 + time_beg[id].tv_usec;
+	tm_2 = time_end[id].tv_sec * 1000000 + time_end[id].tv_usec;
+	total_time[id] = total_time[id] + (tm_2-tm_1);
+}
+
+static unsigned long long time_report(int id)
+{
+	return total_time[id];
+}
+#endif
+
 
 
 int EncConvertCodecFormat(int codec, VpuCodStd* pCodec)
@@ -545,6 +582,11 @@ int EncodeLoop(VpuEncHandle handle,EncContxt * pEncContxt,
 	unsigned char* pCbTopVir=NULL;	//for tile
 	unsigned char* pYBotVir=NULL;	//for field tile
 	unsigned char* pCbBotVir=NULL;	//for field tile
+	unsigned long long totalTime=0;
+
+	time_init(TIME_ENC_ID);
+	time_init(TIME_TOTAL_ID);
+	time_start(TIME_TOTAL_ID);
 
 RepeatEncode:
 
@@ -581,7 +623,13 @@ RepeatEncode:
 		sEncEncParam.nInVirtOutput=(unsigned int)pOutputVirt;
 		sEncEncParam.nInOutputBufLen=nOuputBufSize;
 
-		sEncEncParam.nForceIPicture = 0;
+		if(((nEncodedFrameNum%pEncContxt->nGOPSize)==0) && (VPU_V_AVC==sEncEncParam.eFormat)){
+			sEncEncParam.nForceIPicture = 1;
+			//ENC_STREAM_PRINTF("Force IDR \r\n");
+		}
+		else{
+			sEncEncParam.nForceIPicture = 0;
+		}
 		sEncEncParam.nSkipPicture = 0;
 		sEncEncParam.nEnableAutoSkip = pEncContxt->nEnableAutoSkip;//1;
 
@@ -633,7 +681,9 @@ RepeatEncode:
 #endif
 		
 		//encode frame
+		time_start(TIME_ENC_ID);		
 		ret=VPU_EncEncodeFrame(handle, &sEncEncParam);
+		time_stop(TIME_ENC_ID);
 
 		if(VPU_ENC_RET_SUCCESS!=ret)
 		{
@@ -668,7 +718,9 @@ RepeatEncode:
 
 			nValidOutSize=sEncEncParam.nOutOutputSize;
 			EncOutputFrameBitstream(pEncContxt, pOutputVirt, nValidOutSize);
-			nEncodedFrameNum++;
+			if(sEncEncParam.eOutRetCode & VPU_ENC_OUTPUT_DIS){
+				nEncodedFrameNum++;
+			}
 		}
 		else
 		{
@@ -687,9 +739,13 @@ RepeatEncode:
 	
 Exit:
 	//set output info for user
+	time_stop(TIME_TOTAL_ID);	
 	pEncContxt->nFrameNum=nEncodedFrameNum;
 	pEncContxt->nErr=err;
-
+	totalTime=time_report(TIME_ENC_ID);
+	pEncContxt->nEncFps=(unsigned long long)1000000*nEncodedFrameNum/totalTime;
+	totalTime=time_report(TIME_TOTAL_ID);
+	pEncContxt->nTotalFps=(unsigned long long)1000000*nEncodedFrameNum/totalTime;	
 	return ((err==0)?1:0);
 }
 
@@ -704,7 +760,8 @@ int encode_stream(EncContxt * pEncContxt)
 	EncMemInfo sEncMemInfo;	
 
 	VpuEncOpenParam sEncOpenParam;
-
+	VpuEncOpenParamSimp sEncOpenParamSimp;
+	
 	VpuEncInitInfo sEncInitInfo;
 	VpuFrameBuffer sFrameBuf[MAX_FRAME_NUM];
 	unsigned char* pInputPhy;
@@ -770,6 +827,31 @@ int encode_stream(EncContxt * pEncContxt)
 		return 0;
 	}
 
+#ifdef ENC_USE_SIMPLEOPEN_API
+	ENC_STREAM_PRINTF("using VPU_EncOpenSimp Interface \r\n");
+	memset(&sEncOpenParamSimp,0,sizeof(VpuEncOpenParamSimp));
+
+	if(0==EncConvertCodecFormat(pEncContxt->nCodec, &sEncOpenParamSimp.eFormat)){
+		ENC_STREAM_PRINTF("%s: unsupported codec format: id=%d \r\n",__FUNCTION__,pEncContxt->nCodec);
+		VPU_EncUnLoad();
+		return 0;		
+	}
+	if(0==EncConvertMirror(pEncContxt->nMirror, &sEncOpenParamSimp.sMirror)){
+		ENC_STREAM_PRINTF("%s: unsupported mirror method: id=%d \r\n",__FUNCTION__,pEncContxt->nMirror);
+		VPU_EncUnLoad();
+		return 0;		
+	}
+	sEncOpenParamSimp.nPicWidth= pEncContxt->nPicWidth;
+	sEncOpenParamSimp.nPicHeight=pEncContxt->nPicHeight;
+	sEncOpenParamSimp.nRotAngle=pEncContxt->nRotAngle;
+	sEncOpenParamSimp.nFrameRate=pEncContxt->nFrameRate;
+	sEncOpenParamSimp.nBitRate=pEncContxt->nBitRate;
+	sEncOpenParamSimp.nGOPSize=pEncContxt->nGOPSize;
+	//sEncOpenParamSimp.nIntraRefresh=pEncContxt->nPicWidth*pEncContxt->nPicHeight/256/10;
+	sEncOpenParamSimp.nChromaInterleave=pEncContxt->nChromaInterleave;
+	//open vpu			
+	ret=VPU_EncOpenSimp(&handle, &sMemInfo,&sEncOpenParamSimp);
+#else
 	//clear 0 firstly
 	memset(&sEncOpenParam,0,sizeof(VpuEncOpenParam));
 
@@ -800,7 +882,7 @@ int encode_stream(EncContxt * pEncContxt)
 	//open vpu			
 	EncSetMoreOpenPara(&sEncOpenParam, pEncContxt);
 	ret=VPU_EncOpen(&handle, &sMemInfo,&sEncOpenParam);
-
+#endif
 	if (ret!=VPU_ENC_RET_SUCCESS)
 	{
 		ENC_STREAM_PRINTF("%s: vpu open failure: ret=0x%X \r\n",__FUNCTION__,ret);

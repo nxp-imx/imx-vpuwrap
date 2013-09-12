@@ -366,8 +366,7 @@ int main(int argc, char **argv)
 
 	encContxt.nRepeatNum=ioParams.repeatnum;
 	noerr=encode_stream(&encContxt);
-
-	APP_DEBUG_PRINTF("Encoded Frame Num: %d,  [width x height] = [%d x %d] \r\n",encContxt.nFrameNum,encContxt.nPicWidth,encContxt.nPicHeight);
+	APP_DEBUG_PRINTF("Frame Num: %d,  [width x height] = [%d x %d], enc FPS: %d, total FPS: %d \r\n",encContxt.nFrameNum,encContxt.nPicWidth,encContxt.nPicHeight,encContxt.nEncFps,encContxt.nTotalFps);
 	if((0==noerr) || (0!=encContxt.nErr))
 	{
 		APP_DEBUG_PRINTF("Encode Failure \r\n");
