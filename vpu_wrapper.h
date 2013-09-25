@@ -28,7 +28,7 @@ extern "C" {
 /**************************** version info ***********************************/
 #define VPU_WRAPPER_VERSION(major, minor, release)	 \
 	(((major) << 16) + ((minor) << 8) + (release))
-#define VPU_WRAPPER_VERSION_CODE	VPU_WRAPPER_VERSION(1, 0, 40)
+#define VPU_WRAPPER_VERSION_CODE	VPU_WRAPPER_VERSION(1, 0, 41)
 
 /**************************** decoder part **********************************/
 
@@ -487,6 +487,7 @@ typedef struct {
 	int nBitRate;				/*unit: kbps*/
 	int nGOPSize;
 	int nIntraRefresh;		/*intra macro block numbers*/
+	int nIntraQP;				/*0: auto, >0: qp value*/
 	int nChromaInterleave;	/*should be set to 1 when (nMapType!=0)*/
 	VpuEncMirrorDirection sMirror;
 	//int nQuantParam;
@@ -623,6 +624,7 @@ typedef enum {
 	VPU_ENC_CONF_BIT_RATE,  /*parameter: kbps*/
 	VPU_ENC_CONF_INTRA_REFRESH, /*intra refresh: minimum number of macroblocks to refresh in a frame*/
 	VPU_ENC_CONF_ENA_SPSPPS_IDR, /*some muxers may ignore the sequence or config data(such as ts muxer), so SPS/PPS is needed for every IDR frame, including the first IDR*/
+	VPU_ENC_CONF_RC_INTRA_QP, /*intra qp value*/
 } VpuEncConfig;
 
 

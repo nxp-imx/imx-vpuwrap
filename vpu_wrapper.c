@@ -7547,7 +7547,12 @@ VpuEncRetCode VPU_EncOpenSimp(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,V
 
 	sEncOpenParamMore.nIntraRefresh = pInParam->nIntraRefresh;
 	//sEncOpenParamMore.nRcIntraQp = -1;
-	sEncOpenParamMore.nRcIntraQp =VpuEncGetIntraQP(pInParam);
+	if(0==pInParam->nIntraQP){
+		sEncOpenParamMore.nRcIntraQp =VpuEncGetIntraQP(pInParam);
+	}
+	else{
+		sEncOpenParamMore.nRcIntraQp=pInParam->nIntraQP;
+	}
 
 	sEncOpenParamMore.nUserQpMax = 0;
 	sEncOpenParamMore.nUserQpMin = 0;
@@ -7995,6 +8000,15 @@ VpuEncRetCode VPU_EncConfig(VpuEncHandle InHandle, VpuEncConfig InEncConf, void*
 			*/
 			VPU_ENC_LOG("%s: enable SPS/PPS for IDR frames %d \r\n",__FUNCTION__);
 			pObj->nInsertSPSPPSToIDR=1;
+			break;
+		case VPU_ENC_CONF_RC_INTRA_QP: /*avc: 0..51, other 1..31*/
+			para=*((int*)pInParam);
+			if(para<0){
+				VPU_ENC_ERROR("%s: invalid intra qp %d \r\n",__FUNCTION__,para);
+				return VPU_ENC_RET_INVALID_PARAM;
+			}
+			VPU_ENC_LOG("%s: intra qp : %d \r\n",__FUNCTION__,para);
+			vpu_EncGiveCommand(pVpuObj->handle, ENC_SET_INTRA_QP, &para);
 			break;
 		default:
 			VPU_ENC_ERROR("%s: failure: invalid setting \r\n",__FUNCTION__);	
