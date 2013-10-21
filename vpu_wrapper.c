@@ -5787,6 +5787,9 @@ VpuDecRetCode VPU_DecFlushAll(VpuDecHandle InHandle)
 	pVpuObj=(VpuDecHandleInternal *)InHandle;
 	pObj=&pVpuObj->obj;
 
+	//set dec parameters		
+	//clear 0 firstly
+	vpu_memset(&decParam,0,sizeof(DecParam));
 
 	switch (pObj->state)
 	{
@@ -5862,6 +5865,16 @@ VpuDecRetCode VPU_DecFlushAll(VpuDecHandle InHandle)
 				vpu won't have opportunity to parse PPS info again, as result, no any valid frame are decoded until EOS.
 				so, we need to call vpu_DecStartOneFrame()/vpu_DecGetOutputInfo() to push vpu parse PPS info before vpu_DecBitBufferFlush().
 			*/
+			if(VPU_V_VC1_AP==pObj->CodecFormat){
+				//fix ENGR00284031:
+				/*seqinit (only consume sequence header) -> flush (entry point header is flushed) -> decode (can't find valid entry point)
+				    but for VC1, it has some limitation. e.g vpu only decode current frame when find following start code. 
+				    so we need to fill one additional start code to push vpu consume the entry point as possible*/
+				unsigned char temp[4];
+				temp[0]=temp[1]=0;
+				temp[2]=0x1;
+				VpuFillData(pVpuObj->handle,pObj,temp,3,1,0);
+			}
 			if(startFrameOK==0){
 				VPU_API("calling vpu_DecStartOneFrame \r\n");
 				ret = vpu_DecStartOneFrame(pVpuObj->handle, &decParam);
@@ -5996,10 +6009,6 @@ VpuDecRetCode VPU_DecFlushAll(VpuDecHandle InHandle)
 		VPU_ERROR("%s: vpu update data failure: ret = 0x%X \r\n",__FUNCTION__,ret);	
 		return VPU_DEC_RET_FAILURE;
 	}
-
-	//set dec parameters		
-	//clear 0 firstly
-	vpu_memset(&decParam,0,sizeof(DecParam));
 
 #if 0 //if we have flushed bitstream before, we need not set skip mode
 	decParam.skipframeMode=0;
