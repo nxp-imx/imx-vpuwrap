@@ -175,6 +175,7 @@ static int g_seek_dump=DUMP_ALL_DATA;	/*0: only dump data after seeking; otherwi
 //#define IMX6_INTER_DEBUG	//internal debug
 //#define IMX6_BITBUFSPACE_WORKAROUND	//the free sapce may be not correct for FW version 2.1.3 or later
 #define IMX6_WRONG_EOS_WORKAROUND //for mpeg4, vpu may report disIndx=-1(EOS) in the middle of clip after seeking
+#define IMX6_VP8_SHOWFRAME_WORKAROUND //for special frame(show_frame=0) in vpu8, buffer may be decoded repeatedly, as a result, timestamp will be accumulated
 #endif
 /****************************** cpu version ***************************************/
 #define CPU_IS_MX5X  cpu_is_mx5x
@@ -2811,6 +2812,14 @@ int VpuGetOutput(DecHandle InVpuHandle, VpuDecObj* pObj,int* pOutRetCode,int InS
 			}
 			outInfo.decodingSuccess=0x1;
 		}
+#ifdef IMX6_VP8_SHOWFRAME_WORKAROUND
+		if((outInfo.indexFrameDecoded>=0) &&(VPU_OUT_DIS_INDEX_NODIS==outInfo.indexFrameDisplay)){			
+			//change (>0,-3) => (-2,-3) manually since no I frame (e.g no delay) for vp8
+			VPU_ERROR("find one invisible frame, skip it manually(need to notify user pop one time stamp) \r\n");
+			outInfo.indexFrameDecoded=VPU_OUT_DEC_INDEX_UNDEC;
+			InSkipMode=1;
+		}
+#endif
 	}
 	
 	if(!CPU_IS_MX6X())
