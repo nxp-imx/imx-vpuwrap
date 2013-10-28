@@ -6557,6 +6557,7 @@ typedef struct
 	//int nChromaInterleave;
 	VpuColorFormat eColor;		// only for MJPEG non-420 color format
 	int nInsertSPSPPSToIDR;		// SPS/PPS is requred for every IDR, including the first IDR.
+	int nIsAvcc;					// only for H.264 format
 }VpuEncObj;
 
 typedef struct 
@@ -7080,7 +7081,7 @@ int VpuEncSetSrcFrame(VpuColorFormat eColor,FrameBuffer* pFrame, unsigned char* 
 	int uvStride;	
 	int ySize;
 	int uvSize;
-	int mvSize;	
+	//int mvSize;	
 
 	yStride=nPadW;
 	ySize=yStride*nPadH;
@@ -7112,7 +7113,7 @@ int VpuEncSetSrcFrame(VpuColorFormat eColor,FrameBuffer* pFrame, unsigned char* 
 			uvSize=ySize/4;
 			break;
 	}
-	mvSize=uvSize;	//1 set 0 ?
+	//mvSize=uvSize;	//1 set 0 ?
 	
 	pFrame->bufY=(PhysicalAddress)pSrc;
 	pFrame->bufCb=(PhysicalAddress)(pSrc+ySize);
@@ -7172,6 +7173,167 @@ int VpuEncGetIntraQP(VpuEncOpenParamSimp * pInParam)
 #else
 	return -1;
 #endif
+}
+
+int VpuFindAVCStartCode(unsigned char* pData, int nSize,unsigned char** ppStart)
+{
+#define AVC_START_CODE 0x00000001
+	unsigned int startcode=0xFFFFFFFF;
+	unsigned char* p=pData;
+	unsigned char* pEnd=pData+nSize;
+	while(p<pEnd){
+		startcode=(startcode<<8)|p[0];
+		if(AVC_START_CODE==startcode){			
+			break;
+		}
+		p++;
+	}
+	if(p>=pEnd){
+		VPU_LOG("not find valid start code \r\n");
+		*ppStart=NULL;
+		return 0;
+	}
+	*ppStart=p-3;
+	return 1;
+}
+
+int VpuConvertToAvccHeader(unsigned char* pData, int nSize, int*pFilledSize)
+{
+	unsigned char* pPre=pData;
+	int spsSize=0, ppsSize=0;
+	unsigned char *sps=NULL, *pps=NULL;
+	unsigned char* pNext=NULL;
+	unsigned char naltype;
+	int length=nSize;
+	char* pTemp=NULL,*pFilled=NULL;
+	int filledSize=0;
+	/*search boundary of sps and pps */
+	if(0==VpuFindAVCStartCode(pData,length,&pPre)){
+		goto search_finish;
+	}
+	pPre+=4; //skip 4 bytes of startcode
+	length-=(pPre-pData);
+	if(length<=0){
+		goto search_finish;
+	}
+	while(1){
+		int size;
+		VpuFindAVCStartCode(pPre,length,&pNext);
+		if(pNext){
+			size=pNext-pPre;
+		}
+		else{
+			size=length; //last nal
+		}
+		naltype=pPre[0] & 0x1f;
+		VPU_LOG("find one nal, type: 0x%X, size: %d \r\n",naltype,size);
+		if (naltype==7) { /* SPS */
+			sps=pPre;
+			spsSize=size;
+		}
+		else if (naltype==8) { /* PPS */
+			pps= pPre;
+			ppsSize=size;
+		}
+		if(pNext==NULL){
+			goto search_finish;
+		}
+		pNext+=4;
+		length-=(pNext-pPre);			
+		if(length<=0){
+			goto search_finish;
+		}
+		pPre=pNext;
+	}
+search_finish:
+	if((sps==NULL)||(pps==NULL)){
+		VPU_ERROR("failed to create avcc header: no sps/pps in codec data !\r\n");	
+		return 0;
+	}
+
+	/*fill valid avcc header*/
+	pTemp=vpu_malloc(nSize+20); // need to allocate more bytes(more than 6+2+1+2 bytes) for additonal tag info
+	if(pTemp==NULL){
+		VPU_ERROR("malloc %d bytes failure \r\n",nSize);
+		return 0;
+	}
+	pFilled=pTemp;
+	pFilled[0]=1;		/* version */
+	pFilled[1]=sps[1];	/* profile */
+	pFilled[2]=sps[2];	/* profile compat */
+	pFilled[3]=sps[3];	/* level */
+	pFilled[4]=0xFF;	/* 6 bits reserved (111111) + 2 bits nal size length - 1 (11) */
+	pFilled[5]=0xE1;	/* 3 bits reserved (111) + 5 bits number of sps (00001) */
+	pFilled+=6;
+
+	pFilled[0]=(spsSize>>8)&0xFF; /*sps size*/
+	pFilled[1]=spsSize&0xFF;
+	pFilled+=2;
+	vpu_memcpy(pFilled,sps,spsSize); /*sps data*/
+	pFilled+=spsSize;
+
+	pFilled[0]=1;		/* number of pps */
+	pFilled++;
+	pFilled[0]=(ppsSize>>8)&0xFF;	/*pps size*/
+	pFilled[1]=ppsSize&0xFF;
+	pFilled+=2;
+	vpu_memcpy(pFilled,pps,ppsSize); /*pps data*/	
+
+	filledSize=6+2+spsSize+1+2+ppsSize;
+	vpu_memcpy(pData,pTemp,filledSize);
+	
+	if(pTemp){
+		vpu_free(pTemp);
+	}
+	VPU_LOG("created on avcc header: %d bytes, sps size: %d, pps size: %d \r\n",filledSize,spsSize, ppsSize);
+	*pFilledSize=filledSize;
+	return 1;
+}
+
+int VpuConvertToAvccData(unsigned char* pData, int nSize)
+{
+	/*we will replace the 'start code'(00000001) with 'nal size'(4bytes), and the buffer length no changed*/
+	unsigned char* pPre=pData;
+	int length=nSize;
+	int nalSize=0;
+	int outSize=0;
+	int i=0;
+	unsigned char* pNext=NULL;
+	VPU_LOG("convert to avcc data: %d bytes \r\n",nSize);
+	if(0==VpuFindAVCStartCode(pData,length,&pPre)){
+		goto finish;
+	}
+	pPre+=4; //skip 4 bytes of startcode
+	length-=(pPre-pData);
+	while(1){
+		VpuFindAVCStartCode(pPre,length,&pNext);
+		if(pNext){
+			nalSize=pNext-pPre;
+		}
+		else{
+			nalSize=length; //last nal
+		}
+		pPre[-4]=(nalSize>>24)&0xFF;
+		pPre[-3]=(nalSize>>16)&0xFF;
+		pPre[-2]=(nalSize>>8)&0xFF;
+		pPre[-1]=(nalSize)&0xFF;
+		VPU_LOG("[%d]: fill one nal size: %d \r\n",++i,nalSize);
+		outSize+=nalSize+4;
+		if(pNext==NULL){
+			goto finish;
+		}
+		pNext+=4;
+		length-=(pNext-pPre);			
+		pPre=pNext;
+	}
+finish:
+	if(outSize!=nSize){
+		VPU_ERROR("error: size not matched in convert progress of avcc !\r\n");
+	}
+	if(i==0){
+		VPU_ERROR("error: no find any nal start code in convert progress of avcc !\r\n");
+	}
+	return 1;
 }
 
 VpuEncRetCode VPU_EncLoad()
@@ -7528,6 +7690,11 @@ VpuEncRetCode VPU_EncOpen(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEn
 #endif
 
 	pObj->nInsertSPSPPSToIDR=0;
+#ifdef VPU_ENC_SEQ_DATA_SEPERATE
+	pObj->nIsAvcc=((0!=pInParam->nIsAvcc) && (VPU_V_AVC==pInParam->eFormat))?1:0;
+#else
+	pObj->nIsAvcc=0;
+#endif
 
 	*pOutHandle=(VpuEncHandle)pVpuObj;	
 
@@ -7626,6 +7793,7 @@ VpuEncRetCode VPU_EncOpenSimp(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,V
 		sEncOpenParamMore.nMEUseZeroPmv=0;
 		sEncOpenParamMore.nIntraCostWeight=0;
 	}
+	sEncOpenParamMore.nIsAvcc=pInParam->nIsAvcc;
 	ret=VPU_EncOpen(pOutHandle,pInMemInfo,&sEncOpenParamMore);
 
 	return ret;
@@ -8123,6 +8291,9 @@ VpuEncRetCode VPU_EncEncodeFrame(VpuEncHandle InHandle, VpuEncEncParam* pInOutPa
 		pInOutParam->eOutRetCode=(VpuEncBufRetCode)(VPU_ENC_INPUT_NOT_USED|VPU_ENC_OUTPUT_SEQHEADER);	
 		pVpuObj->obj.nJustOutputOneHeader=1;	//output header
 		pVpuObj->obj.nOutputHeaderCnt++;
+		if(pVpuObj->obj.nIsAvcc){
+			VpuConvertToAvccHeader((unsigned char*)pInOutParam->nInVirtOutput,pInOutParam->nOutOutputSize,&pInOutParam->nOutOutputSize);
+		}
 	}
 	else
 #endif
@@ -8253,6 +8424,9 @@ VpuEncRetCode VPU_EncEncodeFrame(VpuEncHandle InHandle, VpuEncEncParam* pInOutPa
 #ifdef VPU_ENC_SEQ_DATA_SEPERATE		
 		pVpuObj->obj.nJustOutputOneHeader=0;	//output data
 #endif
+		if(pVpuObj->obj.nIsAvcc){
+			VpuConvertToAvccData((unsigned char*)pInOutParam->nInVirtOutput,pInOutParam->nOutOutputSize);
+		}
 	}
 
 	if(VPU_DUMP_RAW){

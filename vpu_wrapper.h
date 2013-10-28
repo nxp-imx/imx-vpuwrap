@@ -28,7 +28,7 @@ extern "C" {
 /**************************** version info ***********************************/
 #define VPU_WRAPPER_VERSION(major, minor, release)	 \
 	(((major) << 16) + ((minor) << 8) + (release))
-#define VPU_WRAPPER_VERSION_CODE	VPU_WRAPPER_VERSION(1, 0, 43)
+#define VPU_WRAPPER_VERSION_CODE	VPU_WRAPPER_VERSION(1, 0, 44)
 
 /**************************** decoder part **********************************/
 
@@ -494,6 +494,7 @@ typedef struct {
 	int nMapType;			/*frame buffer: 0--linear ; 1--frame tile; 2--field tile*/
 	int nLinear2TiledEnable; 	/*valid when (nMapType!=0): 0--tile input; 1--yuv input*/
 	VpuColorFormat eColorFormat;	/*only MJPG support non-420*/
+	int nIsAvcc;				/*it is used for H.264 data format, 0: byte stream ; 1: avcc format*/
 
 	int nReserved[3];				/*reserved for future extension*/
 	void* pAppCxt;				/*reserved for future extension*/
@@ -579,6 +580,7 @@ typedef struct {
 	int nMESearchRange;      // 3: 16x16, 2:32x16, 1:64x32, 0:128x64, H.263(Short Header : always 3)
 	int nMEUseZeroPmv;       // 0: PMV_ENABLE, 1: PMV_DISABLE
 	int nIntraCostWeight;    // Additional weight of Intra Cost for mode decision to reduce Intra MB density
+	int nIsAvcc;				/*it is used for H.264 data format, 0: byte stream ; 1: avcc format*/
 
 	int nReserved[8];				/*reserved for future extension*/
 	void* pAppCxt;			/*reserved for future extension*/
