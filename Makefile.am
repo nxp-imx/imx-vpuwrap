@@ -22,8 +22,6 @@ libfslvpuwrap_la_LIBTOOLFLAGS = --tag=CC
 
 libfslvpuwrapdocdir = $(docdir)/imx-mm/vpu
 libfslvpuwrapdoc_DATA = \
-    docs/vpu_dec_datasheet.pdf    \
-    docs/vpu_enc_datasheet.pdf    \
     EULA.txt
 
 pcverfile = libfslvpuwrap.pc
