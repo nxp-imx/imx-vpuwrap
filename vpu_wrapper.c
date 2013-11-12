@@ -476,6 +476,9 @@ typedef struct
 
 	int initDataCountThd;
 	VpuDecErrInfo nLastErrorInfo;  /*it record the last error info*/
+
+	int nIsAvcc;	/*only for H.264 format*/
+	int nNalSizeLen;
 }VpuDecObj;
 
 typedef struct 
@@ -2032,6 +2035,127 @@ int VpuBitsBufValidDataLength(DecHandle InVpuHandle,VpuDecObj* pObj,unsigned int
 	return 1;
 }
 
+int VpuDetectAvcc(unsigned char* pCodecData, unsigned int nSize, int * pIsAvcc, int * pNalSizeLength)
+{
+	*pIsAvcc=0;
+	if(pCodecData[0]==1){
+		int nalsizelen=(pCodecData[4]&0x3)+1;
+		if(nalsizelen<3){
+			/*Now, we only support nal_size_length == 3 or 4, 
+			   otherwise, the implementation is complex.
+			*/
+			VPU_ERROR("error: only 3 or 4 bytes nal_size_length are supported ! \r\n");
+			return 0;
+		}
+		VPU_LOG("avcc format is detected, nal_size_length % d \r\n",nalsizelen);
+		*pIsAvcc=1;
+		*pNalSizeLength=nalsizelen;
+	}
+	return 1;
+}
+
+int VpuConvertAvccHeader(unsigned char* pCodecData, unsigned int nSize, unsigned char** ppOut, unsigned int * pOutSize)
+{
+	/*will allocate and return one new buffer, caller is responsible to free it  */
+	unsigned char* p=pCodecData;
+	unsigned char* pDes;
+	unsigned char* pSPS, *pPPS;
+	int spsSize,ppsSize;
+	int numPPS, outSize=0;
+	unsigned char* pTemp;
+	int tempBufSize=0;
+	/* [0]: version */
+	/* [1]: profile */
+	/* [2]: profile compat */
+	/* [3]: level */
+	/* [4]: 6 bits reserved (111111) + 2 bits nal size length - 1 (11) */
+	/* [5]: 3 bits reserved (111) + 5 bits number of sps (00001) */
+	/*[6,7]: 16bits: sps_size*/
+	/*sps data*/
+	/*number of pps*/
+	/*16bits: pps_size*/
+	/*pps data */
+	spsSize=(p[6]<<8)|p[7];
+	p+=8;
+	pSPS=p;
+	p+=spsSize;
+	numPPS=*p++;
+
+	VPU_LOG("spsSize: %d , num of PPS: %d \r\n",spsSize, numPPS);
+	tempBufSize=nSize+2*numPPS; //need to allocate more bytes since startcode occupy 4 bytes, while pps size is 2 bytes.
+	pTemp=vpu_malloc(tempBufSize); 
+	if(pTemp==NULL){
+		VPU_ERROR("error: malloc %d bytes fail !\r\n", tempBufSize);
+		//do nothing, return
+		*ppOut=pCodecData;
+		*pOutSize=nSize;
+		return 0;
+	}
+	pDes=pTemp;
+	pDes[0]=pDes[1]=pDes[2]=0; /*fill start code*/
+	pDes[3]=0x1;
+	pDes+=4;
+	vpu_memcpy(pDes,pSPS,spsSize); /*fill sps*/
+	pDes+=spsSize;
+	outSize+=4+spsSize;
+	while(numPPS>0){
+		ppsSize=(p[0]<<8)|p[1];
+		p+=2;
+		pPPS=p;
+		outSize+=4+ppsSize;
+		if(outSize>tempBufSize){
+			VPU_ERROR("error: convert avcc header overflow ! \r\n");
+			//discard left pps data and return
+			*ppOut=pTemp;
+			*pOutSize=(outSize-4-ppsSize);
+			return 0;
+		}
+		VPU_LOG("fill one pps: %d bytes \r\n", ppsSize);
+		pDes[0]=pDes[1]=pDes[2]=0; /*fill start code*/
+		pDes[3]=0x1;
+		pDes+=4;
+		vpu_memcpy(pDes,pPPS,ppsSize); /*fill pps*/
+		pDes+=ppsSize;
+		numPPS--;
+		p+=ppsSize;
+	}
+	*ppOut=pTemp;
+	*pOutSize=outSize;
+	return 1;
+}
+
+int VpuConvertAvccFrame(unsigned char* pCodecData, unsigned int nSize, int nNalSizeLength)
+{
+	/*will change the nalsize with start code (3 or 4 bytes), the buffer size won't be changed*/
+	int leftSize=nSize;
+	unsigned char * p=pCodecData;
+
+	if((nNalSizeLength!=3)&&(nNalSizeLength!=4)){
+		return 0; //not supported
+	}
+
+	while(leftSize>0){
+		int dataSize;
+		if(nNalSizeLength==3){
+			dataSize=(p[0]<<16)|(p[1]<<8)|p[2];
+			p[0]=p[1]=0;
+			p[2]=0x1;  /*fill 3 bytes of startcode*/
+		}
+		else{
+			dataSize=(p[0]<<24)|(p[1]<<16)|(p[2]<<8)|p[3];
+			p[0]=p[1]=p[2]=0;
+			p[3]=0x1; /*fill 4 bytes of startcode*/
+		}
+		VPU_LOG("fill one %d bytes of start code for nal data(%d bytes) \r\n", nNalSizeLength,dataSize);
+		leftSize-=dataSize+4;
+		p+=dataSize+4;
+	}
+	if(leftSize!=0){
+		VPU_ERROR("error: the nal data corrupted ! \r\n");
+	}
+	return 1;
+}
+
 int VpuFillData(DecHandle InVpuHandle,VpuDecObj* pObj,unsigned char* pInVirt,unsigned int nSize, int InIsEnough,int nFileModeOffset)
 {
 
@@ -2499,8 +2623,16 @@ int VpuSeqInit(DecHandle InVpuHandle, VpuDecObj* pObj ,VpuBufferNode* pInData,in
 				else if(pObj->nPrivateSeqHeaderInserted==0)
 				{
 					//insert private data
-					pHeader=pInData->sCodecData.pData;
-					headerLen=pInData->sCodecData.nSize;				
+					if((pObj->CodecFormat==VPU_V_AVC)&&(0==pObj->nIsAvcc)){
+						VpuDetectAvcc(pInData->sCodecData.pData,pInData->sCodecData.nSize,&pObj->nIsAvcc,&pObj->nNalSizeLen);
+					}
+					if(pObj->nIsAvcc){
+						VpuConvertAvccHeader(pInData->sCodecData.pData,pInData->sCodecData.nSize, &pHeader,&headerLen);
+					}
+					else{
+						pHeader=pInData->sCodecData.pData;
+						headerLen=pInData->sCodecData.nSize;
+					}
 				}			
 				else
 				{
@@ -2549,7 +2681,9 @@ int VpuSeqInit(DecHandle InVpuHandle, VpuDecObj* pObj ,VpuBufferNode* pInData,in
 		if(0!=headerLen)
 		{
 			fill_ret=VpuFillData(InVpuHandle,pObj,pHeader,headerLen,1,0);
-			
+			if(pObj->nIsAvcc){
+				vpu_free(pHeader); //the logic should make sure it won't be freed repeatedly
+			}
 			if(0==pObj->nPrivateSeqHeaderInserted)
 			{
 				VpuAccumulateConsumedBytes(pObj, headerLen, 0,NULL,NULL);	//seq/config 
@@ -2572,6 +2706,9 @@ int VpuSeqInit(DecHandle InVpuHandle, VpuDecObj* pObj ,VpuBufferNode* pInData,in
 			}
 		}
 		//allow pInData->nSize==0 ???
+		if(pObj->nIsAvcc){
+			VpuConvertAvccFrame(pInData->pVirAddr,pInData->nSize,pObj->nNalSizeLen);
+		}
 		fill_ret=VpuFillData(InVpuHandle,pObj,pInData->pVirAddr,pInData->nSize,1,headerLen);
 		ASSERT(fill_ret==1);
 		total_size+=headerLen+pInData->nSize;
@@ -4039,6 +4176,9 @@ int VpuDecBuf(DecHandle* pVpuHandle, VpuDecObj* pObj ,VpuBufferNode* pInData,int
 			}
 
 			//allow pInData->nSize==0 for EOS
+			if(pObj->nIsAvcc){
+				VpuConvertAvccFrame(pInData->pVirAddr,pInData->nSize,pObj->nNalSizeLen);
+			}
 			fill_ret=VpuFillData(InVpuHandle,pObj,pInData->pVirAddr,pInData->nSize,1,headerLen);
 			ASSERT(fill_ret==1);
 		}
@@ -4170,6 +4310,9 @@ int VpuDecBuf(DecHandle* pVpuHandle, VpuDecObj* pObj ,VpuBufferNode* pInData,int
 				{
 					fill_ret=VpuFillData(InVpuHandle,pObj,pHeader,headerLen,1,0);
 					VpuAccumulateConsumedBytes(pObj, headerLen, 1,NULL,NULL);
+				}
+				if(pObj->nIsAvcc){
+					VpuConvertAvccFrame(pInData->pVirAddr,pInData->nSize,pObj->nNalSizeLen);
 				}
 				fill_ret=VpuFillData(InVpuHandle,pObj,pInData->pVirAddr,pInData->nSize,1,headerLen);
 				ASSERT(fill_ret==1);	//always enough to fill data
@@ -5085,6 +5228,7 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
 
 	pObj->initDataCountThd=VPU_MAX_INIT_LOOP;
 	pObj->nLastErrorInfo=VPU_DEC_ERR_UNFOUND;
+	pObj->nIsAvcc=0;
 	*pOutHandle=(VpuDecHandle)pVpuObj;
 
 	return VPU_DEC_RET_SUCCESS;
@@ -7317,7 +7461,8 @@ int VpuConvertToAvccData(unsigned char* pData, int nSize)
 		pPre[-3]=(nalSize>>16)&0xFF;
 		pPre[-2]=(nalSize>>8)&0xFF;
 		pPre[-1]=(nalSize)&0xFF;
-		VPU_LOG("[%d]: fill one nal size: %d \r\n",++i,nalSize);
+		VPU_LOG("[%d]: fill one nal size: %d \r\n",i,nalSize);
+		i++;
 		outSize+=nalSize+4;
 		if(pNext==NULL){
 			goto finish;
