@@ -1,0 +1,18 @@
+
+Change log:
+
+ver 1.0.45:
+  add avcc format for H.264 decoder
+
+ver 1.0.44:
+  add avcc format for H.264 encoder
+
+ver 1.0.43:
+  add workaround to fix vp8 buffer conflict issue: buffer is decoded repeatedly
+
+ver 1.0.42:
+  add workaround to fix VC1 decode failure issue: flush before the first frame is decoded
+
+ver 1.0.41:
+  enhance encoder part: add qp related configuration
+
