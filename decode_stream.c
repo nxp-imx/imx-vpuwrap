@@ -690,6 +690,12 @@ int ProcessInitInfo(DecContxt * pDecContxt,VpuDecHandle handle,VpuDecInitInfo* p
 		ySize=Align(pInitInfo->nPicWidth,FRAME_ALIGN)*Align(pInitInfo->nPicHeight,FRAME_ALIGN);
 	}
 
+#ifdef ILLEGAL_MEMORY_DEBUG
+	//in such debug case, we always allocate big enough frame buffers
+	DEC_STREAM_PRINTF("enable illegal memory detect, buffer size: 1920*(1088+32) \r\n");
+	ySize=1920*(1088+32);
+#endif
+
 	//for MJPG: we need to check 4:4:4/4:2:2/4:2:0/4:0:0
 	{
 		VpuCodStd vpuCodec=0;
@@ -827,6 +833,12 @@ int ProcessInitInfo(DecContxt * pDecContxt,VpuDecHandle handle,VpuDecInitInfo* p
 		frameBuf[i].pbufVirtCr=ptrVirt+ySize+uSize;
 		frameBuf[i].pbufVirtMvCol=ptrVirt+ySize+uSize+vSize;
 		//ptrVirt+=ySize+uSize+vSize+mvSize;
+
+#ifdef ILLEGAL_MEMORY_DEBUG
+		memset(frameBuf[i].pbufVirtY,0,ySize);
+		memset(frameBuf[i].pbufVirtCb,0,uSize);
+		memset(frameBuf[i].pbufVirtCr,0,uSize);
+#endif
 
 		/* fill bottom address for field tile*/
 		if(pDecContxt->nMapType==2)

@@ -1688,6 +1688,31 @@ int VpuAccumulateConsumedBytes(VpuDecObj* pObj, int nInSize, int type, unsigned 
 	return 1;
 }
 
+int VpuCheckIllegalMemoryAccess(unsigned char*  pY,unsigned char*  pU,unsigned char*  pV, unsigned int nYStride,int nHeight)
+{
+#define ILLEGAL_MEMORY_MARK	(0)
+#define ILLEGAL_MEMORY_CHECK_LEN	(32)
+	unsigned int nYSize,nCSize;
+	unsigned char* pYEnd,*pUEnd,*pVEnd;
+	int i;
+	nYSize=nYStride*nHeight;
+	nCSize=nYSize/4;
+	pYEnd=pY+nYSize;
+	pUEnd=pU+nCSize;
+	pVEnd=pV+nCSize;
+	for(i=0;i<ILLEGAL_MEMORY_CHECK_LEN;i++){
+		if((pYEnd[i]!=ILLEGAL_MEMORY_MARK)
+			&&(pUEnd[i]!=ILLEGAL_MEMORY_MARK)
+			&&(pVEnd[i]!=ILLEGAL_MEMORY_MARK)){
+			VPU_ERROR("error: illegal memory(off: %d) access detected ! stride: %d, height: %d \r\n",i,nYStride,nHeight);
+			return 0;
+		}
+	}
+	VPU_LOG("memory check is ok !!\r\n");
+	return 1;
+}
+
+
 int VpuSaveDecodedFrameInfo(VpuDecObj* pObj, int index,DecOutputInfo * pCurDecFrameInfo,VpuFrameBuffer* pInFrameDecode)
 {
 	VpuFrameBufInfo * pDstInfo;
@@ -1762,11 +1787,15 @@ int VpuSaveDecodedFrameInfo(VpuDecObj* pObj, int index,DecOutputInfo * pCurDecFr
 		cropHeight=pDstInfo->frameCrop.nBottom-pDstInfo->frameCrop.nTop;		
 		pDstInfo->Q16ShiftWidthDivHeightRatio=VpuConvertAspectRatio(pObj->CodecFormat,(unsigned int)pCurDecFrameInfo->aspectRateInfo,cropWidth,cropHeight, pObj->nProfile,pObj->nLevel);
 
+#ifdef ILLEGAL_MEMORY_DEBUG
+		VpuCheckIllegalMemoryAccess(pInFrameDecode->pbufVirtY, pInFrameDecode->pbufVirtCb, pInFrameDecode->pbufVirtCr,pInFrameDecode->nStrideY,pObj->nOriHeight);
+#endif
 		/*resolution change*/
 		if(pObj->nDecResolutionChangeEnabled!=0){
 			if((pCurDecFrameInfo->decPicWidth!=pObj->nOriWidth)||((pCurDecFrameInfo->decPicHeight!=pObj->nOriHeight))){
 				pObj->nResolutionChanged=1;
 				//in such case, needn't record/accumulate frame info
+				VPU_LOG("resolution change: original: [%d x %d], new: [%d x %d]!\r\n",pObj->nOriWidth,pObj->nOriHeight,pCurDecFrameInfo->decPicWidth,pCurDecFrameInfo->decPicHeight);
 				return 1;
 			}
 		}
