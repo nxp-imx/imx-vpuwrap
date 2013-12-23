@@ -2286,6 +2286,10 @@ int test_case(EncIOParams * pIOParams,EncContxt* pEncCxt,SQLiteColumn* pSQLColum
 	APP_DEBUG_PRINTF("    min PSNR[Y,U,V]:     [%.2f,%.2f,%.2f]\r\n",encStatisInfo.frmMinPSNR[0],encStatisInfo.frmMinPSNR[1],encStatisInfo.frmMinPSNR[2]);
 	APP_DEBUG_PRINTF("    max PSNR[Y,U,V]:     [%.2f,%.2f,%.2f]\r\n",encStatisInfo.frmMaxPSNR[0],encStatisInfo.frmMaxPSNR[1],encStatisInfo.frmMaxPSNR[2]);	
 	APP_DEBUG_PRINTF("\r\n");
+	APP_DEBUG_PRINTF("    average SSIM[Y,U,V]: [%.2f,%.2f,%.2f]\r\n",encStatisInfo.frmAvgSSIM[0],encStatisInfo.frmAvgSSIM[1],encStatisInfo.frmAvgSSIM[2]);
+	APP_DEBUG_PRINTF("    min SSIM[Y,U,V]:     [%.2f,%.2f,%.2f]\r\n",encStatisInfo.frmMinSSIM[0],encStatisInfo.frmMinSSIM[1],encStatisInfo.frmMinSSIM[2]);
+	APP_DEBUG_PRINTF("    max SSIM[Y,U,V]:     [%.2f,%.2f,%.2f]\r\n",encStatisInfo.frmMaxSSIM[0],encStatisInfo.frmMaxSSIM[1],encStatisInfo.frmMaxSSIM[2]);	
+	APP_DEBUG_PRINTF("\r\n");
 
 	if(pIOParams->log)
 	{

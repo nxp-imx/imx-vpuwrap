@@ -100,7 +100,9 @@ typedef struct
 	int nEncFps;
 	int nTotalFps;
 	// internal testing for repeat
-	int nRepeatNum;		
+	int nRepeatNum;
+
+	int nSimpleApi;
 }EncContxt;
 
 

@@ -55,6 +55,7 @@ typedef struct
 	int     gop;			// -gop
 	int     quan;			// -quan
 	int     framerate;		// -framerate
+	int     simpleApi;		//-simple
 }
 IOParams;
 
@@ -105,6 +106,7 @@ static void usage(char*program)
 		   "	-gop <gopsize>		:gop size (default 15) \n"
 		   "	-quan <quantization>	:quantization value (default 10) \n"
 		   "	-framerate <framerate>	:frame rate (default 30) \n"
+		   "	-simple		:call encoder simple API(default: yes) \n"
 		   );
 	exit(0);
 }
@@ -270,6 +272,15 @@ static void GetUserInput(IOParams *pIO, int argc, char *argv[])
 					sscanf(argv[0], "%d", &pIO->gop);
 				}
 			}
+			CASE("-simple")
+			{
+				argc--;
+				argv++;
+				if (argv[0] != NULL)
+				{
+					sscanf(argv[0], "%d", &pIO->simpleApi);
+				}
+			}
 			DEFAULT                             // Has to be last
 			{
 				APP_DEBUG_PRINTF("Unsupported option %s\n", argv[0]);
@@ -311,6 +322,7 @@ int main(int argc, char **argv)
 	ioParams.quan=10;
 	ioParams.gop=15;
 	ioParams.framerate=30;
+	ioParams.simpleApi=1;
 
 	//get input from user
 	GetUserInput(&ioParams, argc, argv);
@@ -365,6 +377,7 @@ int main(int argc, char **argv)
 	//encContxt.nRcIntervalMode=1;
 
 	encContxt.nRepeatNum=ioParams.repeatnum;
+	encContxt.nSimpleApi=ioParams.simpleApi;
 	noerr=encode_stream(&encContxt);
 	APP_DEBUG_PRINTF("Frame Num: %d,  [width x height] = [%d x %d], enc FPS: %d, total FPS: %d \r\n",encContxt.nFrameNum,encContxt.nPicWidth,encContxt.nPicHeight,encContxt.nEncFps,encContxt.nTotalFps);
 	if((0==noerr) || (0!=encContxt.nErr))

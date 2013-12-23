@@ -23,7 +23,6 @@
 #include "encode_stream.h"
 #include "unistd.h"		//for usleep()
 
-#define ENC_USE_SIMPLEOPEN_API
 
 #ifdef ENC_STREAM_DEBUG
 #define ENC_STREAM_PRINTF printf
@@ -827,62 +826,64 @@ int encode_stream(EncContxt * pEncContxt)
 		return 0;
 	}
 
-#ifdef ENC_USE_SIMPLEOPEN_API
-	ENC_STREAM_PRINTF("using VPU_EncOpenSimp Interface \r\n");
-	memset(&sEncOpenParamSimp,0,sizeof(VpuEncOpenParamSimp));
+	if(pEncContxt->nSimpleApi){
+		ENC_STREAM_PRINTF("using VPU_EncOpenSimp Interface \r\n");
+		memset(&sEncOpenParamSimp,0,sizeof(VpuEncOpenParamSimp));
 
-	if(0==EncConvertCodecFormat(pEncContxt->nCodec, &sEncOpenParamSimp.eFormat)){
-		ENC_STREAM_PRINTF("%s: unsupported codec format: id=%d \r\n",__FUNCTION__,pEncContxt->nCodec);
-		VPU_EncUnLoad();
-		return 0;		
+		if(0==EncConvertCodecFormat(pEncContxt->nCodec, &sEncOpenParamSimp.eFormat)){
+			ENC_STREAM_PRINTF("%s: unsupported codec format: id=%d \r\n",__FUNCTION__,pEncContxt->nCodec);
+			VPU_EncUnLoad();
+			return 0;		
+		}
+		if(0==EncConvertMirror(pEncContxt->nMirror, &sEncOpenParamSimp.sMirror)){
+			ENC_STREAM_PRINTF("%s: unsupported mirror method: id=%d \r\n",__FUNCTION__,pEncContxt->nMirror);
+			VPU_EncUnLoad();
+			return 0;		
+		}
+		sEncOpenParamSimp.nPicWidth= pEncContxt->nPicWidth;
+		sEncOpenParamSimp.nPicHeight=pEncContxt->nPicHeight;
+		sEncOpenParamSimp.nRotAngle=pEncContxt->nRotAngle;
+		sEncOpenParamSimp.nFrameRate=pEncContxt->nFrameRate;
+		sEncOpenParamSimp.nBitRate=pEncContxt->nBitRate;
+		sEncOpenParamSimp.nGOPSize=pEncContxt->nGOPSize;
+		//sEncOpenParamSimp.nIntraRefresh=pEncContxt->nPicWidth*pEncContxt->nPicHeight/256/10;
+		sEncOpenParamSimp.nChromaInterleave=pEncContxt->nChromaInterleave;
+		//open vpu			
+		ret=VPU_EncOpenSimp(&handle, &sMemInfo,&sEncOpenParamSimp);
 	}
-	if(0==EncConvertMirror(pEncContxt->nMirror, &sEncOpenParamSimp.sMirror)){
-		ENC_STREAM_PRINTF("%s: unsupported mirror method: id=%d \r\n",__FUNCTION__,pEncContxt->nMirror);
-		VPU_EncUnLoad();
-		return 0;		
+	else{
+		ENC_STREAM_PRINTF("using VPU_EncOpen Interface \r\n");
+		//clear 0 firstly
+		memset(&sEncOpenParam,0,sizeof(VpuEncOpenParam));
+
+		if(0==EncConvertCodecFormat(pEncContxt->nCodec, &sEncOpenParam.eFormat))
+		{
+			ENC_STREAM_PRINTF("%s: unsupported codec format: id=%d \r\n",__FUNCTION__,pEncContxt->nCodec);
+			VPU_EncUnLoad();
+			return 0;		
+		}			
+		if(0==EncConvertMirror(pEncContxt->nMirror, &sEncOpenParam.sMirror))
+		{
+			ENC_STREAM_PRINTF("%s: unsupported mirror method: id=%d \r\n",__FUNCTION__,pEncContxt->nMirror);
+			VPU_EncUnLoad();
+			return 0;		
+		}	
+		sEncOpenParam.nPicWidth= pEncContxt->nPicWidth;
+		sEncOpenParam.nPicHeight=pEncContxt->nPicHeight;
+		sEncOpenParam.nRotAngle=pEncContxt->nRotAngle;
+		sEncOpenParam.nFrameRate=pEncContxt->nFrameRate;
+		sEncOpenParam.nBitRate=pEncContxt->nBitRate;
+		sEncOpenParam.nGOPSize=pEncContxt->nGOPSize;
+		sEncOpenParam.nChromaInterleave=pEncContxt->nChromaInterleave;
+
+		sEncOpenParam.nMapType=pEncContxt->nMapType;
+		sEncOpenParam.nLinear2TiledEnable=pEncContxt->nLinear2TiledEnable;
+		sEncOpenParam.eColorFormat=pEncContxt->nColor;
+
+		//open vpu			
+		EncSetMoreOpenPara(&sEncOpenParam, pEncContxt);
+		ret=VPU_EncOpen(&handle, &sMemInfo,&sEncOpenParam);
 	}
-	sEncOpenParamSimp.nPicWidth= pEncContxt->nPicWidth;
-	sEncOpenParamSimp.nPicHeight=pEncContxt->nPicHeight;
-	sEncOpenParamSimp.nRotAngle=pEncContxt->nRotAngle;
-	sEncOpenParamSimp.nFrameRate=pEncContxt->nFrameRate;
-	sEncOpenParamSimp.nBitRate=pEncContxt->nBitRate;
-	sEncOpenParamSimp.nGOPSize=pEncContxt->nGOPSize;
-	//sEncOpenParamSimp.nIntraRefresh=pEncContxt->nPicWidth*pEncContxt->nPicHeight/256/10;
-	sEncOpenParamSimp.nChromaInterleave=pEncContxt->nChromaInterleave;
-	//open vpu			
-	ret=VPU_EncOpenSimp(&handle, &sMemInfo,&sEncOpenParamSimp);
-#else
-	//clear 0 firstly
-	memset(&sEncOpenParam,0,sizeof(VpuEncOpenParam));
-
-	if(0==EncConvertCodecFormat(pEncContxt->nCodec, &sEncOpenParam.eFormat))
-	{
-		ENC_STREAM_PRINTF("%s: unsupported codec format: id=%d \r\n",__FUNCTION__,pEncContxt->nCodec);
-		VPU_EncUnLoad();
-		return 0;		
-	}			
-	if(0==EncConvertMirror(pEncContxt->nMirror, &sEncOpenParam.sMirror))
-	{
-		ENC_STREAM_PRINTF("%s: unsupported mirror method: id=%d \r\n",__FUNCTION__,pEncContxt->nMirror);
-		VPU_EncUnLoad();
-		return 0;		
-	}	
-	sEncOpenParam.nPicWidth= pEncContxt->nPicWidth;
-	sEncOpenParam.nPicHeight=pEncContxt->nPicHeight;
-	sEncOpenParam.nRotAngle=pEncContxt->nRotAngle;
-	sEncOpenParam.nFrameRate=pEncContxt->nFrameRate;
-	sEncOpenParam.nBitRate=pEncContxt->nBitRate;
-	sEncOpenParam.nGOPSize=pEncContxt->nGOPSize;
-	sEncOpenParam.nChromaInterleave=pEncContxt->nChromaInterleave;
-
-	sEncOpenParam.nMapType=pEncContxt->nMapType;
-	sEncOpenParam.nLinear2TiledEnable=pEncContxt->nLinear2TiledEnable;
-	sEncOpenParam.eColorFormat=pEncContxt->nColor;
-
-	//open vpu			
-	EncSetMoreOpenPara(&sEncOpenParam, pEncContxt);
-	ret=VPU_EncOpen(&handle, &sMemInfo,&sEncOpenParam);
-#endif
 	if (ret!=VPU_ENC_RET_SUCCESS)
 	{
 		ENC_STREAM_PRINTF("%s: vpu open failure: ret=0x%X \r\n",__FUNCTION__,ret);
