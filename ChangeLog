@@ -1,6 +1,9 @@
 
 Change log:
 
+ver 1.0.46:
+  add debug code to detect illegal memory access
+
 ver 1.0.45:
   add avcc format for H.264 decoder
 
