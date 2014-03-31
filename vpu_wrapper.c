@@ -176,6 +176,7 @@ static int g_seek_dump=DUMP_ALL_DATA;	/*0: only dump data after seeking; otherwi
 //#define IMX6_BITBUFSPACE_WORKAROUND	//the free sapce may be not correct for FW version 2.1.3 or later
 #define IMX6_WRONG_EOS_WORKAROUND //for mpeg4, vpu may report disIndx=-1(EOS) in the middle of clip after seeking
 #define IMX6_VP8_SHOWFRAME_WORKAROUND //for special frame(show_frame=0) in vpu8, buffer may be decoded repeatedly, as a result, timestamp will be accumulated
+#define IMX6_AVC_NOFRAME_WORKAROUND //for h.264 clips, vpu may report no frame buffer before decoding the first frame(frames are just registered to vpu)
 #endif
 /****************************** cpu version ***************************************/
 #define CPU_IS_MX5X  cpu_is_mx5x
@@ -1998,7 +1999,6 @@ int VpuClearAllDispFrameFlag(DecHandle InVpuHandle,int Num)
 	return ((ret==RETCODE_SUCCESS)?1:0);
 }
 
-#ifdef IMX6_BUFNOTENOUGH_WORKAROUND 
 int VpuQueryVpuHoldBufNum(VpuDecObj* pObj)
 {
 	//occupied by vpu: state = free or dec
@@ -2013,7 +2013,6 @@ int VpuQueryVpuHoldBufNum(VpuDecObj* pObj)
 	}
 	return num;
 }
-#endif
 	
 int VpuBitsBufIsEnough(DecHandle InVpuHandle,unsigned int nFillSize)
 {
@@ -2987,6 +2986,19 @@ int VpuGetOutput(DecHandle InVpuHandle, VpuDecObj* pObj,int* pOutRetCode,int InS
 		}
 #endif
 	}
+
+#ifdef IMX6_AVC_NOFRAME_WORKAROUND
+	//workaround: check the illegal decIndx and rectify it. (-1,-3 => -2,-3)			
+	if((CPU_IS_MX6X())&&(VPU_V_AVC==pObj->CodecFormat)&&((outInfo.decodingSuccess & 0x10)==0)
+		&&(outInfo.indexFrameDecoded==VPU_OUT_DEC_INDEX_EOS)&&(outInfo.indexFrameDisplay==VPU_OUT_DIS_INDEX_NODIS)){
+		int hold_num=0;
+		hold_num=VpuQueryVpuHoldBufNum(pObj);
+		if(hold_num==pObj->frameNum){
+			VPU_ERROR("illegal decIndex: %d , rectify decIndx to -2 \r\n",outInfo.indexFrameDecoded);
+			outInfo.indexFrameDecoded=VPU_OUT_DEC_INDEX_UNDEC;
+		}
+	}
+#endif
 	
 	if(!CPU_IS_MX6X())
 	{	

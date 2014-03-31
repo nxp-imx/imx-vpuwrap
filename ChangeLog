@@ -1,6 +1,9 @@
 
 Change log:
 
+ver 1.0.47:
+  add one workaround to fix AVC decoder no frame issue
+
 ver 1.0.46:
   add debug code to detect illegal memory access
 
