@@ -1,6 +1,11 @@
 
 Change log:
 
+ver 1.0.48:
+  enhace the robust in avcc conversion operation for corrupted clips
+  add api to query the available frame buffer number in decoder
+  code refine, fix some typo error
+
 ver 1.0.47:
   add one workaround to fix AVC decoder no frame issue
 

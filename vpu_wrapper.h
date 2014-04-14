@@ -28,7 +28,7 @@ extern "C" {
 /**************************** version info ***********************************/
 #define VPU_WRAPPER_VERSION(major, minor, release)	 \
 	(((major) << 16) + ((minor) << 8) + (release))
-#define VPU_WRAPPER_VERSION_CODE	VPU_WRAPPER_VERSION(1, 0, 47)
+#define VPU_WRAPPER_VERSION_CODE	VPU_WRAPPER_VERSION(1, 0, 48)
 
 /**************************** decoder part **********************************/
 
@@ -657,6 +657,7 @@ VpuDecRetCode VPU_DecOutFrameDisplayed(VpuDecHandle InHandle, VpuFrameBuffer* pI
 //VpuDecRetCode VPU_DecFlushLeftFrame(VpuDecHandle InHandle);
 VpuDecRetCode VPU_DecFlushAll(VpuDecHandle InHandle);
 VpuDecRetCode VPU_DecAllRegFrameInfo(VpuDecHandle InHandle, VpuFrameBuffer** ppOutFrameBuf, int* pOutNum);
+VpuDecRetCode VPU_DecGetNumAvailableFrameBuffers(VpuDecHandle InHandle,int* pOutBufNum);
 
 VpuDecRetCode VPU_DecClose(VpuDecHandle InHandle);
 VpuDecRetCode VPU_DecUnLoad();
@@ -676,7 +677,7 @@ VpuEncRetCode VPU_EncOpen(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEn
 VpuEncRetCode VPU_EncClose(VpuEncHandle InHandle);
 VpuEncRetCode VPU_EncGetInitialInfo(VpuEncHandle InHandle, VpuEncInitInfo * pOutInitInfo);
 VpuEncRetCode VPU_EncGetVersionInfo(VpuVersionInfo * pOutVerInfo);
-VpuDecRetCode VPU_EncGetWrapperVersionInfo(VpuWrapperVersionInfo * pOutVerInfo);
+VpuEncRetCode VPU_EncGetWrapperVersionInfo(VpuWrapperVersionInfo * pOutVerInfo);
 VpuEncRetCode VPU_EncRegisterFrameBuffer(VpuEncHandle InHandle,VpuFrameBuffer *pInFrameBufArray, int nNum,int nSrcStride);
 VpuEncRetCode VPU_EncQueryMem(VpuMemInfo* pOutMemInfo);
 VpuEncRetCode VPU_EncGetMem(VpuMemDesc* pInOutMem);

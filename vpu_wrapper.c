@@ -115,8 +115,8 @@ static int nVpuLogLevel=0;		//bit 0: api log; bit 1: raw dump; bit 2: yuv dump
 #include "Log.h"
 #define LOG_PRINTF LogOutput
 #define VPU_LOG_LEVELFILE "/data/vpu_log_level"
-#define VPU_DUMP_RAWFILE "/mnt/sdcard/temp_wrapper.bit"
-#define VPU_DUMP_YUVFILE "/mnt/sdcard/temp_wrapper.yuv"
+#define VPU_DUMP_RAWFILE "/data/temp_wrapper.bit"
+#define VPU_DUMP_YUVFILE "/data/temp_wrapper.yuv"
 #else
 #define LOG_PRINTF printf
 #define VPU_LOG_LEVELFILE "/etc/vpu_log_level"
@@ -2103,10 +2103,16 @@ int VpuConvertAvccHeader(unsigned char* pCodecData, unsigned int nSize, unsigned
 	/*number of pps*/
 	/*16bits: pps_size*/
 	/*pps data */
+	if(nSize<8){
+		goto corrupt_header;
+	}
 	spsSize=(p[6]<<8)|p[7];
 	p+=8;
 	pSPS=p;
 	p+=spsSize;
+	if(p>=pCodecData+nSize){
+		goto corrupt_header;
+	}
 	numPPS=*p++;
 
 	VPU_LOG("spsSize: %d , num of PPS: %d \r\n",spsSize, numPPS);
@@ -2127,6 +2133,9 @@ int VpuConvertAvccHeader(unsigned char* pCodecData, unsigned int nSize, unsigned
 	pDes+=spsSize;
 	outSize+=4+spsSize;
 	while(numPPS>0){
+		if((p+2) > (pCodecData+nSize)){
+			goto corrupt_header;
+		}
 		ppsSize=(p[0]<<8)|p[1];
 		p+=2;
 		pPPS=p;
@@ -2150,20 +2159,30 @@ int VpuConvertAvccHeader(unsigned char* pCodecData, unsigned int nSize, unsigned
 	*ppOut=pTemp;
 	*pOutSize=outSize;
 	return 1;
+
+corrupt_header:
+	//do nothing, return
+	VPU_ERROR("error: codec data corrupted ! \r\n");
+	*ppOut=pCodecData;
+	*pOutSize=nSize;
+	return 0;
 }
 
-int VpuConvertAvccFrame(unsigned char* pCodecData, unsigned int nSize, int nNalSizeLength)
+int VpuConvertAvccFrame(unsigned char* pData, unsigned int nSize, int nNalSizeLength)
 {
 	/*will change the nalsize with start code (3 or 4 bytes), the buffer size won't be changed*/
 	int leftSize=nSize;
-	unsigned char * p=pCodecData;
+	unsigned char * p=pData;
 
 	if((nNalSizeLength!=3)&&(nNalSizeLength!=4)){
 		return 0; //not supported
 	}
 
 	while(leftSize>0){
-		int dataSize;
+		unsigned int dataSize;
+		if((p+nNalSizeLength) > (pData+nSize)){
+			goto corrupt_data;
+		}
 		if(nNalSizeLength==3){
 			dataSize=(p[0]<<16)|(p[1]<<8)|p[2];
 			p[0]=p[1]=0;
@@ -2179,9 +2198,13 @@ int VpuConvertAvccFrame(unsigned char* pCodecData, unsigned int nSize, int nNalS
 		p+=dataSize+4;
 	}
 	if(leftSize!=0){
-		VPU_ERROR("error: the nal data corrupted ! \r\n");
+		goto corrupt_data;
 	}
 	return 1;
+
+corrupt_data:
+	VPU_ERROR("error: the nal data corrupted ! \r\n");
+	return 0;
 }
 
 int VpuFillData(DecHandle InVpuHandle,VpuDecObj* pObj,unsigned char* pInVirt,unsigned int nSize, int InIsEnough,int nFileModeOffset)
@@ -2709,7 +2732,7 @@ int VpuSeqInit(DecHandle InVpuHandle, VpuDecObj* pObj ,VpuBufferNode* pInData,in
 		if(0!=headerLen)
 		{
 			fill_ret=VpuFillData(InVpuHandle,pObj,pHeader,headerLen,1,0);
-			if(pObj->nIsAvcc){
+			if(pObj->nIsAvcc && (pInData->sCodecData.pData != pHeader)){
 				vpu_free(pHeader); //the logic should make sure it won't be freed repeatedly
 			}
 			if(0==pObj->nPrivateSeqHeaderInserted)
@@ -6456,6 +6479,22 @@ VpuDecRetCode VPU_DecAllRegFrameInfo(VpuDecHandle InHandle, VpuFrameBuffer** ppO
 	return VPU_DEC_RET_SUCCESS;
 }
 
+VpuDecRetCode VPU_DecGetNumAvailableFrameBuffers(VpuDecHandle InHandle,int* pOutBufNum)
+{
+	int i, cnt;
+	VpuDecHandleInternal * pVpuObj;
+	pVpuObj=(VpuDecHandleInternal *)InHandle;
+
+	cnt=0;
+	for (i=0;i<pVpuObj->obj.frameNum;i++){
+		if (pVpuObj->obj.frameBufState[i] == VPU_FRAME_STATE_FREE){
+			cnt++;
+		}
+	}
+	*pOutBufNum=cnt;
+	return VPU_DEC_RET_SUCCESS;
+}
+
 VpuDecRetCode VPU_DecClose(VpuDecHandle InHandle)
 {
 	VpuDecHandleInternal * pVpuObj;
@@ -8108,7 +8147,7 @@ VpuEncRetCode VPU_EncGetVersionInfo(VpuVersionInfo * pOutVerInfo)
 
 }
 
-VpuDecRetCode VPU_EncGetWrapperVersionInfo(VpuWrapperVersionInfo * pOutVerInfo)
+VpuEncRetCode VPU_EncGetWrapperVersionInfo(VpuWrapperVersionInfo * pOutVerInfo)
 {
 	pOutVerInfo->nMajor= (VPU_WRAPPER_VERSION_CODE >> (16)) & 0xff;
 	pOutVerInfo->nMinor= (VPU_WRAPPER_VERSION_CODE >> (8)) & 0xff;
@@ -8615,6 +8654,9 @@ VpuEncRetCode VPU_EncEncodeFrame(VpuEncHandle InHandle, VpuEncEncParam* pInOutPa
 		}
 	}
 
+	if(pInOutParam->nOutOutputSize > pInOutParam->nInOutputBufLen){
+		VPU_ERROR("memory overflow: buffer size: %d, actual filled size: %d \r\n",pInOutParam->nInOutputBufLen,pInOutParam->nOutOutputSize);
+	}
 	if(VPU_DUMP_RAW){
 		WrapperFileDumpBitstrem(&fpBitstream,(unsigned char*)pInOutParam->nInVirtOutput,pInOutParam->nOutOutputSize);
 	}

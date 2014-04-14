@@ -134,7 +134,7 @@ int EncFreeMemBlock(EncMemInfo* pEncMem)
 {
 	int i;
 	VpuMemDesc vpuMem;
-	VpuDecRetCode vpuRet;
+	VpuEncRetCode vpuRet;
 	int retOk=1;
 
 	//free virtual mem
@@ -774,6 +774,7 @@ int encode_stream(EncContxt * pEncContxt)
 	int noerr=1;	
 	int nTileAlign=1;	//for tile input
 	int nYSize,nUSize,nVSize;	//for tile input 
+	VpuCodStd eFormat;
 
 	//init 
 	memset(&sMemInfo,0,sizeof(VpuMemInfo));
@@ -826,20 +827,22 @@ int encode_stream(EncContxt * pEncContxt)
 		return 0;
 	}
 
+	if(0==EncConvertCodecFormat(pEncContxt->nCodec, &eFormat)){
+		ENC_STREAM_PRINTF("%s: unsupported codec format: id=%d \r\n",__FUNCTION__,pEncContxt->nCodec);
+		VPU_EncUnLoad();
+		return 0;
+	}
+
 	if(pEncContxt->nSimpleApi){
 		ENC_STREAM_PRINTF("using VPU_EncOpenSimp Interface \r\n");
 		memset(&sEncOpenParamSimp,0,sizeof(VpuEncOpenParamSimp));
 
-		if(0==EncConvertCodecFormat(pEncContxt->nCodec, &sEncOpenParamSimp.eFormat)){
-			ENC_STREAM_PRINTF("%s: unsupported codec format: id=%d \r\n",__FUNCTION__,pEncContxt->nCodec);
-			VPU_EncUnLoad();
-			return 0;		
-		}
 		if(0==EncConvertMirror(pEncContxt->nMirror, &sEncOpenParamSimp.sMirror)){
 			ENC_STREAM_PRINTF("%s: unsupported mirror method: id=%d \r\n",__FUNCTION__,pEncContxt->nMirror);
 			VPU_EncUnLoad();
 			return 0;		
 		}
+		sEncOpenParamSimp.eFormat=eFormat;
 		sEncOpenParamSimp.nPicWidth= pEncContxt->nPicWidth;
 		sEncOpenParamSimp.nPicHeight=pEncContxt->nPicHeight;
 		sEncOpenParamSimp.nRotAngle=pEncContxt->nRotAngle;
@@ -856,18 +859,13 @@ int encode_stream(EncContxt * pEncContxt)
 		//clear 0 firstly
 		memset(&sEncOpenParam,0,sizeof(VpuEncOpenParam));
 
-		if(0==EncConvertCodecFormat(pEncContxt->nCodec, &sEncOpenParam.eFormat))
-		{
-			ENC_STREAM_PRINTF("%s: unsupported codec format: id=%d \r\n",__FUNCTION__,pEncContxt->nCodec);
-			VPU_EncUnLoad();
-			return 0;		
-		}			
 		if(0==EncConvertMirror(pEncContxt->nMirror, &sEncOpenParam.sMirror))
 		{
 			ENC_STREAM_PRINTF("%s: unsupported mirror method: id=%d \r\n",__FUNCTION__,pEncContxt->nMirror);
 			VPU_EncUnLoad();
 			return 0;		
-		}	
+		}
+		sEncOpenParam.eFormat=eFormat;
 		sEncOpenParam.nPicWidth= pEncContxt->nPicWidth;
 		sEncOpenParam.nPicHeight=pEncContxt->nPicHeight;
 		sEncOpenParam.nRotAngle=pEncContxt->nRotAngle;
@@ -914,7 +912,7 @@ int encode_stream(EncContxt * pEncContxt)
 	nBufNum=sEncInitInfo.nMinFrameBufferCount;
 	ENC_STREAM_PRINTF("Init OK: min buffer cnt: %d, alignment: %d \r\n",sEncInitInfo.nMinFrameBufferCount,sEncInitInfo.nAddressAlignment);
 	//fill frameBuf[]
-	if(-1==EncOutFrameBufCreateRegisterFrame(sEncOpenParam.eFormat,pEncContxt->nColor,sFrameBuf, nBufNum,pEncContxt->nPicWidth, pEncContxt->nPicHeight, &sEncMemInfo,pEncContxt->nRotAngle,&nSrcStride,sEncInitInfo.nAddressAlignment,pEncContxt->nMapType))
+	if(-1==EncOutFrameBufCreateRegisterFrame(eFormat,pEncContxt->nColor,sFrameBuf, nBufNum,pEncContxt->nPicWidth, pEncContxt->nPicHeight, &sEncMemInfo,pEncContxt->nRotAngle,&nSrcStride,sEncInitInfo.nAddressAlignment,pEncContxt->nMapType))
 	{
 		ENC_STREAM_PRINTF("%s: allocate vpu frame buffer failure \r\n",__FUNCTION__);
 		VPU_EncClose(handle);
