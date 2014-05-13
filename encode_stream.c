@@ -591,7 +591,7 @@ RepeatEncode:
 
 	//reset init value
 	err=0;
-	nEncodedFrameNum=0;
+	//nEncodedFrameNum=0;
 	nNeedInput=1;
 	
 	while(nEncodedFrameNum < pEncContxt->nMaxNum)
@@ -622,12 +622,23 @@ RepeatEncode:
 		sEncEncParam.nInVirtOutput=(unsigned int)pOutputVirt;
 		sEncEncParam.nInOutputBufLen=nOuputBufSize;
 
-		if(((nEncodedFrameNum%pEncContxt->nGOPSize)==0) && (VPU_V_AVC==sEncEncParam.eFormat)){
-			sEncEncParam.nForceIPicture = 1;
-			//ENC_STREAM_PRINTF("Force IDR \r\n");
+		if(pEncContxt->nGOPSize==0){
+			if(nEncodedFrameNum==0){
+				//only insert one IDR for the whole clip
+				sEncEncParam.nForceIPicture = 1;
+			}
+			else{
+				sEncEncParam.nForceIPicture = 0;
+			}
 		}
-		else{
-			sEncEncParam.nForceIPicture = 0;
+		else {
+			if(((nEncodedFrameNum%pEncContxt->nGOPSize)==0) && (VPU_V_AVC==sEncEncParam.eFormat)){
+				sEncEncParam.nForceIPicture = 1;
+				//ENC_STREAM_PRINTF("Force IDR \r\n");
+			}
+			else{
+				sEncEncParam.nForceIPicture = 0;
+			}
 		}
 		sEncEncParam.nSkipPicture = 0;
 		sEncEncParam.nEnableAutoSkip = pEncContxt->nEnableAutoSkip;//1;
@@ -849,7 +860,7 @@ int encode_stream(EncContxt * pEncContxt)
 		sEncOpenParamSimp.nFrameRate=pEncContxt->nFrameRate;
 		sEncOpenParamSimp.nBitRate=pEncContxt->nBitRate;
 		sEncOpenParamSimp.nGOPSize=pEncContxt->nGOPSize;
-		//sEncOpenParamSimp.nIntraRefresh=pEncContxt->nPicWidth*pEncContxt->nPicHeight/256/10;
+		sEncOpenParamSimp.nIntraRefresh=pEncContxt->nIntraRefresh;
 		sEncOpenParamSimp.nChromaInterleave=pEncContxt->nChromaInterleave;
 		//open vpu			
 		ret=VPU_EncOpenSimp(&handle, &sMemInfo,&sEncOpenParamSimp);
@@ -898,7 +909,12 @@ int encode_stream(EncContxt * pEncContxt)
 		VPU_EncUnLoad();
 		return 0;
 	}	
-	
+
+	//set intra refresh mode
+	if(pEncContxt->nIntraRefreshMode){
+		VPU_EncConfig(handle, VPU_ENC_CONF_INTRA_REFRESH_MODE, &pEncContxt->nIntraRefreshMode);
+	}
+
 	//get initinfo
 	ret=VPU_EncGetInitialInfo(handle,&sEncInitInfo);
 	if(VPU_ENC_RET_SUCCESS!=ret)

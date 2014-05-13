@@ -51,6 +51,7 @@ typedef struct
 	int nSliceSizeMode;
 	int nSliceSize;
 	int nIntraRefresh;
+	int nIntraRefreshMode;
 	int nRcIntraQp;
 	int nUserQPMin;
 	int nUserQPMax;

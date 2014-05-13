@@ -28,7 +28,7 @@ extern "C" {
 /**************************** version info ***********************************/
 #define VPU_WRAPPER_VERSION(major, minor, release)	 \
 	(((major) << 16) + ((minor) << 8) + (release))
-#define VPU_WRAPPER_VERSION_CODE	VPU_WRAPPER_VERSION(1, 0, 48)
+#define VPU_WRAPPER_VERSION_CODE	VPU_WRAPPER_VERSION(1, 0, 49)
 
 /**************************** decoder part **********************************/
 
@@ -627,6 +627,7 @@ typedef enum {
 	VPU_ENC_CONF_INTRA_REFRESH, /*intra refresh: minimum number of macroblocks to refresh in a frame*/
 	VPU_ENC_CONF_ENA_SPSPPS_IDR, /*some muxers may ignore the sequence or config data(such as ts muxer), so SPS/PPS is needed for every IDR frame, including the first IDR*/
 	VPU_ENC_CONF_RC_INTRA_QP, /*intra qp value*/
+	VPU_ENC_CONF_INTRA_REFRESH_MODE, /*intra refresh mode: 0: normal; 1: cyclic*/
 } VpuEncConfig;
 
 

@@ -1,6 +1,12 @@
 
 Change log:
 
+ver 1.0.49:
+  add config for intra refresh mode
+  enhance avcc conversion for corrupted clips
+  change deblock related parameter to improve encode quality
+  config stuff padding(disable) for mjpeg encoder
+
 ver 1.0.48:
   enhace the robust in avcc conversion operation for corrupted clips
   add api to query the available frame buffer number in decoder

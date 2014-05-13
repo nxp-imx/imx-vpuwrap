@@ -56,6 +56,10 @@ typedef struct
 	int     quan;			// -quan
 	int     framerate;		// -framerate
 	int     simpleApi;		//-simple
+	int     gamma;		//-gamma
+	int     initialdelay;	//-initial
+	int     refreshratio;	//-refreshratio
+	int     refreshmode;	//-refreshmode
 }
 IOParams;
 
@@ -106,7 +110,11 @@ static void usage(char*program)
 		   "	-gop <gopsize>		:gop size (default 15) \n"
 		   "	-quan <quantization>	:quantization value (default 10) \n"
 		   "	-framerate <framerate>	:frame rate (default 30) \n"
-		   "	-simple		:call encoder simple API(default: yes) \n"
+		   "	-simple		:call encoder simple API(default: 1) \n"
+		   "	-gamma		:gamma value(only valid when simple=0):  default (0.75*32768)  \n"
+		   "	-initial	:initial dealy(only valid when simple=0): default 0 \n"
+		   "	-refreshratio	:intra refresh percentage: default 0, range is [0,100] \n"
+		   "	-refreshmode	:intra refresh mode: 0(default)--normal; 1-cyclic \n"
 		   );
 	exit(0);
 }
@@ -132,7 +140,37 @@ static void GetUserInput(IOParams *pIO, int argc, char *argv[])
 				{
 					sscanf(argv[0], "%d", &pIO->interleave);
 				}
-			}		
+			}
+			CASE("-initial")
+			{
+				argc--;
+				argv++;
+				if (argv[0] != NULL)
+				{
+					sscanf(argv[0], "%d", &pIO->initialdelay);
+				}
+			}
+			CASE("-refreshratio")
+			{
+				argc--;
+				argv++;
+				if (argv[0] != NULL)
+				{
+					sscanf(argv[0], "%d", &pIO->refreshratio);
+				}
+				if(pIO->refreshratio>100){
+					usage(pIO->infile);
+				}
+			}
+			CASE("-refreshmode")
+			{
+				argc--;
+				argv++;
+				if (argv[0] != NULL)
+				{
+					sscanf(argv[0], "%d", &pIO->refreshmode);
+				}
+			}
 			CASE("-i")
 			{
 				argc--;
@@ -281,6 +319,15 @@ static void GetUserInput(IOParams *pIO, int argc, char *argv[])
 					sscanf(argv[0], "%d", &pIO->simpleApi);
 				}
 			}
+			CASE("-gamma")
+			{
+				argc--;
+				argv++;
+				if (argv[0] != NULL)
+				{
+					sscanf(argv[0], "%d", &pIO->gamma);
+				}
+			}
 			DEFAULT                             // Has to be last
 			{
 				APP_DEBUG_PRINTF("Unsupported option %s\n", argv[0]);
@@ -323,6 +370,10 @@ int main(int argc, char **argv)
 	ioParams.gop=15;
 	ioParams.framerate=30;
 	ioParams.simpleApi=1;
+	ioParams.gamma=(int)(0.75*32768);         /*  (0*32768 <= gamma <= 1*32768) */
+	ioParams.initialdelay=0;
+	ioParams.refreshratio=0;
+	ioParams.refreshmode=0;
 
 	//get input from user
 	GetUserInput(&ioParams, argc, argv);
@@ -372,12 +423,19 @@ int main(int argc, char **argv)
 	encContxt.pfOneFrameEnd=NULL;
 
 	encContxt.nRcIntraQp=-1;
-	encContxt.nUserGamma=(int)(0.75*32768);         /*  (0*32768 <= gamma <= 1*32768) */
+	encContxt.nUserGamma=ioParams.gamma;
 	encContxt.nH263_annexJEnable=1;
 	//encContxt.nRcIntervalMode=1;
 
 	encContxt.nRepeatNum=ioParams.repeatnum;
 	encContxt.nSimpleApi=ioParams.simpleApi;
+	encContxt.nInitialDelay=ioParams.initialdelay;
+	encContxt.nIntraRefresh=(0==ioParams.refreshratio)?0:(ioParams.width*ioParams.height/256/ioParams.refreshratio);
+	encContxt.nIntraRefreshMode=ioParams.refreshmode;
+	if(encContxt.nSimpleApi==0){
+		APP_DEBUG_PRINTF("gamma: %d, initial delay: %d, intra refresh: %d, intra refresh mode: %d \r\n",
+			encContxt.nUserGamma,encContxt.nInitialDelay,encContxt.nIntraRefresh,encContxt.nIntraRefreshMode);
+	}
 	noerr=encode_stream(&encContxt);
 	APP_DEBUG_PRINTF("Frame Num: %d,  [width x height] = [%d x %d], enc FPS: %d, total FPS: %d \r\n",encContxt.nFrameNum,encContxt.nPicWidth,encContxt.nPicHeight,encContxt.nEncFps,encContxt.nTotalFps);
 	if((0==noerr) || (0!=encContxt.nErr))

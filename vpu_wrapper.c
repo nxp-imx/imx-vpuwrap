@@ -2180,7 +2180,8 @@ int VpuConvertAvccFrame(unsigned char* pData, unsigned int nSize, int nNalSizeLe
 
 	while(leftSize>0){
 		unsigned int dataSize;
-		if((p+nNalSizeLength) > (pData+nSize)){
+		if(((p+nNalSizeLength) > (pData+nSize))
+			|| (p < pData)){
 			goto corrupt_data;
 		}
 		if(nNalSizeLength==3){
@@ -7886,6 +7887,27 @@ VpuEncRetCode VPU_EncOpen(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEn
 #endif
 	}
 
+#if 0
+	VPU_ENC_LOG("gop: %d, initial delay: %d, intrarefresh: %d, mbinterval: %d, intervalMode: %d, rcIntraQP: %d, slicemode: %d, slicesize: %d, slicesizemode: %d \r\n",
+		sEncOpenParam.gopSize, sEncOpenParam.initialDelay,sEncOpenParam.intraRefresh,
+		sEncOpenParam.MbInterval, sEncOpenParam.RcIntervalMode, sEncOpenParam.rcIntraQp,
+		sEncOpenParam.slicemode.sliceMode,sEncOpenParam.slicemode.sliceSize, sEncOpenParam.slicemode.sliceSizeMode);
+	VPU_ENC_LOG("gamma: %d, qpmax: %d, maxenable: %d, qpmin: %d, minenable: %d, vbvsize: %d, avcintra16x16only: %d \r\n",
+		sEncOpenParam.userGamma, sEncOpenParam.userQpMax, sEncOpenParam.userQpMaxEnable,
+		sEncOpenParam.userQpMin,sEncOpenParam.userQpMinEnable,
+		sEncOpenParam.vbvBufferSize, sEncOpenParam.avcIntra16x16OnlyModeEnable);
+
+	VPU_ENC_LOG("bitrate: %d, autoskip: %d, intracost: %d, MEsearch: %d, MEUseZeroPmv: %d  \r\n",
+		sEncOpenParam.bitRate,sEncOpenParam.enableAutoSkip,sEncOpenParam.IntraCostWeight, sEncOpenParam.MESearchRange,sEncOpenParam.MEUseZeroPmv);
+	VPU_ENC_LOG("avc_intrapred: %d, avc_desaDeblk: %d, avc_alpha: %d, avc_beta: %d,  avc_qpoff: %d, avc_aud: %d \r\n",
+		sEncOpenParam.EncStdParam.avcParam.avc_constrainedIntraPredFlag,
+		sEncOpenParam.EncStdParam.avcParam.avc_disableDeblk,
+		sEncOpenParam.EncStdParam.avcParam.avc_deblkFilterOffsetAlpha,
+		sEncOpenParam.EncStdParam.avcParam.avc_deblkFilterOffsetBeta,
+		sEncOpenParam.EncStdParam.avcParam.avc_chromaQpOffset,
+		sEncOpenParam.EncStdParam.avcParam.avc_audEnable);
+#endif
+
 	VPU_ENC_API("calling vpu_EncOpen() \r\n");
 	ret= vpu_EncOpen(&pVpuObj->handle, &sEncOpenParam);
 	if(ret!=RETCODE_SUCCESS)
@@ -7905,6 +7927,11 @@ VpuEncRetCode VPU_EncOpen(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEn
 		vpu_EncGiveCommand(pVpuObj->handle, SET_ROTATION_ANGLE,&pInParam->nRotAngle);
 		VPU_ENC_API("calling vpu_EncGiveCommand(SET_MIRROR_DIRECTION) \r\n");
 		vpu_EncGiveCommand(pVpuObj->handle, SET_MIRROR_DIRECTION, &pInParam->sMirror);
+	}
+
+	if(pInParam->eFormat==VPU_V_MJPG){
+		int stuff_ena=0;
+		vpu_EncGiveCommand(pVpuObj->handle, ENC_ENABLE_SOF_STUFF, &stuff_ena);
 	}
 
 	pObj->nHeaderNeeded=1;
@@ -7996,7 +8023,7 @@ VpuEncRetCode VPU_EncOpenSimp(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,V
 		case VPU_V_AVC:
 			sEncOpenParamMore.VpuEncStdParam.avcParam.avc_constrainedIntraPredFlag = 0;
 			sEncOpenParamMore.VpuEncStdParam.avcParam.avc_disableDeblk = 0;
-			sEncOpenParamMore.VpuEncStdParam.avcParam.avc_deblkFilterOffsetAlpha = 6;
+			sEncOpenParamMore.VpuEncStdParam.avcParam.avc_deblkFilterOffsetAlpha = 0;//6;  set 0 to improve quality: ENGR00305955: bottom line flicker issue
 			sEncOpenParamMore.VpuEncStdParam.avcParam.avc_deblkFilterOffsetBeta = 0;
 			sEncOpenParamMore.VpuEncStdParam.avcParam.avc_chromaQpOffset = 0;
 			sEncOpenParamMore.VpuEncStdParam.avcParam.avc_audEnable = 0;
@@ -8420,6 +8447,15 @@ VpuEncRetCode VPU_EncConfig(VpuEncHandle InHandle, VpuEncConfig InEncConf, void*
 			}
 			VPU_ENC_LOG("%s: intra qp : %d \r\n",__FUNCTION__,para);
 			vpu_EncGiveCommand(pVpuObj->handle, ENC_SET_INTRA_QP, &para);
+			break;
+		case VPU_ENC_CONF_INTRA_REFRESH_MODE:
+			para=*((int*)pInParam);
+			if(para<0){
+				VPU_ENC_ERROR("%s: invalid intra refresh mode parameter: %d \r\n",__FUNCTION__,para);
+				return VPU_ENC_RET_INVALID_PARAM;
+			}
+			VPU_ENC_LOG("%s: intra fresh mode: %d \r\n",__FUNCTION__,para);
+			vpu_EncGiveCommand(pVpuObj->handle, ENC_SET_INTRA_REFRESH_MODE, &para);
 			break;
 		default:
 			VPU_ENC_ERROR("%s: failure: invalid setting \r\n",__FUNCTION__);	
