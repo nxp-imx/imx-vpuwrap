@@ -8690,7 +8690,7 @@ VpuEncRetCode VPU_EncEncodeFrame(VpuEncHandle InHandle, VpuEncEncParam* pInOutPa
 		}
 	}
 
-	if(pInOutParam->nOutOutputSize > pInOutParam->nInOutputBufLen){
+	if((unsigned int)pInOutParam->nOutOutputSize > pInOutParam->nInOutputBufLen){
 		VPU_ERROR("memory overflow: buffer size: %d, actual filled size: %d \r\n",pInOutParam->nInOutputBufLen,pInOutParam->nOutOutputSize);
 	}
 	if(VPU_DUMP_RAW){
