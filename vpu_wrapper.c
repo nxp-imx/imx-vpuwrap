@@ -480,6 +480,7 @@ typedef struct
 
 	int nIsAvcc;	/*only for H.264 format*/
 	int nNalSizeLen;
+	int nNalNum; /*added for nal_size_length = 1 or 2*/
 }VpuDecObj;
 
 typedef struct 
@@ -1668,6 +1669,12 @@ int VpuAccumulateConsumedBytes(VpuDecObj* pObj, int nInSize, int type, unsigned 
 			pObj->nAccumulatedConsumedFrmBytes-=pObj->nAdditionalFrmHeaderBytes;
 			ASSERT(nInSize>pObj->nAdditionalFrmHeaderBytes);
 
+			/*consider the nal size length = 1,2: additonal (4-length) bytes are filled by wrapper*/
+			if(pObj->nIsAvcc && (pObj->nNalSizeLen<3)){
+				/*now, we consider nal number is fixed in every frame*/
+				pObj->nAccumulatedConsumedFrmBytes -= pObj->nNalNum*(4-pObj->nNalSizeLen);
+			}
+
 			/*total consumed bytes= stuffer size + frame size*/
 			pObj->nAccumulatedConsumedBytes=pObj->nAccumulatedConsumedStufferBytes+pObj->nAccumulatedConsumedFrmBytes;
 
@@ -1689,14 +1696,21 @@ int VpuAccumulateConsumedBytes(VpuDecObj* pObj, int nInSize, int type, unsigned 
 	return 1;
 }
 
-int VpuCheckIllegalMemoryAccess(unsigned char*  pY,unsigned char*  pU,unsigned char*  pV, unsigned int nYStride,int nHeight)
+int VpuCheckIllegalMemoryAccess(unsigned char*  pY,unsigned char*  pU,unsigned char*  pV, unsigned int nYStride,int nOriHeight,int nInterlaced)
 {
 #define ILLEGAL_MEMORY_MARK	(0)
 #define ILLEGAL_MEMORY_CHECK_LEN	(32)
+#define Align(ptr,align)	(((unsigned int)ptr+(align)-1)/(align)*(align))
 	unsigned int nYSize,nCSize;
 	unsigned char* pYEnd,*pUEnd,*pVEnd;
-	int i;
-	nYSize=nYStride*nHeight;
+	int i,nPadHeight;
+	if(nInterlaced){
+		nPadHeight=Align(nOriHeight,32);
+	}
+	else{
+		nPadHeight=Align(nOriHeight,16);
+	}
+	nYSize=nYStride*nPadHeight;
 	nCSize=nYSize/4;
 	pYEnd=pY+nYSize;
 	pUEnd=pU+nCSize;
@@ -1705,7 +1719,7 @@ int VpuCheckIllegalMemoryAccess(unsigned char*  pY,unsigned char*  pU,unsigned c
 		if((pYEnd[i]!=ILLEGAL_MEMORY_MARK)
 			&&(pUEnd[i]!=ILLEGAL_MEMORY_MARK)
 			&&(pVEnd[i]!=ILLEGAL_MEMORY_MARK)){
-			VPU_ERROR("error: illegal memory(off: %d) access detected ! stride: %d, height: %d \r\n",i,nYStride,nHeight);
+			VPU_ERROR("error: illegal memory(off: %d) access detected ! stride: %d, ori height: %d, padded height: %d \r\n",i,nYStride,nOriHeight,nPadHeight);
 			return 0;
 		}
 	}
@@ -1789,7 +1803,7 @@ int VpuSaveDecodedFrameInfo(VpuDecObj* pObj, int index,DecOutputInfo * pCurDecFr
 		pDstInfo->Q16ShiftWidthDivHeightRatio=VpuConvertAspectRatio(pObj->CodecFormat,(unsigned int)pCurDecFrameInfo->aspectRateInfo,cropWidth,cropHeight, pObj->nProfile,pObj->nLevel);
 
 #ifdef ILLEGAL_MEMORY_DEBUG
-		VpuCheckIllegalMemoryAccess(pInFrameDecode->pbufVirtY, pInFrameDecode->pbufVirtCb, pInFrameDecode->pbufVirtCr,pInFrameDecode->nStrideY,pObj->nOriHeight);
+		VpuCheckIllegalMemoryAccess(pInFrameDecode->pbufVirtY, pInFrameDecode->pbufVirtCb, pInFrameDecode->pbufVirtCr,pInFrameDecode->nStrideY,pObj->nOriHeight,pObj->initInfo.nInterlace);
 #endif
 		/*resolution change*/
 		if(pObj->nDecResolutionChangeEnabled!=0){
@@ -2063,21 +2077,16 @@ int VpuBitsBufValidDataLength(DecHandle InVpuHandle,VpuDecObj* pObj,unsigned int
 	return 1;
 }
 
-int VpuDetectAvcc(unsigned char* pCodecData, unsigned int nSize, int * pIsAvcc, int * pNalSizeLength)
+int VpuDetectAvcc(unsigned char* pCodecData, unsigned int nSize, int * pIsAvcc, int * pNalSizeLength,int* pNalNum)
 {
 	*pIsAvcc=0;
 	if(pCodecData[0]==1){
 		int nalsizelen=(pCodecData[4]&0x3)+1;
-		if(nalsizelen<3){
-			/*Now, we only support nal_size_length == 3 or 4, 
-			   otherwise, the implementation is complex.
-			*/
-			VPU_ERROR("error: only 3 or 4 bytes nal_size_length are supported ! \r\n");
-			return 0;
-		}
+		/*possible nal size length: 1,2,3,4*/
 		VPU_LOG("avcc format is detected, nal_size_length % d \r\n",nalsizelen);
 		*pIsAvcc=1;
 		*pNalSizeLength=nalsizelen;
+		*pNalNum=0; // init 0
 	}
 	return 1;
 }
@@ -2168,38 +2177,158 @@ corrupt_header:
 	return 0;
 }
 
-int VpuConvertAvccFrame(unsigned char* pData, unsigned int nSize, int nNalSizeLength)
+int VpuScanAvccFrameNalNum(unsigned char* pData, unsigned int nSize, int nNalSizeLength)
 {
-	/*will change the nalsize with start code (3 or 4 bytes), the buffer size won't be changed*/
+	int leftSize=nSize;
+	unsigned char* p=pData;
+	unsigned int dataSize;
+	int num=0;
+	
+	while(leftSize>0){
+		if(((p+nNalSizeLength) > (pData+nSize)) || (p < pData)){
+			goto corrupt_data;
+		}
+		
+		if(nNalSizeLength==4){
+			dataSize=(p[0]<<24)|(p[1]<<16)|(p[2]<<8)|p[3];
+			p+=dataSize+4;
+			leftSize-=dataSize+4;
+		}
+		else if(nNalSizeLength==3){
+			dataSize=(p[0]<<16)|(p[1]<<8)|p[2];
+			p+=dataSize+3;
+			leftSize-=dataSize+3;
+		}
+		else if(nNalSizeLength==2){
+			dataSize=(p[0]<<8) |p[1];
+			p+=dataSize+2;
+			leftSize-=dataSize+2;
+		}
+		else {
+			dataSize=p[0];
+			p+=dataSize+1;
+			leftSize-=dataSize+1;
+		}
+		num++;
+	}
+	if(leftSize!=0){
+		goto corrupt_data;
+	}
+	VPU_LOG("nal number: %d \r\n",num);
+	return num;
+	
+corrupt_data:
+	VPU_ERROR("error: the nal data corrupted ! can't scan the nal number \r\n");
+	return 0;
+}
+
+int VpuConvertAvccFrame(unsigned char* pData, unsigned int nSize, int nNalSizeLength, unsigned char** ppFrm, unsigned int* pSize, int * pNalNum)
+{
+	/*for nal size length 3 or 4: will change the nalsize with start code , the buffer size won't be changed
+	   for nal size length 1 or 2: will re-malloc new frame data	*/
 	int leftSize=nSize;
 	unsigned char * p=pData;
+	unsigned char* pEnd;
+	unsigned char* pStart;
+	unsigned char* pOldFrm=NULL;
+	unsigned int nNewSize=0;
+	unsigned char* pNewFrm=NULL;
 
-	if((nNalSizeLength!=3)&&(nNalSizeLength!=4)){
-		return 0; //not supported
+	*ppFrm=pData;
+	*pSize=nSize;
+	pStart=pData;
+	pEnd=pData+nSize;
+	
+	if(nNalSizeLength<3){
+		int nNalNum;
+		nNalNum=VpuScanAvccFrameNalNum(pData,nSize,nNalSizeLength);
+		if(nNalNum==0){
+			return 0;
+		}
+		if(((*pNalNum)!=0) && ((*pNalNum)!=nNalNum)){
+			/*if nNalNum not fixed value, we need to consider how to update consumed size in VpuAccumulateConsumedBytes() ? */
+			VPU_ERROR("warning: the num of nal not fixed in every frame, previous: %d, new: %d \r\n",*pNalNum,nNalNum);
+		}
+		*pNalNum=nNalNum;  //update
+		nNewSize=nSize+(4-nNalSizeLength)*nNalNum;
+		pNewFrm=vpu_malloc(nNewSize);
+		if(pNewFrm==NULL){
+			VPU_ERROR("malloc failure: %d bytes \r\n",nNewSize);
+			return 0;
+		}
+		pStart=pNewFrm;
+		pEnd=pNewFrm+nNewSize;
+		p=pNewFrm;
+		pOldFrm=pData;
+		leftSize=nNewSize;
 	}
 
 	while(leftSize>0){
 		unsigned int dataSize;
-		if(((p+nNalSizeLength) > (pData+nSize))
-			|| (p < pData)){
-			goto corrupt_data;
-		}
-		if(nNalSizeLength==3){
-			dataSize=(p[0]<<16)|(p[1]<<8)|p[2];
-			p[0]=p[1]=0;
-			p[2]=0x1;  /*fill 3 bytes of startcode*/
-		}
-		else{
+
+		if(nNalSizeLength==4){
+			if(((p+4) > pEnd) || (p < pStart)){
+				goto corrupt_data;
+			}
 			dataSize=(p[0]<<24)|(p[1]<<16)|(p[2]<<8)|p[3];
 			p[0]=p[1]=p[2]=0;
 			p[3]=0x1; /*fill 4 bytes of startcode*/
+			p+=dataSize+4;
+			leftSize-=dataSize+4;
+		}
+		else if(nNalSizeLength==3){
+			if(((p+3) > pEnd) || (p < pStart)){
+				goto corrupt_data;
+			}
+			dataSize=(p[0]<<16)|(p[1]<<8)|p[2];
+			p[0]=p[1]=0;
+			p[2]=0x1;  /*fill 3 bytes of startcode*/
+			p+=dataSize+3;
+			leftSize-=dataSize+3;
+		}
+		else if(nNalSizeLength==2){
+			if(((p+4) > pEnd) || (p < pStart) || (pOldFrm<pData) || ((pOldFrm+2)>(pData+nSize))){
+				goto corrupt_data;
+			}
+			dataSize=(pOldFrm[0]<<8) |pOldFrm[1];
+			p[0]=p[1]=p[2]=0;
+			p[3]=0x1; /*fill 4 bytes of startcode*/
+			p+=4;
+			pOldFrm+=2;
+			if((dataSize > (unsigned int)(pEnd-p)) || (dataSize>(unsigned int)(pData+nSize-pOldFrm))){
+				goto corrupt_data;
+			}
+			vpu_memcpy(p,pOldFrm,dataSize);
+			p+=dataSize;
+			pOldFrm+=dataSize;
+			leftSize-=dataSize+4;
+		}
+		else{ /*1 byte*/
+			if(((p+4) > pEnd) || (p < pStart) || (pOldFrm<pData) || ((pOldFrm+1)>(pData+nSize))){
+				goto corrupt_data;
+			}
+			dataSize=pOldFrm[0];
+			p[0]=p[1]=p[2]=0;
+			p[3]=0x1; /*fill 4 bytes of startcode*/
+			p+=4;
+			pOldFrm+=1;
+			if((dataSize > (unsigned int)(pEnd-p)) || (dataSize>(unsigned int)(pData+nSize-pOldFrm))){
+				goto corrupt_data;
+			}
+			vpu_memcpy(p,pOldFrm,dataSize);
+			p+=dataSize;
+			pOldFrm+=dataSize;
+			leftSize-=dataSize+4;
 		}
 		VPU_LOG("fill one %d bytes of start code for nal data(%d bytes) \r\n", nNalSizeLength,dataSize);
-		leftSize-=dataSize+4;
-		p+=dataSize+4;
 	}
 	if(leftSize!=0){
 		goto corrupt_data;
+	}
+
+	if(nNalSizeLength<3){
+		*ppFrm=pNewFrm;
+		*pSize=nNewSize;
 	}
 	return 1;
 
@@ -2676,7 +2805,7 @@ int VpuSeqInit(DecHandle InVpuHandle, VpuDecObj* pObj ,VpuBufferNode* pInData,in
 				{
 					//insert private data
 					if((pObj->CodecFormat==VPU_V_AVC)&&(0==pObj->nIsAvcc)){
-						VpuDetectAvcc(pInData->sCodecData.pData,pInData->sCodecData.nSize,&pObj->nIsAvcc,&pObj->nNalSizeLen);
+						VpuDetectAvcc(pInData->sCodecData.pData,pInData->sCodecData.nSize,&pObj->nIsAvcc,&pObj->nNalSizeLen,&pObj->nNalNum);
 					}
 					if(pObj->nIsAvcc){
 						VpuConvertAvccHeader(pInData->sCodecData.pData,pInData->sCodecData.nSize, &pHeader,&headerLen);
@@ -2759,9 +2888,17 @@ int VpuSeqInit(DecHandle InVpuHandle, VpuDecObj* pObj ,VpuBufferNode* pInData,in
 		}
 		//allow pInData->nSize==0 ???
 		if(pObj->nIsAvcc){
-			VpuConvertAvccFrame(pInData->pVirAddr,pInData->nSize,pObj->nNalSizeLen);
+			unsigned char* pFrm=NULL;
+			unsigned int nFrmSize;
+			VpuConvertAvccFrame(pInData->pVirAddr,pInData->nSize,pObj->nNalSizeLen,&pFrm,&nFrmSize,&pObj->nNalNum);
+			fill_ret=VpuFillData(InVpuHandle,pObj,pFrm,nFrmSize,1,headerLen);
+			if(pFrm!=pInData->pVirAddr){
+				vpu_free(pFrm);
+			}
 		}
-		fill_ret=VpuFillData(InVpuHandle,pObj,pInData->pVirAddr,pInData->nSize,1,headerLen);
+		else{
+			fill_ret=VpuFillData(InVpuHandle,pObj,pInData->pVirAddr,pInData->nSize,1,headerLen);
+		}
 		ASSERT(fill_ret==1);
 		total_size+=headerLen+pInData->nSize;
 		total_loop++;
@@ -2950,6 +3087,7 @@ int VpuGetOutput(DecHandle InVpuHandle, VpuDecObj* pObj,int* pOutRetCode,int InS
 	VPU_TRACE;
 	VPU_API("calling vpu_DecGetOutputInfo() \r\n");
 	ret = vpu_DecGetOutputInfo(InVpuHandle, &outInfo);
+
 	VPU_API("calling vpu_DecGetOutputInfo(), indexFrmDec: %d, return indexFrmDis: %d, type: %d, success: 0x%X, errMB: %d, consumed: %d \r\n",outInfo.indexFrameDecoded,outInfo.indexFrameDisplay,outInfo.picType,outInfo.decodingSuccess,outInfo.numOfErrMBs,outInfo.consumedByte);
 	VPU_LOG("fieldSequence: %d, vc1_repeatFrame: %d,interlacedFrame: %d, indexFrameRangemap: %d, progressiveFrame: %d, topFieldFirst: %d \r\n",outInfo.fieldSequence,outInfo.vc1_repeatFrame,outInfo.interlacedFrame,outInfo.indexFrameRangemap,outInfo.progressiveFrame,outInfo.topFieldFirst);
 #ifdef VPU_BACKDOOR		
@@ -3310,9 +3448,11 @@ int VpuGetOutput(DecHandle InVpuHandle, VpuDecObj* pObj,int* pOutRetCode,int InS
 				if(VPU_FRAME_STATE_DEC!=state)
 				{
 					//FIXME: we should set dropped, but not discard it internally. otherwise, the timestamp is not matched!!!!
-					VPU_API("%s: calling vpu_DecClrDispFlag(): %d (invalid output) \r\n",__FUNCTION__,outInfo.indexFrameDisplay);				
-					ret=vpu_DecClrDispFlag(InVpuHandle,outInfo.indexFrameDisplay);
-					ASSERT(RETCODE_SUCCESS==ret);
+					if(VPU_FRAME_STATE_DISP!=state){
+						VPU_API("%s: calling vpu_DecClrDispFlag(): %d (invalid output) \r\n",__FUNCTION__,outInfo.indexFrameDisplay);				
+						ret=vpu_DecClrDispFlag(InVpuHandle,outInfo.indexFrameDisplay);
+						ASSERT(RETCODE_SUCCESS==ret);
+					}
 					//needn't clear frame state ?
 					//VpuClearDispFrame(outInfo.indexFrameDisplay, pVpuObj->obj.frameBufState);
 
@@ -4242,9 +4382,17 @@ int VpuDecBuf(DecHandle* pVpuHandle, VpuDecObj* pObj ,VpuBufferNode* pInData,int
 
 			//allow pInData->nSize==0 for EOS
 			if(pObj->nIsAvcc){
-				VpuConvertAvccFrame(pInData->pVirAddr,pInData->nSize,pObj->nNalSizeLen);
+				unsigned char* pFrm=NULL;
+				unsigned int nFrmSize;
+				VpuConvertAvccFrame(pInData->pVirAddr,pInData->nSize,pObj->nNalSizeLen,&pFrm,&nFrmSize,&pObj->nNalNum);
+				fill_ret=VpuFillData(InVpuHandle,pObj,pFrm,nFrmSize,1,headerLen);
+				if(pFrm!=pInData->pVirAddr){
+					vpu_free(pFrm);
+				}
 			}
-			fill_ret=VpuFillData(InVpuHandle,pObj,pInData->pVirAddr,pInData->nSize,1,headerLen);
+			else{
+				fill_ret=VpuFillData(InVpuHandle,pObj,pInData->pVirAddr,pInData->nSize,1,headerLen);
+			}
 			ASSERT(fill_ret==1);
 		}
 	}
@@ -4377,9 +4525,17 @@ int VpuDecBuf(DecHandle* pVpuHandle, VpuDecObj* pObj ,VpuBufferNode* pInData,int
 					VpuAccumulateConsumedBytes(pObj, headerLen, 1,NULL,NULL);
 				}
 				if(pObj->nIsAvcc){
-					VpuConvertAvccFrame(pInData->pVirAddr,pInData->nSize,pObj->nNalSizeLen);
+					unsigned char* pFrm=NULL;
+					unsigned int nFrmSize;
+					VpuConvertAvccFrame(pInData->pVirAddr,pInData->nSize,pObj->nNalSizeLen,&pFrm,&nFrmSize,&pObj->nNalNum);
+					fill_ret=VpuFillData(InVpuHandle,pObj,pFrm,nFrmSize,1,headerLen);
+					if(pFrm!=pInData->pVirAddr){
+						vpu_free(pFrm);
+					}
 				}
-				fill_ret=VpuFillData(InVpuHandle,pObj,pInData->pVirAddr,pInData->nSize,1,headerLen);
+				else{
+					fill_ret=VpuFillData(InVpuHandle,pObj,pInData->pVirAddr,pInData->nSize,1,headerLen);
+				}
 				ASSERT(fill_ret==1);	//always enough to fill data
 				decParam.chunkSize=pInData->nSize+headerLen;
 				bufUseState=VPU_DEC_INPUT_USED;	

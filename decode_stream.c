@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2010-2012, Freescale Semiconductor Inc.,
+ *  Copyright (c) 2010-2014, Freescale Semiconductor Inc.,
  *  All Rights Reserved.
  *
  *  The following programs are the sole property of Freescale Semiconductor Inc.,
@@ -692,8 +692,8 @@ int ProcessInitInfo(DecContxt * pDecContxt,VpuDecHandle handle,VpuDecInitInfo* p
 
 #ifdef ILLEGAL_MEMORY_DEBUG
 	//in such debug case, we always allocate big enough frame buffers
-	DEC_STREAM_PRINTF("enable illegal memory detect, buffer size: 1920*(1088+32) \r\n");
-	ySize=1920*(1088+32);
+	DEC_STREAM_PRINTF("enable illegal memory detect, buffer size: 1920*(1088+64) \r\n");
+	ySize=1920*(1088+64);
 #endif
 
 	//for MJPG: we need to check 4:4:4/4:2:2/4:2:0/4:0:0

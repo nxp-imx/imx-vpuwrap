@@ -1,6 +1,11 @@
 
 Change log:
 
+ver 1.0.50:
+  add support for nal_size_length is equal to 1 or 2
+  fix bug in detecting of illegal memory access
+  fix bug related with conflict buffer state
+
 ver 1.0.49:
   add config for intra refresh mode
   enhance avcc conversion for corrupted clips
