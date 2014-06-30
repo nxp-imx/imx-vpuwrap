@@ -6861,7 +6861,7 @@ VpuDecRetCode VPU_DecGetMem(VpuMemDesc* pInOutMem)
 		return VPU_DEC_RET_FAILURE;
 	}
 	ret=IOGetVirtMem(&buff);
-	if(ret==0) //if(ret!=RETCODE_SUCCESS)
+	if(ret==-1) //if(ret==MAP_FAILED)
 	{
 		VPU_ERROR("%s: get virtual memory failure: size=%d, ret=%d \r\n",__FUNCTION__,buff.size,ret);
 		return VPU_DEC_RET_FAILURE;
@@ -8511,7 +8511,7 @@ VpuEncRetCode VPU_EncGetMem(VpuMemDesc* pInOutMem)
 		return VPU_ENC_RET_FAILURE;
 	}
 	ret=IOGetVirtMem(&buff);
-	if(ret==0) //if(ret!=RETCODE_SUCCESS)
+	if(ret==-1) //if(ret==MAP_FAILED)
 	{
 		VPU_ENC_ERROR("%s: get virtual memory failure: size=%d, ret=%d \r\n",__FUNCTION__,buff.size,(UINT32)ret);
 		return VPU_ENC_RET_FAILURE;

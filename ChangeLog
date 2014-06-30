@@ -1,6 +1,9 @@
 
 Change log:
 
+ver 1.0.51:
+  modify the checking of return value from IOGetVirtMem
+
 ver 1.0.50:
   add support for nal_size_length is equal to 1 or 2
   fix bug in detecting of illegal memory access
