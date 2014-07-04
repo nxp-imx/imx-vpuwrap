@@ -1,6 +1,9 @@
 
 Change log:
 
+ver 1.0.52:
+  For corrupted clips with only one frame, we will report error instead of eos
+  
 ver 1.0.51:
   modify the checking of return value from IOGetVirtMem
 

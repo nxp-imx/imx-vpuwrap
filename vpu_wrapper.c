@@ -4955,6 +4955,7 @@ int VpuCheckDeadLoop(VpuDecObj* pObj ,VpuBufferNode* pInData,int* pOutRetCode,in
 #endif
 	{
 		//dead loop at seq init step
+#if 0	//remove this logic for OMX requirement on iMX6
 		if((0==pInData->nSize)&&(NULL!=pInData->pVirAddr))
 		{
 			//EOS: (addr!=NULL && size==0)
@@ -4963,6 +4964,7 @@ int VpuCheckDeadLoop(VpuDecObj* pObj ,VpuBufferNode* pInData,int* pOutRetCode,in
 			pObj->state=VPU_DEC_STATE_EOS;
 		}
 		else
+#endif
 		{
 			noerr=0;
 		}
