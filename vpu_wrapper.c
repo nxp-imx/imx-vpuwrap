@@ -59,7 +59,6 @@
 
 //#define VPU_DEC_PIPELINE
 #define VPU_DEC_CHECK_INIT_LENGTH		//VPU limitation of minimum size 512 before seq init ?
-#define VPU_ONE_EOS
 #define VPU_SUPPORT_UNCLOSED_GOP		// for unclosed gop case:(1) drop B frames whose reference are missing (2) drop non-I frame after flushing
 #define VPU_PROTECT_MULTI_INSTANCE	// for stream mode, we need to add protection for (startoneframe()--check busy/wait interrupt--getoutput()) to avoid hangup
 //#define VPU_DEBUG_BS
@@ -2339,11 +2338,6 @@ corrupt_data:
 
 int VpuFillData(DecHandle InVpuHandle,VpuDecObj* pObj,unsigned char* pInVirt,unsigned int nSize, int InIsEnough,int nFileModeOffset)
 {
-
-#ifdef VPU_ONE_EOS
-	static int eos_flag=0;
-#endif
-
 	PhysicalAddress Rd;
 	PhysicalAddress Wr;
 	unsigned long nSpace;
@@ -2367,22 +2361,10 @@ int VpuFillData(DecHandle InVpuHandle,VpuDecObj* pObj,unsigned char* pInVirt,uns
 		return 1; //0
 	}
 
-#ifdef VPU_ONE_EOS
-	if((1==eos_flag))		
-	{
-		if (0==nSize)
-		{
-			// avoid repeated send EOS flag
-			return 1; 
-		}
-		else
-		{
-			//reset for repeat playing
-			eos_flag=0;
-		}
+	if((1==pObj->filledEOS) && (0==nSize)){
+		// avoid repeated send EOS flag
+		return 1; 
 	}
-#endif
-	
 
 	nFillSize=nSize;
 	pSrc=pInVirt;
@@ -2474,20 +2456,7 @@ int VpuFillData(DecHandle InVpuHandle,VpuDecObj* pObj,unsigned char* pInVirt,uns
 
 	//check ret ??
 
-#ifdef VPU_ONE_EOS
-	//update eos flag
-	if(nFillUnit==0)
-	{
-		eos_flag=1;
-	}
-	else
-	{
-		eos_flag=0;
-	}
-#endif
-
 #ifdef VPU_PROTECT_MULTI_INSTANCE
-	//TODO: In fact, we can merge two variables (eos_flag and filledEOS) into one 
 	if(nFillUnit==0)
 	{
 		pObj->filledEOS=1;
@@ -3125,7 +3094,7 @@ int VpuGetOutput(DecHandle InVpuHandle, VpuDecObj* pObj,int* pOutRetCode,int InS
 		if((VPU_OUT_DEC_INDEX_EOS==outInfo.indexFrameDecoded) &&(VPU_OUT_DIS_INDEX_EOS==outInfo.indexFrameDisplay))
 		{
 			VPU_ERROR("%s: warning: conflict index meaning, indexFrameDecoded: %d, indexFrameDisplay: %d, decodingSuccess: %dwill rectify it maunally !!! \r\n",__FUNCTION__,outInfo.indexFrameDecoded,outInfo.indexFrameDisplay,outInfo.decodingSuccess);
-			if(0==outInfo.decodingSuccess)
+			if(0==(outInfo.decodingSuccess&0x1))
 			{
 				//no frame buffer: -1,-1 => -1,-3
 				//outInfo.indexFrameDecoded=VPU_OUT_DEC_INDEX_EOS;
@@ -3282,6 +3251,14 @@ int VpuGetOutput(DecHandle InVpuHandle, VpuDecObj* pObj,int* pOutRetCode,int InS
 			*/
 			outInfo.indexFrameDecoded=VPU_OUT_DEC_INDEX_NOMEANING;	//skip below some special process, such as VPU_DEC_NO_ENOUGH_BUF/VPU_DEC_OUTPUT_DROPPED 
 			*pOutInStreamModeEnough=0;
+		}
+		else if ((CPU_IS_MX6X()) && (pObj->nDecResolutionChangeEnabled!=0)&& ((outInfo.decodingSuccess>>20) & 0x1)){
+			/*resolution changed: H.264/AVC, MPEG-2, VC1, AVS, MPEG-4:*/
+			pObj->nResolutionChanged=1;
+			outInfo.indexFrameDecoded=VPU_OUT_DEC_INDEX_NOMEANING;
+			outInfo.indexFrameDisplay=VPU_OUT_DIS_INDEX_NODIS;
+			*pOutRetCode=VPU_DEC_OUTPUT_NODIS;
+			VPU_LOG("vpu report resolution changed ! discard current display frame \r\n");
 		}
 		else
 #endif		
@@ -4775,7 +4752,7 @@ AfterGetOuput:
 	}
 
 	/*check whether resolution change happen*/
-	if((pObj->nDecResolutionChangeEnabled!=0)&&(frmDecoded==1))
+	if((pObj->nDecResolutionChangeEnabled!=0)/*&&(frmDecoded==1)*/)
 	{
 		if(pObj->nResolutionChanged)
 		{

@@ -1,6 +1,10 @@
 
 Change log:
 
+ver 1.0.53:
+  add detecting of resoluton change(bit20)
+  fix bug of eos condition in multi-instance
+  
 ver 1.0.52:
   For corrupted clips with only one frame, we will report error instead of eos
   
