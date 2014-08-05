@@ -1,6 +1,9 @@
 
 Change log:
 
+ver 1.0.54:
+  revert detection of resolution change(bit20) since vpu may report resolution change wrong for corrupted clips.
+
 ver 1.0.53:
   add detecting of resoluton change(bit20)
   fix bug of eos condition in multi-instance

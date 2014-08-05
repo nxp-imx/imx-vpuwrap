@@ -3252,6 +3252,7 @@ int VpuGetOutput(DecHandle InVpuHandle, VpuDecObj* pObj,int* pOutRetCode,int InS
 			outInfo.indexFrameDecoded=VPU_OUT_DEC_INDEX_NOMEANING;	//skip below some special process, such as VPU_DEC_NO_ENOUGH_BUF/VPU_DEC_OUTPUT_DROPPED 
 			*pOutInStreamModeEnough=0;
 		}
+#ifdef DETECT_RESOLUTION_CHANGE_BEFORE_DECODE //disable it by default since vpu may report resolution change wrong
 		else if ((CPU_IS_MX6X()) && (pObj->nDecResolutionChangeEnabled!=0)&& ((outInfo.decodingSuccess>>20) & 0x1)){
 			/*resolution changed: H.264/AVC, MPEG-2, VC1, AVS, MPEG-4:*/
 			pObj->nResolutionChanged=1;
@@ -3260,6 +3261,7 @@ int VpuGetOutput(DecHandle InVpuHandle, VpuDecObj* pObj,int* pOutRetCode,int InS
 			*pOutRetCode=VPU_DEC_OUTPUT_NODIS;
 			VPU_LOG("vpu report resolution changed ! discard current display frame \r\n");
 		}
+#endif
 		else
 #endif		
 		{
