@@ -169,7 +169,7 @@ static int g_seek_dump=DUMP_ALL_DATA;	/*0: only dump data after seeking; otherwi
 #define IMX6_RANGEMAP_WORKAROUND_IGNORE
 //#define IMX6_LD_BUG_WORKAROUND	 //1 for iMX6 compiler : ld (2.20.1-system.20100303) bug ??	
 //#define IMX6_PIC_ORDER_WORKAROUND	//fixed for 6_Gee_HD.avi
-//#define IMX6_BUFNOTENOUGH_WORKAROUND	//when buffer is not enough, vpu may return dispIndex=-1(EOS) directly, but not decIndex=-1
+#define IMX6_BUFNOTENOUGH_WORKAROUND	//when buffer is not enough, vpu may return dispIndex=-1(EOS) directly, but not decIndex=-1
 //#define IMX6_INTER_DEBUG_RD_WR	//internal debug: rd wr register
 //#define IMX6_INTER_DEBUG	//internal debug
 //#define IMX6_BITBUFSPACE_WORKAROUND	//the free sapce may be not correct for FW version 2.1.3 or later
@@ -3984,7 +3984,14 @@ if(CPU_IS_MX6X())
 	}
 }
 #endif
-	
+
+	/*clear variables related with buffer*/
+	pVpuObj->obj.nAccumulatedConsumedStufferBytes=0;
+	pVpuObj->obj.nAccumulatedConsumedFrmBytes=0;
+	pVpuObj->obj.nAccumulatedConsumedBytes=0;
+	pVpuObj->obj.pLastDecodedFrm=NULL;
+	pVpuObj->obj.nLastFrameEndPosPhy=(unsigned int)pVpuObj->obj.pBsBufPhyEnd-1+FRAME_END_OFFSET;
+
 	return 1;
 
 }
@@ -5746,8 +5753,8 @@ RepeatDec:
 		case VPU_DEC_STATE_DEC:
 		case VPU_DEC_STATE_STARTFRAMEOK:
 #ifdef IMX6_BUFNOTENOUGH_WORKAROUND
-			//if(CPU_IS_MX6X())
-			if((CPU_IS_MX6X())&&(VPU_V_VP8==pVpuObj->obj.CodecFormat))  //now, only for iMX6/VP8
+			//if((CPU_IS_MX6X())&&(VPU_V_VP8==pVpuObj->obj.CodecFormat))  //now, only for iMX6/VP8
+			if((CPU_IS_MX6X())&&(VPU_V_RV==pVpuObj->obj.CodecFormat))  //now, only for iMX6/RV
 			{
 				int used_num=0;
 				used_num=VpuQueryVpuHoldBufNum(pObj);

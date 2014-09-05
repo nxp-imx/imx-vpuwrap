@@ -1,6 +1,10 @@
 
 Change log:
 
+ver 1.0.55:
+  fix bug for resolution change in loop play
+  add workaround for rmvb decode timeout issue when no enough frame buffer
+
 ver 1.0.54:
   revert detection of resolution change(bit20) since vpu may report resolution change wrong for corrupted clips.
 

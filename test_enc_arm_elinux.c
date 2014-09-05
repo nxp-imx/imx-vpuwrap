@@ -426,11 +426,13 @@ int main(int argc, char **argv)
 	encContxt.nUserGamma=ioParams.gamma;
 	encContxt.nH263_annexJEnable=1;
 	//encContxt.nRcIntervalMode=1;
+	encContxt.nAvc_constrainedIntraPredFlag=1;
+	//encContxt.nAvc_Intra16x16Only=1;
 
 	encContxt.nRepeatNum=ioParams.repeatnum;
 	encContxt.nSimpleApi=ioParams.simpleApi;
 	encContxt.nInitialDelay=ioParams.initialdelay;
-	encContxt.nIntraRefresh=(0==ioParams.refreshratio)?0:(ioParams.width*ioParams.height/256/ioParams.refreshratio);
+	encContxt.nIntraRefresh=(0==ioParams.refreshratio)?0:(ioParams.width*ioParams.height*ioParams.refreshratio/256/100);
 	encContxt.nIntraRefreshMode=ioParams.refreshmode;
 	if(encContxt.nSimpleApi==0){
 		APP_DEBUG_PRINTF("gamma: %d, initial delay: %d, intra refresh: %d, intra refresh mode: %d \r\n",
