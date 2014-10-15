@@ -1,6 +1,9 @@
 
 Change log:
 
+ver 1.0.56:
+  re-enable detection of resolution change due to the latest FW
+
 ver 1.0.55:
   fix bug for resolution change in loop play
   add workaround for rmvb decode timeout issue when no enough frame buffer

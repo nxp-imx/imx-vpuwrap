@@ -176,6 +176,7 @@ static int g_seek_dump=DUMP_ALL_DATA;	/*0: only dump data after seeking; otherwi
 #define IMX6_WRONG_EOS_WORKAROUND //for mpeg4, vpu may report disIndx=-1(EOS) in the middle of clip after seeking
 #define IMX6_VP8_SHOWFRAME_WORKAROUND //for special frame(show_frame=0) in vpu8, buffer may be decoded repeatedly, as a result, timestamp will be accumulated
 #define IMX6_AVC_NOFRAME_WORKAROUND //for h.264 clips, vpu may report no frame buffer before decoding the first frame(frames are just registered to vpu)
+#define IMX6_DETECT_RESOLUTION_CHANGE_BEFORE_DECODE //detect resolution change before decoding 
 #endif
 /****************************** cpu version ***************************************/
 #define CPU_IS_MX5X  cpu_is_mx5x
@@ -3252,7 +3253,7 @@ int VpuGetOutput(DecHandle InVpuHandle, VpuDecObj* pObj,int* pOutRetCode,int InS
 			outInfo.indexFrameDecoded=VPU_OUT_DEC_INDEX_NOMEANING;	//skip below some special process, such as VPU_DEC_NO_ENOUGH_BUF/VPU_DEC_OUTPUT_DROPPED 
 			*pOutInStreamModeEnough=0;
 		}
-#ifdef DETECT_RESOLUTION_CHANGE_BEFORE_DECODE //disable it by default since vpu may report resolution change wrong
+#ifdef IMX6_DETECT_RESOLUTION_CHANGE_BEFORE_DECODE
 		else if ((CPU_IS_MX6X()) && (pObj->nDecResolutionChangeEnabled!=0)&& ((outInfo.decodingSuccess>>20) & 0x1)){
 			/*resolution changed: H.264/AVC, MPEG-2, VC1, AVS, MPEG-4:*/
 			pObj->nResolutionChanged=1;
