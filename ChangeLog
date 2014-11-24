@@ -1,6 +1,9 @@
 
 Change log:
 
+ver 1.0.57:
+  fix bug for clips with resolution change in which one internal variable need to be cleared.
+
 ver 1.0.56:
   re-enable detection of resolution change due to the latest FW
 

@@ -4057,7 +4057,7 @@ int VpuResolutionChangeResetGlobalVariables(VpuDecObj* pObj)
 	pObj->nAdditionalSeqBytes=0;
 	pObj->nAdditionalFrmHeaderBytes=0;
 	pObj->nLastFrameEndPosPhy=(unsigned int)pObj->pBsBufPhyEnd-1+FRAME_END_OFFSET;	//make sure we can compute the length of sequence/config before the first frame
-
+	pObj->pPreDisplayFrameBuf=NULL;
 	return 1;
 }
 
