@@ -8208,29 +8208,15 @@ VpuEncRetCode VPU_EncClose(VpuEncHandle InHandle)
 	}
 
 	pVpuObj=(VpuEncHandleInternal *)InHandle;
-
-	//add robust : if busy(fix some timeout issue) , reset it 
-	VPU_ENC_API("calling vpu_IsBusy() \r\n");
-	if(vpu_IsBusy())
-	{
-		VPU_ENC_API("calling vpu_SWReset(0x%X,0) \r\n",(UINT32)pVpuObj->handle);
-		ret=vpu_SWReset(pVpuObj->handle,0);
-		if(RETCODE_SUCCESS!=ret)
-		{
-			VPU_ENC_ERROR("%s: vpu reset failure, ret=%d \r\n",__FUNCTION__,ret);
-			//return VPU_ENC_RET_FAILURE;
-		}	
-	}	
-
-	//normal close
 	VPU_ENC_API("calling vpu_EncClose() \r\n");
-	ret=vpu_EncClose(pVpuObj->handle);
-	if(RETCODE_SUCCESS!=ret)
-	{
-		VPU_ENC_ERROR("%s: vpu close failure, ret=%d \r\n",__FUNCTION__,ret);
-		return VPU_ENC_RET_FAILURE;
-	}	
-	
+	ret = vpu_EncClose(pVpuObj->handle);
+	if (ret == RETCODE_FRAME_NOT_COMPLETE) {
+		VPU_ENC_API("calling vpu_SWReset(0x%X,0) \r\n",(UINT32)pVpuObj->handle);
+		vpu_SWReset(pVpuObj->handle, 0);
+		VPU_ENC_API("calling vpu_EncClose() again\r\n");
+		vpu_EncClose(pVpuObj->handle);
+	}
+
 	return VPU_ENC_RET_SUCCESS;
 }
 

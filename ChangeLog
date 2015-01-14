@@ -1,6 +1,9 @@
 
 Change log:
 
+ver 1.0.58:
+  fix one potential risk where encoder may crash at close stage in multi-instance case
+  
 ver 1.0.57:
   fix bug for clips with resolution change in which one internal variable need to be cleared.
 
