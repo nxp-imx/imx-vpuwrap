@@ -1,6 +1,9 @@
 
 Change log:
 
+ver 1.0.59:
+  handle the special gop size in order to pass some CTS tests in which large gopsize will be set
+  
 ver 1.0.58:
   fix one potential risk where encoder may crash at close stage in multi-instance case
   

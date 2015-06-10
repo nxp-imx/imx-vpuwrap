@@ -8053,6 +8053,11 @@ VpuEncRetCode VPU_EncOpen(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEn
 		sEncOpenParam.EncStdParam.avcParam.avc_audEnable);
 #endif
 
+	if(sEncOpenParam.gopSize>0x7FFF){ // we can't return failure in order to support some special CTS test
+		VPU_ERROR("warning: the gop size %d is too large, will reset it to %d \r\n",sEncOpenParam.gopSize,0x7FFF);
+		sEncOpenParam.gopSize=0x7FFF;
+	}
+
 	VPU_ENC_API("calling vpu_EncOpen() \r\n");
 	ret= vpu_EncOpen(&pVpuObj->handle, &sEncOpenParam);
 	if(ret!=RETCODE_SUCCESS)

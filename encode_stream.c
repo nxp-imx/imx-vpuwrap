@@ -229,37 +229,37 @@ int EncGetOneYUVFrameSize(int nColor,int nWidth,int nHeight,int* pYSize, int * p
 	switch(nColor)
 	{
 		case 0:	//4:2:0
-			nFrmSize=nWidth*nHeight*3/2;
+			nFrmSize=nWidth*Align(nHeight,16)*3/2; //still need to align input yuv buffer
 			*pYSize=nWidth*nHeight;
 			*pUSize=nWidth*nHeight/4;
 			*pVSize=nWidth*nHeight/4;
 			break;
 		case 1:	//4:2:2 hor
-			nFrmSize=nWidth*nHeight*2;
+			nFrmSize=nWidth*Align(nHeight,16)*2;
 			*pYSize=nWidth*nHeight;
 			*pUSize=nWidth*nHeight/2;
 			*pVSize=nWidth*nHeight/2;
 			break;
 		case 2:	//4:2:2 ver
-			nFrmSize=nWidth*nHeight*2;
+			nFrmSize=nWidth*Align(nHeight,16)*2;
 			*pYSize=nWidth*nHeight;
 			*pUSize=nWidth*nHeight/2;
 			*pVSize=nWidth*nHeight/2;
 			break;
 		case 3:	//4:4:4
-			nFrmSize=nWidth*nHeight*3;
+			nFrmSize=nWidth*Align(nHeight,16)*3;
 			*pYSize=nWidth*nHeight;
 			*pUSize=nWidth*nHeight;
 			*pVSize=nWidth*nHeight;
 			break;
 		case 4:	//4:0:0
-			nFrmSize=nWidth*nHeight;
+			nFrmSize=nWidth*Align(nHeight,16);
 			*pYSize=nWidth*nHeight;
 			*pUSize=0;
 			*pVSize=0;
 			break;
 		default:	//4:2:0
-			nFrmSize=nWidth*nHeight*3/2;
+			nFrmSize=nWidth*Align(nHeight,16)*3/2;
 			*pYSize=nWidth*nHeight;
 			*pUSize=nWidth*nHeight/4;
 			*pVSize=nWidth*nHeight/4;			
