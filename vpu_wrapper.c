@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2010-2014, Freescale Semiconductor Inc.,
+ *  Copyright (c) 2010-2015, Freescale Semiconductor Inc.,
  *  All Rights Reserved.
  *
  *  The following programs are the sole property of Freescale Semiconductor Inc.,
@@ -1788,8 +1788,13 @@ int VpuSaveDecodedFrameInfo(VpuDecObj* pObj, int index,DecOutputInfo * pCurDecFr
 			//crop info is invalid
 			pDstInfo->frameCrop.nLeft= 0;
 			pDstInfo->frameCrop.nTop = 0;
-			pDstInfo->frameCrop.nRight=pCurDecFrameInfo->decPicWidth;
-			pDstInfo->frameCrop.nBottom=pCurDecFrameInfo->decPicHeight;
+			if (pObj->CodecFormat==VPU_V_VP8){
+				pDstInfo->frameCrop.nRight=pCurDecFrameInfo->vp8ScaleInfo.picWidth;
+				pDstInfo->frameCrop.nBottom=pCurDecFrameInfo->vp8ScaleInfo.picHeight;
+			}else{
+				pDstInfo->frameCrop.nRight=pCurDecFrameInfo->decPicWidth;
+				pDstInfo->frameCrop.nBottom=pCurDecFrameInfo->decPicHeight;
+			}
 		}
 		else
 		{	

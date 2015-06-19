@@ -1,6 +1,9 @@
 
 Change log:
 
+ver 1.0.60:
+  fix the inaccurate crop info for vp8
+
 ver 1.0.59:
   handle the special gop size in order to pass some CTS tests in which large gopsize will be set
   
