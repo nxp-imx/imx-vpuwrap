@@ -1812,7 +1812,7 @@ int VpuSaveDecodedFrameInfo(VpuDecObj* pObj, int index,DecOutputInfo * pCurDecFr
 #endif
 		/*resolution change*/
 		if(pObj->nDecResolutionChangeEnabled!=0){
-			if((pCurDecFrameInfo->decPicWidth!=pObj->nOriWidth)||((pCurDecFrameInfo->decPicHeight!=pObj->nOriHeight))){
+			if((Align(pCurDecFrameInfo->decPicWidth,16)!=Align(pObj->nOriWidth,16))||(Align(pCurDecFrameInfo->decPicHeight,16)!=Align(pObj->nOriHeight,16))){
 				pObj->nResolutionChanged=1;
 				//in such case, needn't record/accumulate frame info
 				VPU_LOG("resolution change: original: [%d x %d], new: [%d x %d]!\r\n",pObj->nOriWidth,pObj->nOriHeight,pCurDecFrameInfo->decPicWidth,pCurDecFrameInfo->decPicHeight);
@@ -4088,6 +4088,9 @@ int VpuResolutionChangeProcess(DecHandle* pInOutVpuHandle, VpuDecObj* pObj)
 	nBakLen=VpuComputeValidSizeInRingBuf(pObj->nLastFrameEndPosPhy, Wr,(unsigned int)pObj->pBsBufPhyStart,(unsigned int)pObj->pBsBufPhyEnd);
 	nBakLen-=2;	//reduce start and end themselves
 	nBakLen+=FRAME_END_OFFSET+FRAME_START_OFFSET;
+	if(pObj->CodecFormat==VPU_V_VP8){
+		nBakLen+=VP8_SEQ_HEADER_SIZE; //for vp8, we need to add system header again
+	}
 	if(nBakLen<=0)
 	{
 		VPU_ERROR("error last frame location !!! \r\n");
@@ -4108,7 +4111,17 @@ int VpuResolutionChangeProcess(DecHandle* pInOutVpuHandle, VpuDecObj* pObj)
 	nBsBufVirtEnd=(unsigned int)pObj->pBsBufVirtStart+((unsigned int)pObj->pBsBufPhyEnd-(unsigned int)pObj->pBsBufPhyStart);
 	nStart=(unsigned int)pObj->pBsBufVirtStart+((unsigned int)pObj->nLastFrameEndPosPhy-(unsigned int)pObj->pBsBufPhyStart);
 	nEnd=(unsigned int)pObj->pBsBufVirtStart+((unsigned int)Wr-(unsigned int)pObj->pBsBufPhyStart);
-	pObj->nSeqBakLen=VpuCopyValidSizeInRingBuf(pObj->pSeqBak, nStart, nEnd, (unsigned int)pObj->pBsBufVirtStart,nBsBufVirtEnd);
+
+	if(pObj->CodecFormat==VPU_V_VP8){
+		int headerLen;
+		VP8CreateSeqHeader(pObj->pSeqBak, (int*)(&headerLen),1,1,0,pObj->picWidth,pObj->picHeight); //we still don't know the correct resolution yet, just fill one fake value
+		VPU_LOG("vp8: insert system header: %d , fake resolution: %d x %d  \r\n",headerLen,pObj->picWidth,pObj->picHeight); 
+		ASSERT(VP8_SEQ_HEADER_SIZE==headerLen);
+		pObj->nSeqBakLen=VpuCopyValidSizeInRingBuf(pObj->pSeqBak+headerLen, nStart, nEnd, (unsigned int)pObj->pBsBufVirtStart,nBsBufVirtEnd);
+		pObj->nSeqBakLen+=headerLen;
+	}else{
+		pObj->nSeqBakLen=VpuCopyValidSizeInRingBuf(pObj->pSeqBak, nStart, nEnd, (unsigned int)pObj->pBsBufVirtStart,nBsBufVirtEnd);
+	}
 	pObj->nSeqBakLen--;  //remove the 'nEnd' itself
 	ASSERT(pObj->nSeqBakLen==nBakLen);
 	VPU_LOG("backup sequence info: %d bytes: virtual range: [0x%X,0x%X), phy range: [0x%X, 0x%X) \r\n",pObj->nSeqBakLen,nStart,nEnd,pObj->nLastFrameEndPosPhy,Wr);
@@ -5420,6 +5433,8 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
 			case VPU_V_MPEG4:
 			case VPU_V_AVC:				
 			case VPU_V_MPEG2:
+			case VPU_V_VP8:
+			case VPU_V_H263:
 				pObj->nDecFrameRptEnabled=1;
 				pObj->nDecResolutionChangeEnabled=1;
 				break;

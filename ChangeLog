@@ -1,6 +1,9 @@
 
 Change log:
 
+ver 1.0.61:
+  enable resolution change report for vp8 and H.263
+
 ver 1.0.60:
   fix the inaccurate crop info for vp8
 
