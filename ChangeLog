@@ -1,6 +1,9 @@
 
 Change log:
 
+ver 1.0.62:
+  add check for invalid frame rate
+
 ver 1.0.61:
   enable resolution change report for vp8 and H.263
 
