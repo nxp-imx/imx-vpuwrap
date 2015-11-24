@@ -1,6 +1,9 @@
 
 Change log:
 
+ver 1.0.63:
+  fix special clips in which there are two different SPS headers before the first frame
+
 ver 1.0.62:
   add check for invalid frame rate
 

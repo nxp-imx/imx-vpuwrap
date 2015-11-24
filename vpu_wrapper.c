@@ -3034,6 +3034,17 @@ int VpuSeqInit(DecHandle InVpuHandle, VpuDecObj* pObj ,VpuBufferNode* pInData,in
 #endif
 		pObj->nOriHeight=pObj->initInfo.nPicHeight;
 		pObj->nOriWidth=pObj->initInfo.nPicWidth;
+
+		if(pObj->nDecResolutionChangeEnabled!=0){
+			//update 'nLastFrameEndPosPhy' for special case: there are two different SPS headers(will cause resolution change) before the first frame
+			PhysicalAddress Rd;
+			PhysicalAddress Wr;
+			unsigned long nSpace;
+			ret=vpu_DecGetBitstreamBuffer(InVpuHandle, &Rd, &Wr, &nSpace);
+			pObj->nLastFrameEndPosPhy=Rd;
+			pObj->nAccumulatedConsumedStufferBytes+=Rd-(unsigned int)pObj->pBsBufPhyStart;
+		}
+
 		return 1;
 	}
 
@@ -4080,6 +4091,7 @@ int VpuResolutionChangeProcess(DecHandle* pInOutVpuHandle, VpuDecObj* pObj)
 	VpuBufferNode InData;
 	int nOutRetCode=0;
 	int nNoErr=1;
+	int nIsAvcc;
 
 	/*backup sequence data*/
 	VPU_API("calling vpu_DecGetBitstreamBuffer() \r\n");
@@ -4149,7 +4161,10 @@ int VpuResolutionChangeProcess(DecHandle* pInOutVpuHandle, VpuDecObj* pObj)
 	InData.pVirAddr=pObj->pSeqBak;
 	InData.sCodecData.pData=NULL;
 	InData.sCodecData.nSize=0xFFFFFFFF; //regard as raw data
+	nIsAvcc=pObj->nIsAvcc;
+	pObj->nIsAvcc=0;//need to disable conversion temporarily
 	seqOK=VpuSeqInit(InVpuHandle, pObj, &InData, &nOutRetCode,&nNoErr);
+	pObj->nIsAvcc=nIsAvcc;
 	if(0==seqOK)
 	{
 		VPU_ERROR("resolution change: seqinit fail \r\n");
