@@ -2104,7 +2104,7 @@ int VpuConvertAvccHeader(unsigned char* pCodecData, unsigned int nSize, unsigned
 	unsigned char* pSPS, *pPPS;
 	int spsSize,ppsSize;
 	int numPPS, outSize=0;
-	unsigned char* pTemp;
+	unsigned char* pTemp=NULL;
 	int tempBufSize=0;
 	/* [0]: version */
 	/* [1]: profile */
@@ -2179,6 +2179,9 @@ corrupt_header:
 	VPU_ERROR("error: codec data corrupted ! \r\n");
 	*ppOut=pCodecData;
 	*pOutSize=nSize;
+	if(pTemp){
+		vpu_free(pTemp);
+	}
 	return 0;
 }
 
@@ -2339,6 +2342,9 @@ int VpuConvertAvccFrame(unsigned char* pData, unsigned int nSize, int nNalSizeLe
 
 corrupt_data:
 	VPU_ERROR("error: the nal data corrupted ! \r\n");
+	if(pNewFrm){
+		vpu_free(pNewFrm);
+	}
 	return 0;
 }
 
@@ -2600,6 +2606,8 @@ int VpuSeqInit(DecHandle InVpuHandle, VpuDecObj* pObj ,VpuBufferNode* pInData,in
 
 	unsigned char* pHeader=NULL;
 	unsigned int headerLen=0;
+	unsigned int headerAllocated=0;
+	int init_ok=0;
 
 	unsigned char aVC1Header[VC1_MAX_SEQ_HEADER_SIZE];
 	unsigned char aVP8Header[VP8_SEQ_HEADER_SIZE+VP8_FRM_HEADER_SIZE];
@@ -2784,6 +2792,9 @@ int VpuSeqInit(DecHandle InVpuHandle, VpuDecObj* pObj ,VpuBufferNode* pInData,in
 					}
 					if(pObj->nIsAvcc){
 						VpuConvertAvccHeader(pInData->sCodecData.pData,pInData->sCodecData.nSize, &pHeader,&headerLen);
+						if(pInData->sCodecData.pData != pHeader){
+							headerAllocated=1;
+						}
 					}
 					else{
 						pHeader=pInData->sCodecData.pData;
@@ -2828,7 +2839,8 @@ int VpuSeqInit(DecHandle InVpuHandle, VpuDecObj* pObj ,VpuBufferNode* pInData,in
 		*pNoErr=0;
 		total_size=0;	//clear 0
 		total_loop=0;
-		return 0;
+		init_ok=0;
+		goto FINISH;
 	}
 	else
 	{
@@ -2837,9 +2849,6 @@ int VpuSeqInit(DecHandle InVpuHandle, VpuDecObj* pObj ,VpuBufferNode* pInData,in
 		if(0!=headerLen)
 		{
 			fill_ret=VpuFillData(InVpuHandle,pObj,pHeader,headerLen,1,0);
-			if(pObj->nIsAvcc && (pInData->sCodecData.pData != pHeader)){
-				vpu_free(pHeader); //the logic should make sure it won't be freed repeatedly
-			}
 			if(0==pObj->nPrivateSeqHeaderInserted)
 			{
 				VpuAccumulateConsumedBytes(pObj, headerLen, 0,NULL,NULL);	//seq/config 
@@ -2892,7 +2901,8 @@ int VpuSeqInit(DecHandle InVpuHandle, VpuDecObj* pObj ,VpuBufferNode* pInData,in
 		{
 			//not inited
 			*pOutRetCode=VPU_DEC_INPUT_USED;
-			return 0;
+			init_ok=0;
+			goto FINISH;
 		}
 		VPU_LOG("have collect %d bytes data to start seq init \r\n",VPU_MIN_INIT_SIZE);
 #endif	
@@ -2936,7 +2946,8 @@ int VpuSeqInit(DecHandle InVpuHandle, VpuDecObj* pObj ,VpuBufferNode* pInData,in
 			*pNoErr=0;
 			pObj->nLastErrorInfo=VPU_DEC_ERR_NOT_SUPPORTED;
 		}
-		return 0;
+		init_ok=0;
+		goto FINISH;
 	}
 	else
 	{
@@ -3045,8 +3056,14 @@ int VpuSeqInit(DecHandle InVpuHandle, VpuDecObj* pObj ,VpuBufferNode* pInData,in
 			pObj->nAccumulatedConsumedStufferBytes+=Rd-(unsigned int)pObj->pBsBufPhyStart;
 		}
 
-		return 1;
+		init_ok=1;
 	}
+
+FINISH:
+	if(headerAllocated){
+		vpu_free(pHeader);
+	}
+	return init_ok;
 
 }
 
@@ -4422,6 +4439,8 @@ int VpuDecBuf(DecHandle* pVpuHandle, VpuDecObj* pObj ,VpuBufferNode* pInData,int
 		bufUseState=VPU_DEC_INPUT_NOT_USED;	
 	}
 
+	//clear 0 firstly	
+	vpu_memset(&decParam,0,sizeof(DecParam));
 
 	if(VPU_DEC_STATE_DEC==pObj->state)
 	{
@@ -4452,8 +4471,6 @@ int VpuDecBuf(DecHandle* pVpuHandle, VpuDecObj* pObj ,VpuBufferNode* pInData,int
 #endif
 
 		//set dec parameters
-		//clear 0 firstly	
-		vpu_memset(&decParam,0,sizeof(DecParam));
 		decParam.skipframeMode=pObj->skipFrameMode;
 		decParam.skipframeNum=pObj->skipFrameNum;
 		decParam.iframeSearchEnable=pObj->iframeSearchEnable;

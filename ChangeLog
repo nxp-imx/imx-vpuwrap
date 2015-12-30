@@ -1,6 +1,9 @@
 
 Change log:
 
+ver 1.0.64:
+  fix some potential issues, include memory leak and uninitialized variable
+
 ver 1.0.63:
   fix special clips in which there are two different SPS headers before the first frame
 
