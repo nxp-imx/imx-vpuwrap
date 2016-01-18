@@ -1,6 +1,9 @@
 
 Change log:
 
+ver 1.0.65:
+  fix vpu hange issue caused by non-supported vc1 clip
+
 ver 1.0.64:
   fix some potential issues, include memory leak and uninitialized variable
 

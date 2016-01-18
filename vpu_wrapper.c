@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 2010-2015, Freescale Semiconductor Inc.,
+ *  Copyright (c) 2010-2016, Freescale Semiconductor Inc.,
  *  All Rights Reserved.
  *
  *  The following programs are the sole property of Freescale Semiconductor Inc.,
@@ -734,7 +734,7 @@ int VC1CreateNALSeqHeader(unsigned char* pHeader, int* pHeaderLen,
 }
 
 int VC1CreateRCVSeqHeader(unsigned char* pHeader, int* pHeaderLen, 
-	unsigned char* pCodecPri,unsigned int nFrameSize,int nWidth,int nHeight)
+	unsigned char* pCodecPri,unsigned int nFrameSize,int nWidth,int nHeight,int* pNoError)
 {
 	int nHeaderLen;
 
@@ -768,6 +768,8 @@ int VC1CreateRCVSeqHeader(unsigned char* pHeader, int* pHeaderLen,
 	if((profile!=0)&&(profile!=4)&&(profile!=12))
 	{
 		VPU_ERROR("unsuport profile: %d, private: 0x%X \r\n",profile,*((unsigned int*)pCodecPri));
+		//it is reasonable to return error immediately since only one sequence header inserted in whole rcv clip
+		*pNoError=0;
 	}
 	vpu_memcpy(pHeader+i, pCodecPri, HdrExtDataLen);
 	i += HdrExtDataLen;
@@ -2653,7 +2655,7 @@ int VpuSeqInit(DecHandle InVpuHandle, VpuDecObj* pObj ,VpuBufferNode* pInData,in
 				{
 					//1 nSize must == frame size ??? 
 					VPU_LOG("%s: [width x height]=[%d x %d] , frame size =%d \r\n",__FUNCTION__,pObj->picWidth,pObj->picHeight,pInData->nSize);
-					VC1CreateRCVSeqHeader(pHeader, (int*)(&headerLen),pInData->sCodecData.pData, pInData->nSize,pObj->picWidth,pObj->picHeight);
+					VC1CreateRCVSeqHeader(pHeader, (int*)(&headerLen),pInData->sCodecData.pData, pInData->nSize,pObj->picWidth,pObj->picHeight,pNoErr);
 				}
 
 #ifdef VPU_WRAPPER_DEBUG
