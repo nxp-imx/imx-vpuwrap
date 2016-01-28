@@ -7959,6 +7959,10 @@ VpuEncRetCode VPU_EncOpen(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEn
 			sEncOpenParam.EncStdParam.h263Param.h263_annexKEnable = pInParam->VpuEncStdParam.h263Param.h263_annexKEnable;
 			sEncOpenParam.EncStdParam.h263Param.h263_annexTEnable = pInParam->VpuEncStdParam.h263Param.h263_annexTEnable;
 			sEncOpenParam.bitstreamFormat = STD_H263;
+			if(sEncOpenParam.frameRateInfo<=14){
+				VPU_ENC_ERROR("not supported frame rate for H263: %d, change to 15 \r\n",sEncOpenParam.frameRateInfo);
+				sEncOpenParam.frameRateInfo=15;
+			}
 			break;
 		case VPU_V_AVC:
 			sEncOpenParam.EncStdParam.avcParam.avc_constrainedIntraPredFlag = pInParam->VpuEncStdParam.avcParam.avc_constrainedIntraPredFlag;
@@ -8227,6 +8231,10 @@ VpuEncRetCode VPU_EncOpenSimp(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,V
 			sEncOpenParamMore.VpuEncStdParam.h263Param.h263_annexJEnable = 1;
 			sEncOpenParamMore.VpuEncStdParam.h263Param.h263_annexKEnable = 0;
 			sEncOpenParamMore.VpuEncStdParam.h263Param.h263_annexTEnable = 0;
+			if(sEncOpenParamMore.nFrameRate<=14){
+				VPU_ENC_ERROR("not supported frame rate for H263: %d, change to 15 \r\n",sEncOpenParamMore.nFrameRate);
+				sEncOpenParamMore.nFrameRate=15;
+			}
 			break;
 		case VPU_V_AVC:
 			sEncOpenParamMore.VpuEncStdParam.avcParam.avc_constrainedIntraPredFlag = 0;

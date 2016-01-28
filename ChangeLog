@@ -1,6 +1,9 @@
 
 Change log:
 
+ver 1.0.66:
+  fix h263 encoder failure issue due to invalid frame rate
+
 ver 1.0.65:
   fix vpu hange issue caused by non-supported vc1 clip
 
