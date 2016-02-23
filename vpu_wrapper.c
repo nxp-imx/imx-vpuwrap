@@ -2244,6 +2244,7 @@ int VpuConvertAvccFrame(unsigned char* pData, unsigned int nSize, int nNalSizeLe
 	unsigned int nNewSize=0;
 	unsigned char* pNewFrm=NULL;
 
+	ASSERT(NULL!=pData);
 	*ppFrm=pData;
 	*pSize=nSize;
 	pStart=pData;
@@ -2851,6 +2852,7 @@ int VpuSeqInit(DecHandle InVpuHandle, VpuDecObj* pObj ,VpuBufferNode* pInData,in
 		if(0!=headerLen)
 		{
 			fill_ret=VpuFillData(InVpuHandle,pObj,pHeader,headerLen,1,0);
+			ASSERT(fill_ret==1);
 			if(0==pObj->nPrivateSeqHeaderInserted)
 			{
 				VpuAccumulateConsumedBytes(pObj, headerLen, 0,NULL,NULL);	//seq/config 
@@ -3931,7 +3933,8 @@ int VpuDecClearOperationEOStoDEC(VpuDecHandle InHandle)
 #ifdef VPU_IMX6_VC1AP_RANGEMAP_BUF_WORKAROUND
 			else if((pVpuObj->obj.CodecFormat==VPU_V_VC1_AP) &&(pVpuObj->obj.frameBufState[i]==VPU_FRAME_STATE_FREE)){
 				VPU_API("%s: workaround for VC1 AP rangemap: calling vpu_DecClrDispFlag(): %d \r\n",__FUNCTION__,i);
-				vpu_DecClrDispFlag(pVpuObj->handle,i);
+				ret=vpu_DecClrDispFlag(pVpuObj->handle,i);
+				ASSERT(RETCODE_SUCCESS==ret);
 			}
 #endif
 			
@@ -4416,6 +4419,7 @@ int VpuDecBuf(DecHandle* pVpuHandle, VpuDecObj* pObj ,VpuBufferNode* pInData,int
 			if(0!=headerLen)
 			{
 				fill_ret=VpuFillData(InVpuHandle,pObj,pHeader,headerLen,1,0);
+				ASSERT(fill_ret==1);
 				VpuAccumulateConsumedBytes(pObj, headerLen, 1,NULL,NULL);
 			}
 
@@ -4561,6 +4565,7 @@ int VpuDecBuf(DecHandle* pVpuHandle, VpuDecObj* pObj ,VpuBufferNode* pInData,int
 				if(0!=headerLen)
 				{
 					fill_ret=VpuFillData(InVpuHandle,pObj,pHeader,headerLen,1,0);
+					ASSERT(fill_ret==1);
 					VpuAccumulateConsumedBytes(pObj, headerLen, 1,NULL,NULL);
 				}
 				if(pObj->nIsAvcc){
@@ -5250,7 +5255,7 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
 			sDecOpenParam.bitstreamFormat = STD_MPEG4;
 			sDecOpenParam.mp4Class = 1;
 			VPU_LOG("open DIVX 56 \r\n");
-			LOG_DIVX_WARNING("LEVEL: 1 Error: Find DivX56, not supported ! \r\n");
+			LOG_DIVX_WARNING("LEVEL: 1 Warning: Find DivX56, license is required ! \r\n");
 			break;
 		case VPU_V_XVID:		/**< XVID */
 			sDecOpenParam.bitstreamFormat = STD_MPEG4;
@@ -5261,14 +5266,14 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
 			sDecOpenParam.bitstreamFormat = STD_MPEG4;
 			sDecOpenParam.mp4Class = 5;
 			VPU_LOG("open DIVX 4 \r\n");
-			LOG_DIVX_WARNING("LEVEL: 1 Error: Find DivX4, not supported ! \r\n");
+			LOG_DIVX_WARNING("LEVEL: 1 Warning: Find DivX4, license is required ! \r\n");
 			break;	
 		case VPU_V_DIVX3:		/**< DIVX 3 */ 
 			sDecOpenParam.bitstreamFormat = STD_DIV3;
 			sDecOpenParam.reorderEnable = 1;
 			//sDecOpenParam.filePlayEnable = 1; 
 			VPU_LOG("open DIVX 3 \r\n");
-			LOG_DIVX_WARNING("LEVEL: 1 Error: Find DivX3, not supported ! \r\n");
+			LOG_DIVX_WARNING("LEVEL: 1 Warning: Find DivX3, license is required ! \r\n");
 			break;		
 		case VPU_V_RV:		
 			sDecOpenParam.bitstreamFormat = STD_RV;

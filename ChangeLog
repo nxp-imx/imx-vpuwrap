@@ -1,6 +1,9 @@
 
 Change log:
 
+ver 1.0.67:
+  add several double check to invalid or null value
+
 ver 1.0.66:
   fix h263 encoder failure issue due to invalid frame rate
 
