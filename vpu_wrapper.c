@@ -6288,6 +6288,7 @@ VpuDecRetCode VPU_DecFlushAll(VpuDecHandle InHandle)
 				so, we need to call vpu_DecStartOneFrame()/vpu_DecGetOutputInfo() to push vpu parse PPS info before vpu_DecBitBufferFlush().
 			*/
 			if(VPU_V_VC1_AP==pObj->CodecFormat){
+				int fill_ret;
 				//fix ENGR00284031:
 				/*seqinit (only consume sequence header) -> flush (entry point header is flushed) -> decode (can't find valid entry point)
 				    but for VC1, it has some limitation. e.g vpu only decode current frame when find following start code. 
@@ -6295,7 +6296,8 @@ VpuDecRetCode VPU_DecFlushAll(VpuDecHandle InHandle)
 				unsigned char temp[4];
 				temp[0]=temp[1]=0;
 				temp[2]=0x1;
-				VpuFillData(pVpuObj->handle,pObj,temp,3,1,0);
+				fill_ret=VpuFillData(pVpuObj->handle,pObj,temp,3,1,0);
+				ASSERT(fill_ret==1);
 			}
 			if(startFrameOK==0){
 				VPU_API("calling vpu_DecStartOneFrame \r\n");

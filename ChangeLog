@@ -1,6 +1,9 @@
 
 Change log:
 
+ver 1.0.68:
+  add check to return value of function
+
 ver 1.0.67:
   add several double check to invalid or null value
 
