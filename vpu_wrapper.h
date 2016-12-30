@@ -16,6 +16,7 @@
  *	2011-02-17		eagle zhou		0.2				Add encoder part
  *	2011-12-22		eagle zhou		1.0				refine api
  *	2012-01-**		eagle zhou		1.0.*			add new features: including tile format,etc
+ *	2016-12-30	  Song Bing			2.0.0			Add Hantro video decoder support
  */
 
 #ifndef VPU_WRAPPER_H
@@ -28,7 +29,7 @@ extern "C" {
 /**************************** version info ***********************************/
 #define VPU_WRAPPER_VERSION(major, minor, release)	 \
 	(((major) << 16) + ((minor) << 8) + (release))
-#define VPU_WRAPPER_VERSION_CODE	VPU_WRAPPER_VERSION(1, 0, 68)
+#define VPU_WRAPPER_VERSION_CODE	VPU_WRAPPER_VERSION(2, 0, 0)
 
 /**************************** decoder part **********************************/
 
@@ -37,7 +38,7 @@ extern "C" {
 //typedef RetCode VpuRetCode;
 //typedef vpu_versioninfo VpuVersionInfo;
 //typedef DecHandle VpuDecHandle;
-typedef unsigned int VpuDecHandle;
+typedef unsigned long VpuDecHandle;
 //typedef DecOpenParam VpuDecOpenParam;
 //typedef DecInitialInfo VpuSeqInfo;
 //typedef FrameBuffer VpuFrameBuffer;
@@ -67,6 +68,8 @@ typedef enum {
 	VPU_V_MJPG,
 	VPU_V_AVS,
 	VPU_V_VP8,
+	VPU_V_VP9,
+	VPU_V_HEVC,
 } VpuCodStd;
 
 typedef enum {
@@ -234,8 +237,9 @@ typedef struct {
 	//int mp4Class;
 	//int block;
 	int nEnableFileMode;
+	int nEnableVideoCompressor;
 
-	int nReserved[3];			/*reserved for future extension*/
+	int nReserved[2];			/*reserved for future extension*/
 	void* pAppCxt;			/*reserved for future application extension*/
 } VpuDecOpenParam;
 
@@ -316,8 +320,9 @@ typedef struct {
 	int nConsumedByte;		/*reserved to record sequence length: value -1 indicate unknow*/
 	//DecReportBufSize reportBufSize;
 	int nAddressAlignment;	/*address alignment for Y/Cb/Cr (unit: bytes)*/
+	int nFrameSize;         /*hantro video decoder append DMV and compression table in pixel buffer */
 
-	int nReserved[5];			/*reserved for future extension*/
+	int nReserved[4];			/*reserved for future extension*/
 	void* pSpecialInfo;		/*reserved for future special extension*/
 } VpuDecInitInfo;
 

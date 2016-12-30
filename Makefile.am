@@ -4,15 +4,24 @@ COMPATNUM=@LIBTOOL_VERSION_INFO@
 
 lib_LTLIBRARIES = libfslvpuwrap.la
 
-libfslvpuwrap_la_SOURCES = vpu_wrapper.c
+libfslvpuwrap_la_SOURCES = utils.c
+if USE_VPU_LIB
+libfslvpuwrap_la_SOURCES += vpu_wrapper.c
+endif
+if USE_HANTRO_LIB
+libfslvpuwrap_la_SOURCES += vpu_wrapper_hantro.c
+endif
 
 libfslvpuwrapincludedir = $(includedir)/imx-mm/vpu
 
 libfslvpuwrapinclude_HEADERS = vpu_wrapper.h
 
+if USE_VPU_LIB
 libfslvpuwrap_la_LIBADD = $(IMX_VPU_LIB)
-
-libfslvpuwrap_la_CFLAGS =
+endif
+if USE_HANTRO_LIB
+libfslvpuwrap_la_LIBADD = $(IMX_HANTRO_LIB)
+endif
 
 libfslvpuwrap_la_OBJCFLAGS =
 

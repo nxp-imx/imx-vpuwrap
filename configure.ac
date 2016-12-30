@@ -1,7 +1,7 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl Created by Anjuta application wizard.
 
-AC_INIT(imx-vpuwrap, 1.0.68)
+AC_INIT(imx-vpuwrap, 2.0.0)
 m4_ifdef([AM_SILENT_RULES],[AM_SILENT_RULES([yes])])
 
 AM_INIT_AUTOMAKE(AC_PACKAGE_NAME, AC_PACKAGE_VERSION)
@@ -29,14 +29,20 @@ dnl *************************************************
 eval LIBTOOL_VERSION_INFO="3:0:0"
 
 AC_CHECK_HEADERS([vpu_lib.h], [HAVE_VPU_LIB=yes], [HAVE_VPU_LIB=no])
-if test "x$HAVE_VPU_LIB" = "xno"; then
-    AC_MSG_ERROR([lib_vpu is required, consider installing imx-lib])
-else
+if test "x$HAVE_VPU_LIB" = "xyes"; then
     IMX_VPU_LIB="-lvpu"
 fi
+AM_CONDITIONAL(USE_VPU_LIB, test "x$HAVE_VPU_LIB" = "xyes")
+
+AC_CHECK_HEADERS([codec.h], [HAVE_HANTRO_LIB=yes], [HAVE_HANTRO_LIB=no])
+if test "x$HAVE_HANTRO_LIB" = "xyes"; then
+    IMX_HANTRO_LIB="-lcodec"
+fi
+AM_CONDITIONAL(USE_HANTRO_LIB, test "x$HAVE_HANTRO_LIB" = "xyes")
 
 AC_SUBST(LIBTOOL_VERSION_INFO)
 AC_SUBST(IMX_VPU_LIB)
+AC_SUBST(IMX_HANTRO_LIB)
 
 AC_OUTPUT([
 Makefile
