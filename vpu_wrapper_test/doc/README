@@ -1,0 +1,52 @@
+Develop V4L2 video codec test suit to ensure V4L2 video codec quality. The test suit will include one script and one unit test. Script will include all kinds of complicate test, unit test will implement all API which needed by test script and will be reference code for using V4L2 video codec.
+
+V4L2 video codec test suit will test video encoder and video decoder. It will include video codec acceptance test and sanity test. Acceptance will finished within four hours, sanity test should finished within half an hour. The output of video decoder can be discard, output to file or display onto screen. Display video decoder output to screen is just for easy to debug video decoder, and will keep simply.
+
+Below list the test cases which the test suit should cover.
+- V4L2 API compatibility test, will test by v4l2-compliance.
+- Normal decoder, included check time stamp and EOS. Report right video resolution and interlace mode for interlace stream.
+- Performance test, included show average FPS and codec time for every frame.
+- Flush and seek, included received key frame and non-key frame after seek.
+- All memory mode, included MMAP, USERPTR and DMA buffer.
+- Resolution change, included change to bigger resolution and change to smaller resolution.
+- Multi-instance, included instance schedule, should has same priority for all instance.
+- Stress test, included fuzzy stream.
+- Aging test, included one stream loop and several stream loop.
+- Suspend/Resume, driver should save and then resume codec.
+- Kill process when running.
+- Close power/clock after finished running.
+- Memory leakage.
+- CPU loading.
+
+Reference:
+http://events.linuxfoundation.org/sites/events/files/slides/v4l2-testing.pdf
+VPU unit test.
+
+ZPU unit test interface should be below. Will develop one tool used to dump compressed video, time stamp, codec data, output raw video and output time stamp. The tool can build based on GStreamer. Script can compare decoder output video and output time stamp with output reference.
+
+mxc_zpu_test.out --help
+Usage: ./mxc_zpu_test.out --help --list --encoder/--decoder --input_mode ... --input_file ... --input_meta ... --output_mode ... --output_file ... --output_meta ... --memory_mode ... --count ... --seek_to ... --format ... --width ... --height ... --fps ... --yuv_format .. --bitrate ... --gop ... --quantization ... --interactive --verbose
+
+--list             List all V4L2 video codec device and show all capability.
+--encoder    Decoder test case.
+--decoder    Encoder test case.
+--input_mode  Input can be file.
+--input_file      Input stream. Compressed video for decoder, raw video for encoder.
+--input_meta  Input time stamp and frame position for decoder.
+--output_mode Output can be file or display onto screen.
+--output_file    Output stream. Raw video for decoder, compressed video for encoder.
+--output_meta Output video information and output time stamp for decoder.
+--memory_mode    Memory mode can be MMAP, USERPTR or DMA.
+--count          Number of frames to decoder/encoder.
+--seek_to     Seek to the position, can be percentage of input video file (xx%) or accurate time (xxx) ms.
+--format        Video compress format.
+--width               Width.
+--height              Height.
+--fps                   Frame rate.
+--yuv_format      Raw video format.
+--bitrate              bitrate in kbps.
+--gop                  GOP size.
+--quantization    Quantization parameter for encoder.
+--interactive   Can accept command for seek and exit.
+--verbose      Print more information, stream information and performance data.
+-W use vpu wrapper test function
