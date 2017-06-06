@@ -1,6 +1,6 @@
 ifeq ($(BUILD),ARM11YOCTO_HW)
 #. /opt/fsl-imx-internal-x11/1.0+snapshot/environment-setup-cortexa9hf-vfp-neon-freescale-linux-gnueabi
-. /opt/fsl-imx-x11/4.1.30-3.0.0/environment-setup-aarch64-poky-linux
+#. /opt/fsl-imx-x11/4.1.30-3.0.0/environment-setup-aarch64-poky-linux
 endif
 ifeq ($(BUILD),UNIX)
 	TGT_OS_BIN 	= x86_unix

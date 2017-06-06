@@ -14,22 +14,31 @@
 #include <stdlib.h>
 #include "sink.h"
 #include "log.h"
-
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
 sink::sink ()
 {
-  pprocess = new process ();
+  pprocess = NULL;
 }
 
 sink::~sink ()
 {
-  delete pprocess;
+  if(pprocess)
+    delete pprocess;
 }
 
 bool sink::set_format (Format *format)
 {
   CHECK_NULL (format);
   mformat = *format;
-  pprocess->set_format (format);
+  //no process function for gl sink
+  if(GL_SINK != mformat.output_mode){
+    if(pprocess == NULL)
+        pprocess = new process ();
+    pprocess->set_format (format);
+  }
   set_format_sink (format);
   return true;
 }
@@ -47,8 +56,12 @@ bool sink::alloc_buffer (Buffer *buf)
 bool sink::put_buffer (Buffer * buf)
 {
   CHECK_NULL (buf);
-  pprocess->put_buffer (buf, get_render_buffer());
-  put_buffer_sink (buf);
+  if(GL_SINK == mformat.output_mode){
+    put_buffer_sink (buf);
+  }else{
+    pprocess->put_buffer (buf, get_render_buffer());
+    put_buffer_sink (buf);
+  }
   return true;
 }
 

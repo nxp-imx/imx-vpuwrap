@@ -44,7 +44,6 @@ class vpu_wrapper_decoder : public codec_api{
     int ConvertCodecFormat(VpuCodStd* pCodec);
     int ProcessInitInfo(VpuDecHandle handle,VpuDecInitInfo* pInitInfo,DecMemInfo* pDecMemInfo, int*pOutFrmNum);
 
-
     pthread_t input_thread_id, output_thread_id,decode_thread_id;
     input *minput;
     output *moutput;

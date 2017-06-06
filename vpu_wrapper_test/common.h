@@ -72,6 +72,7 @@ typedef struct _Format {
 typedef struct _Buffer {
   int plane_num;
   char *data[MAX_V4L2_PLANES];
+  char *phy_data[MAX_V4L2_PLANES];
   int alloc_size[MAX_V4L2_PLANES];
   int size[MAX_V4L2_PLANES];
   int64 pts; /* time stamp in ms */
@@ -79,5 +80,10 @@ typedef struct _Buffer {
   int v4l2_index;
 } Buffer;
 
-
+typedef enum {
+  KMS_SINK,
+  FILE_SINK,
+  FB_SINK,
+  GL_SINK
+} SINK_MODE;
 #endif

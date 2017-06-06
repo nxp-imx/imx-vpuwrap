@@ -13,13 +13,13 @@
 
 #include "fb_sink.h"
 #include "file_sink.h"
+#ifdef ENABLE_GL_SINK
+#include "gl_sink.h"
+#endif
 #include "output.h"
 #include "log.h"
 
-typedef enum {
-  KMS_SINK,
-  FILE_SINK
-} SINK_MODE;
+
 
 output::output ()
 {
@@ -42,7 +42,12 @@ bool output::set_format (Format *format)
     delete psink;
   if (format->output_mode == FILE_SINK)
     psink = new file_sink ();
-  else
+  else if(format->output_mode == GL_SINK){
+    #ifdef ENABLE_GL_SINK
+    psink = new gl_sink ();
+    #endif
+    ;
+  }else
     psink = new fb_sink ();
   panalysis->set_format (format);
   psink->set_format (format);

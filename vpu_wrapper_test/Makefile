@@ -25,8 +25,14 @@ APP_OBJS = $(OBJ_DIR)/camera_input.o \
 
 BUILD_VPU_WRAPPER = $(shell if [ -f $(vpu_wrapper.h) ]; then echo "exist"; else echo "not_exist"; fi;)
 ifeq ($(BUILD_VPU_WRAPPER), exist)
-LD_LIBS += -l_vpu_wrapper
+LD_LIBS += -lfslvpuwrap
 APP_OBJS += $(OBJ_DIR)/vpu_wrapper_decoder.o
+endif
+
+ifeq ($(BUILD_GL_SINK), true)
+CXXFLAGS += -DENABLE_GL_SINK
+LD_LIBS += -lEGL -lX11 -lGLESv2
+APP_OBJS += $(OBJ_DIR)/gl_sink.o
 endif
 
 ALL_OBJS = $(APP_OBJS)

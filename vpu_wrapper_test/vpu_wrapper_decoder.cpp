@@ -11,6 +11,7 @@
 vpu_wrapper_decoder::vpu_wrapper_decoder (int fd)
 {
 
+    inBufferCnt = 0;
 }
 vpu_wrapper_decoder::~vpu_wrapper_decoder()
 {
@@ -78,14 +79,17 @@ void *vpu_wrapper_decoder::input_thread ()
         hasInput = true;
         if(inputBuf.size[0] > 0)
             inBufferCnt ++;
-        else if(inputBuf.size[0] == 0)
+        else if(inputBuf.size[0] == 0){
             bInputEos = true;
+            LOG_DEBUG("input_thread inputBuf EOS \n");
+        }
 
         LOG_DEBUG ("input thread get input buffer size=%d,cnt=%d\n",inputBuf.size[0],inBufferCnt);
     }
     pthread_mutex_unlock(&stream_lock);
     usleep(5000);
   }
+
   LOG_DEBUG ("input thread exit.\n");
     return NULL;
 }
@@ -111,12 +115,24 @@ void *vpu_wrapper_decoder::output_thread ()
         buf.plane_num = 2;
         buf.data[0] = (char*)frameInfo.pDisplayFrameBuf->pbufVirtY;
         buf.data[1] = (char*)frameInfo.pDisplayFrameBuf->pbufVirtCb;
+        buf.phy_data[0] = (char*)frameInfo.pDisplayFrameBuf->pbufY;
+        buf.phy_data[1] = (char*)frameInfo.pDisplayFrameBuf->pbufCb;
         //buf.data[2] = (char*)frameInfo.pDisplayFrameBuf->pbufVirtCr;
         buf.size[0] = buf.alloc_size[0] = mformat.image_size[0];
         buf.size[1] = buf.alloc_size[1] = mformat.image_size[1];
         //buf.size[2] = buf.alloc_size[2] = mformat.image_size[2];
 
-        LOG_DEBUG("output_thread size0=%d,size1=%d",buf.size[0],buf.size[1]);
+        #if 0
+        FILE * pfile;
+        pfile = fopen("raw.yuv","ab");
+        if(pfile){
+            fwrite(buf.data[0],1,buf.size[0],pfile);
+            fwrite(buf.data[1],1,buf.size[1],pfile);
+            fclose(pfile);
+        }
+        #endif
+        LOG_DEBUG("output_thread size0=%d,size1=%d \n",buf.size[0],buf.size[1]);
+
         moutput->put_buffer (&buf);
         mcount ++;
         LOG_DEBUG ("VPU_DecOutFrameDisplayed BEGIN mcount=%d\n",mcount);
@@ -124,6 +140,7 @@ void *vpu_wrapper_decoder::output_thread ()
         if(ret != VPU_DEC_RET_SUCCESS){
             LOG_ERROR ("VPU_DecOutFrameDisplayed failed\n");
         }
+
     }
 
     pthread_mutex_unlock(&stream_lock);
@@ -172,12 +189,16 @@ void *vpu_wrapper_decoder::decode_thread ()
 
             InData.sCodecData.pData=NULL;
             InData.sCodecData.nSize=0;
-            LOG_DEBUG ("decode_thread BEGIN size=%d,inCnt=%d,vaddr=%p\n",InData.nSize,inBufferCnt,InData.pVirAddr);
+            LOG_DEBUG ("decode_thread BEGIN size=%d,inCnt=%lld,vaddr=%p\n",InData.nSize,inBufferCnt,InData.pVirAddr);
             ret=VPU_DecDecodeBuf(handle, &InData,&bufRetCode);
-            LOG_DEBUG ("decode_thread ret=%x,inCnt=%d,bufRetCode=%x\n",ret,inBufferCnt,bufRetCode);
+            LOG_DEBUG ("decode_thread ret=%x,inCnt=%lld,bufRetCode=%x\n",ret,inBufferCnt,bufRetCode);
         }
 
         if(bufRetCode&VPU_DEC_INPUT_USED){
+            for (int i = 0; i < inputBuf.plane_num; i ++){
+                if(inputBuf.data[i] != NULL)
+                    free(inputBuf.data[i]);
+            }
             memset(&inputBuf,0, sizeof(Buffer));
             hasInput = false;
         }
@@ -262,7 +283,7 @@ static void *decode_thread_wrap (void *arg)
 
 #define Align(ptr,align)	(((unsigned int64)ptr+(align)-1)/(align)*(align))
 
-#define FRAME_ALIGN (1)
+#define FRAME_ALIGN (32)
 
 int vpu_wrapper_decoder::MallocMemBlock(VpuMemInfo* pMemBlock,DecMemInfo* pDecMem)
 {
@@ -325,7 +346,7 @@ int vpu_wrapper_decoder::FreeMemBlock(DecMemInfo* pDecMem)
     VpuMemDesc vpuMem;
     VpuDecRetCode vpuRet;
     int retOk=1;
-LOG_DEBUG("FreeMemBlock 1\n");
+
     //free virtual mem
     for(i=0;i<pDecMem->nVirtNum;i++)
     {
@@ -333,8 +354,6 @@ LOG_DEBUG("FreeMemBlock 1\n");
     }
     pDecMem->nVirtNum=0;
 
-LOG_DEBUG("FreeMemBlock 2\n");
-#if 0
     //free physical mem
     for(i=0;i<pDecMem->nPhyNum;i++)
     {
@@ -342,16 +361,17 @@ LOG_DEBUG("FreeMemBlock 2\n");
         vpuMem.nVirtAddr=pDecMem->phyMem_virtAddr[i];
         vpuMem.nCpuAddr=pDecMem->phyMem_cpuAddr[i];
         vpuMem.nSize=pDecMem->phyMem_size[i];
+        LOG_DEBUG("FreeMemBlock i=%d,virtaddr=%p,phyaddr=%p \n",i,vpuMem.nVirtAddr,vpuMem.nPhyAddr);
         vpuRet=VPU_DecFreeMem(&vpuMem);
         if(vpuRet!=VPU_DEC_RET_SUCCESS)
         {
             LOG_ERROR("%s: free vpu memory failure : ret=%d \r\n",__FUNCTION__,vpuRet);
             retOk=0;
         }
+
     }
     pDecMem->nPhyNum=0;
-#endif
-LOG_DEBUG("FreeMemBlock 3\n");
+
     return retOk;
 }
 
@@ -391,7 +411,20 @@ int vpu_wrapper_decoder::FreeMemBlockFrame(DecMemInfo* pDecMem, int nFrmNum)
 int vpu_wrapper_decoder::ConvertCodecFormat(VpuCodStd* pCodec)
 {
 
-    *pCodec = VPU_V_HEVC;
+    if(!strcmp(mformat.format,"H264")){
+        *pCodec = VPU_V_AVC;
+    }else if(!strcmp(mformat.format,"HEVC")){
+        *pCodec = (VpuCodStd)16;//VPU_V_HEVC;
+    }else if(!strcmp(mformat.format,"MPEG4")){
+        *pCodec = VPU_V_MPEG4;
+    }else if(!strcmp(mformat.format,"H263")){
+        *pCodec = VPU_V_H263;
+    }else if(!strcmp(mformat.format,"MPEG2")){
+        *pCodec = VPU_V_MPEG2;
+    }else if(!strcmp(mformat.format,"VP8")){
+        *pCodec = VPU_V_VP8;
+    }
+
     return 1;
 }
 
@@ -405,6 +438,7 @@ int vpu_wrapper_decoder::start_decode()
     VpuWrapperVersionInfo w_ver;
     VpuDecOpenParam decOpenParam;
     int capability=0;
+    memset(&decOpenParam, 0, sizeof(VpuDecOpenParam));
 
     ret = VPU_DecLoad();
     if(ret != 0)
@@ -457,9 +491,10 @@ int vpu_wrapper_decoder::start_decode()
     VPU_DecGetCapability(handle, VPU_DEC_CAP_FRAMESIZE, &capability);
     LOG_DEBUG("capability: report frame size supported: %d \r\n",capability);
     
-    decOpenParam.nChromaInterleave=0;//default: no interleave
+    decOpenParam.nChromaInterleave=1;//default: enable interleave for NV12 format or it will be i420
     decOpenParam.nMapType=0;//default: using linear format
     decOpenParam.nTiled2LinearEnable=0;//default: no additional convert
+    decOpenParam.nReorderEnable = 1;//enable vpu reorder for B frame
 
     //open vpu
     ret=VPU_DecOpen(&handle, &decOpenParam, &memInfo);
@@ -565,8 +600,6 @@ int vpu_wrapper_decoder::ProcessInitInfo(VpuDecHandle handle,VpuDecInitInfo* pIn
     int mvSize=0;
     unsigned char* ptr;
     unsigned char* ptrVirt;
-    int nAlign;
-
 
     ret=VPU_DecGetInitialInfo(handle, pInitInfo);
     if(VPU_DEC_RET_SUCCESS!=ret)
@@ -609,7 +642,7 @@ int vpu_wrapper_decoder::ProcessInitInfo(VpuDecHandle handle,VpuDecInitInfo* pIn
     mformat.plane_num = 2;
 
     BufNum=pInitInfo->nMinFrameBufferCount+3;
-        
+
     moutput->set_format (&mformat);
 
     for(int i = 0; i < BufNum; i++){
@@ -621,7 +654,7 @@ int vpu_wrapper_decoder::ProcessInitInfo(VpuDecHandle handle,VpuDecInitInfo* pIn
 
         if(VPU_DEC_RET_SUCCESS!=ret)
         {
-            LOG_ERROR("%s: vpu malloc frame buf failure: ret=%d \r\n",__FUNCTION__,ret);	
+            LOG_ERROR("%s: vpu malloc frame buf failure: ret=%d \r\n",__FUNCTION__,ret);
             return ret;
         }
         //record memory info for release
@@ -636,28 +669,28 @@ int vpu_wrapper_decoder::ProcessInitInfo(VpuDecHandle handle,VpuDecInitInfo* pIn
         ptrVirt=(unsigned char*)vpuMem.nVirtAddr;
 
         /*align the base address*/
-        if(nAlign>1)
+        if(FRAME_ALIGN>1)
         {
-        	ptr=(unsigned char*)Align(ptr,nAlign);
-        	ptrVirt=(unsigned char*)Align(ptrVirt,nAlign);
+            ptr=(unsigned char*)Align(ptr,FRAME_ALIGN);
+            ptrVirt=(unsigned char*)Align(ptrVirt,FRAME_ALIGN);
         }
 
         /* fill stride info */
         frameBuf[i].nStrideY=yStride;
-        frameBuf[i].nStrideC=uStride;	
+        frameBuf[i].nStrideC=uStride;
 
         /* fill phy addr*/
         frameBuf[i].pbufY=ptr;
         frameBuf[i].pbufCb=ptr+ySize;
         frameBuf[i].pbufCr=ptr+ySize+uSize;
         frameBuf[i].pbufMvCol=ptr+ySize+uSize+vSize;
-        //ptr+=ySize+uSize+vSize+mvSize;
+
+        LOG_DEBUG("VPU_DecRegisterFrameBuffer addr=%p,phy=%p \n",ptrVirt,ptr);
         /* fill virt addr */
         frameBuf[i].pbufVirtY=ptrVirt;
         frameBuf[i].pbufVirtCb=ptrVirt+ySize;
         frameBuf[i].pbufVirtCr=ptrVirt+ySize+uSize;
         frameBuf[i].pbufVirtMvCol=ptrVirt+ySize+uSize+vSize;
-        //ptrVirt+=ySize+uSize+vSize+mvSize;
 
 #ifdef ILLEGAL_MEMORY_DEBUG
         memset(frameBuf[i].pbufVirtY,0,ySize);
