@@ -23,6 +23,11 @@ if USE_HANTRO_LIB
 libfslvpuwrap_la_LIBADD = $(IMX_HANTRO_LIB)
 endif
 
+libfslvpuwrap_la_CFLAGS =
+if USE_HANTRO_LIB
+libfslvpuwrap_la_CFLAGS += -DSET_OUTPUT_CROP_RECT -DUSE_EXTERNAL_BUFFER -DVSI_API -DENABLE_CODEC_VP8
+endif
+
 libfslvpuwrap_la_OBJCFLAGS =
 
 libfslvpuwrap_la_LDFLAGS = -version-info $(COMPATNUM)
