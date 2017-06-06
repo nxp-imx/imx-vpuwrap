@@ -14,7 +14,7 @@ endif
 
 libfslvpuwrapincludedir = $(includedir)/imx-mm/vpu
 
-libfslvpuwrapinclude_HEADERS = vpu_wrapper.h
+libfslvpuwrapinclude_HEADERS = vpu_wrapper.h utils.h
 
 if USE_VPU_LIB
 libfslvpuwrap_la_LIBADD = $(IMX_VPU_LIB)
