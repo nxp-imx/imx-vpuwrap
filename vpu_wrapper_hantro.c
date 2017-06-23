@@ -108,13 +108,12 @@ typedef enum
   VPU_DEC_STATE_CORRUPT
 }VpuDecState;
 
-static const void *pdwl = NULL;
-
 typedef struct
 {
   /* open parameters */
   VpuCodStd CodecFormat;
 
+  const void *pdwl;
   /* hantro decoder */
   CODEC_PROTOTYPE *codec;
 
@@ -181,20 +180,6 @@ typedef struct
 
 VpuDecRetCode VPU_DecLoad()
 {
-  struct DWLInitParam dwlInit;
-
-  // Need lock to ensure singleton.
-  if (!pdwl)
-  {
-    dwlInit.client_type = DWL_CLIENT_TYPE_HEVC_DEC;
-    pdwl = (void*)DWLInit(&dwlInit);
-    if (!pdwl)
-    {
-      VPU_ERROR("%s: DWLInit failed !! \r\n",__FUNCTION__);
-      return VPU_DEC_RET_FAILURE;
-    }
-  }
-
   return VPU_DEC_RET_SUCCESS;
 }
 
@@ -264,6 +249,7 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
   bool bDeblock, bIsRV8, bIsMvcStream;
   unsigned int imageSize;
   VpuDecObj* pObj;
+  struct DWLInitParam dwlInit;
 
   pMemVirt=&pInMemInfo->MemSubBlock[VIRT_INDEX];
   pMemPhy=&pInMemInfo->MemSubBlock[PHY_INDEX];
@@ -282,16 +268,25 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
     return VPU_DEC_RET_INVALID_PARAM;
   }
 
-  if (!pdwl)
-  {
-    VPU_ERROR("%s: DWL haven't Init !! \r\n",__FUNCTION__);
-    return VPU_DEC_RET_FAILURE;
-  }
-
   pVpuObj=(VpuDecHandleInternal*)pMemVirt->pVirtAddr;
   pObj=&pVpuObj->obj;
 
   memset(pObj, 0, sizeof(VpuDecObj));
+
+  if (pInParam->CodecFormat == VPU_V_HEVC || pInParam->CodecFormat == VPU_V_VP9)
+  {
+    dwlInit.client_type = DWL_CLIENT_TYPE_HEVC_DEC;
+  }
+  else
+  {
+    dwlInit.client_type = DWL_CLIENT_TYPE_H264_DEC;
+  }
+  pObj->pdwl = (void*)DWLInit(&dwlInit);
+  if (!pObj->pdwl)
+  {
+    VPU_ERROR("%s: DWLInit failed !! \r\n",__FUNCTION__);
+    return VPU_DEC_RET_FAILURE;
+  }
 
   g2Conf.bEnableTiled = false;
   if (pInParam->nTiled2LinearEnable)
@@ -307,28 +302,28 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
   VPU_LOG("format: %d \r\n",pInParam->CodecFormat);
   switch (pInParam->CodecFormat) {
     case VPU_V_AVC:
-      pObj->codec = HantroHwDecOmx_decoder_create_h264(pdwl,
+      pObj->codec = HantroHwDecOmx_decoder_create_h264(pObj->pdwl,
           bIsMvcStream, &g1Conf);
       VPU_LOG("open H.264 \r\n");
       break;
     case VPU_V_MPEG2: 	 /**< AKA: H.262 */
-      pObj->codec = HantroHwDecOmx_decoder_create_mpeg2(pdwl,
+      pObj->codec = HantroHwDecOmx_decoder_create_mpeg2(pObj->pdwl,
           &g1Conf);
       VPU_LOG("open Mpeg2 \r\n");
       break;
     case VPU_V_H263:		 /**< H.263 */
-      pObj->codec = HantroHwDecOmx_decoder_create_mpeg4(pdwl,
+      pObj->codec = HantroHwDecOmx_decoder_create_mpeg4(pObj->pdwl,
           bDeblock, MPEG4FORMAT_H263, &g1Conf);
       VPU_LOG("open H263 \r\n");
       break;
     case VPU_V_MPEG4: 	 /**< MPEG-4 */
-      pObj->codec = HantroHwDecOmx_decoder_create_mpeg4(pdwl,
+      pObj->codec = HantroHwDecOmx_decoder_create_mpeg4(pObj->pdwl,
           bDeblock, MPEG4FORMAT_MPEG4, &g1Conf);
       VPU_LOG("open Mpeg4 \r\n");
       break;
     case VPU_V_DIVX4:		/**< DIVX 4 */
     case VPU_V_DIVX56:		/**< DIVX 5/6 */
-      pObj->codec = HantroHwDecOmx_decoder_create_mpeg4(pdwl,
+      pObj->codec = HantroHwDecOmx_decoder_create_mpeg4(pObj->pdwl,
           bDeblock, MPEG4FORMAT_CUSTOM_1, &g1Conf);
       VPU_LOG("open DIVX 4 \r\n");
       VPU_LOG("open DIVX 56 \r\n");
@@ -337,13 +332,13 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
       VPU_LOG("open XVID \r\n");
       break;
     case VPU_V_DIVX3:		/**< DIVX 3 */
-      pObj->codec = HantroHwDecOmx_decoder_create_mpeg4(pdwl,
+      pObj->codec = HantroHwDecOmx_decoder_create_mpeg4(pObj->pdwl,
           bDeblock, MPEG4FORMAT_CUSTOM_1_3, &g1Conf);
       VPU_LOG("open DIVX 3 \r\n");
       break;
     case VPU_V_RV:		
       pObj->codec =
-        HantroHwDecOmx_decoder_create_rv(pdwl,
+        HantroHwDecOmx_decoder_create_rv(pObj->pdwl,
             bIsRV8, imageSize,
             pInParam->nPicWidth, pInParam->nPicHeight,
             &g1Conf);
@@ -351,12 +346,12 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
       break;
     case VPU_V_VC1:		 /**< all versions of Windows Media Video */
     case VPU_V_VC1_AP:
-      pObj->codec = HantroHwDecOmx_decoder_create_vc1(pdwl,
+      pObj->codec = HantroHwDecOmx_decoder_create_vc1(pObj->pdwl,
           &g1Conf);
       VPU_LOG("open VC1 \r\n");
       break;
     case VPU_V_AVC_MVC:
-      pObj->codec = HantroHwDecOmx_decoder_create_h264(pdwl,
+      pObj->codec = HantroHwDecOmx_decoder_create_h264(pObj->pdwl,
           bIsMvcStream, &g1Conf);
       VPU_LOG("open H.264 MVC \r\n");
       break;
@@ -365,24 +360,24 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
       VPU_LOG("open MJPEG \r\n");
       break;
     case VPU_V_AVS:
-      pObj->codec = HantroHwDecOmx_decoder_create_avs(pdwl,
+      pObj->codec = HantroHwDecOmx_decoder_create_avs(pObj->pdwl,
           &g1Conf);
       VPU_LOG("open AVS \r\n");
       break;
     case VPU_V_VP8:
-      pObj->codec = HantroHwDecOmx_decoder_create_vp8(pdwl,
+      pObj->codec = HantroHwDecOmx_decoder_create_vp8(pObj->pdwl,
           &g1Conf);
       VPU_LOG("open VP8 \r\n");
       break;
     case VPU_V_HEVC:
       g2Conf.bEnableRingBuffer = pObj->ringbuffer = true;
-      pObj->codec = HantroHwDecOmx_decoder_create_hevc(pdwl,
+      pObj->codec = HantroHwDecOmx_decoder_create_hevc(pObj->pdwl,
           &g2Conf);
       VPU_LOG("open HEVC \r\n");
       break;
     case VPU_V_VP9:
       g2Conf.bEnableRingBuffer = pObj->ringbuffer = true;
-      pObj->codec = HantroHwDecOmx_decoder_create_vp9(pdwl,
+      pObj->codec = HantroHwDecOmx_decoder_create_vp9(pObj->pdwl,
           &g2Conf);
       VPU_LOG("open VP9 \r\n");
       break;
@@ -1108,15 +1103,15 @@ VpuDecRetCode VPU_DecClose(VpuDecHandle InHandle)
 
   pObj->codec->destroy(pObj->codec);
 
+  if (pObj->pdwl)
+    DWLRelease(pObj->pdwl);
+  pObj->pdwl = NULL;
+
   return VPU_DEC_RET_SUCCESS;
 }
 
 VpuDecRetCode VPU_DecUnLoad()
 {
-  if (pdwl)
-    DWLRelease(pdwl);
-  pdwl = NULL;
-
   return VPU_DEC_RET_SUCCESS;
 }
 
@@ -1157,9 +1152,13 @@ VpuDecRetCode VPU_DecGetMem(VpuMemDesc* pInOutMem)
 {
   struct DWLLinearMem info;
   struct DWLInitParam dwlInit;
+  const void *pdwl = NULL;
 
+  dwlInit.client_type = DWL_CLIENT_TYPE_HEVC_DEC;
+  pdwl = (void*)DWLInit(&dwlInit);
   if (!pdwl)
   {
+    VPU_ERROR("%s: DWLInit failed !! \r\n",__FUNCTION__);
     return VPU_DEC_RET_FAILURE;
   }
 
@@ -1173,6 +1172,9 @@ VpuDecRetCode VPU_DecGetMem(VpuMemDesc* pInOutMem)
   pInOutMem->nVirtAddr=info.virtual_address;
   pInOutMem->nCpuAddr=info.ion_fd;
 
+  if (pdwl)
+    DWLRelease(pdwl);
+
   return VPU_DEC_RET_SUCCESS;
 
 }
@@ -1181,6 +1183,7 @@ VpuDecRetCode VPU_DecFreeMem(VpuMemDesc* pInMem)
 {
   struct DWLLinearMem info;
   struct DWLInitParam dwlInit;
+  const void *pdwl = NULL;
 
   info.size = pInMem->nSize;
   info.virtual_address = pInMem->nVirtAddr;
@@ -1188,12 +1191,17 @@ VpuDecRetCode VPU_DecFreeMem(VpuMemDesc* pInMem)
   info.ion_fd = pInMem->nCpuAddr;
 
   dwlInit.client_type = DWL_CLIENT_TYPE_HEVC_DEC;
+  pdwl = (void*)DWLInit(&dwlInit);
   if (!pdwl)
   {
+    VPU_ERROR("%s: DWLInit failed !! \r\n",__FUNCTION__);
     return VPU_DEC_RET_FAILURE;
   }
 
   DWLFreeLinear(pdwl, &info);
+
+  if (pdwl)
+    DWLRelease(pdwl);
 
   return VPU_DEC_RET_SUCCESS;
 }
