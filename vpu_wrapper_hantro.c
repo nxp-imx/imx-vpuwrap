@@ -39,7 +39,7 @@
 #include "utils.h"
 #include "vpu_wrapper.h"
 
-static int nVpuLogLevel=1;		//bit 0: api log; bit 1: raw dump; bit 2: yuv dump
+static int nVpuLogLevel=0;		//bit 0: api log; bit 1: raw dump; bit 2: yuv dump
 #ifdef ANDROID_BUILD
 #include "Log.h"
 #define LOG_PRINTF LogOutput
