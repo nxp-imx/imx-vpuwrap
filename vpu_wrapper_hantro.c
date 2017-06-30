@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
+#include <time.h>
 
 #include "dwl.h"
 #include "codec.h"
@@ -171,6 +172,8 @@ typedef struct
   bool ringbuffer;
   int nFrameSize;
   int nOutFrameCount;
+  int total_frames;
+  long long total_time;
 }VpuDecObj;
 
 typedef struct 
@@ -662,6 +665,7 @@ static VpuDecRetCode VPU_DecGetFrame(VpuDecObj* pObj, int* pOutBufRetCode)
       *pOutBufRetCode |= VPU_DEC_OUTPUT_DIS;
       pObj->state=VPU_DEC_STATE_OUTOK;
       pObj->nOutFrameCount ++;
+      pObj->total_frames ++;
       //if (pObj->nOutFrameCount > 5)
       //*pOutBufRetCode |= VPU_DEC_NO_ENOUGH_BUF;
       break;
@@ -674,6 +678,15 @@ static VpuDecRetCode VPU_DecGetFrame(VpuDecObj* pObj, int* pOutBufRetCode)
   }
 
   return VPU_DEC_RET_SUCCESS;
+}
+
+long long monotonic_time (void)
+{
+  struct timespec ts;
+
+  clock_gettime (CLOCK_MONOTONIC, &ts);
+
+  return (((long long) ts.tv_sec) * 1000000) + (ts.tv_nsec / 1000);
 }
 
 static VpuDecRetCode VPU_DecDecode(VpuDecObj* pObj, int* pOutBufRetCode)
@@ -724,8 +737,10 @@ static VpuDecRetCode VPU_DecDecode(VpuDecObj* pObj, int* pOutBufRetCode)
     memset(&frm, 0, sizeof(FRAME));
 
     VPU_LOG("decoder input stream length: %d\n", stream.streamlen);
+    long long start_time = monotonic_time();
     CODEC_STATE codec =
       pObj->codec->decode(pObj->codec, &stream, &bytes, &frm);
+    pObj->total_time += monotonic_time() - start_time;
     VPU_LOG("decoder return: %d byte consumed: %d\n", codec, bytes);
 
     pObj->nBsBufLen -= bytes + first;
@@ -1100,6 +1115,13 @@ VpuDecRetCode VPU_DecClose(VpuDecHandle InHandle)
   }
   pVpuObj=(VpuDecHandleInternal *)InHandle;
   pObj=&pVpuObj->obj;
+
+  VPU_LOG("Total consumed time: %0.5f\n", ((double)pObj->total_time)/1000000);
+  VPU_LOG("Total frames: %d\n", pObj->total_frames);
+  if(pObj->total_time > 0)
+  {
+    VPU_LOG("Video decode fps: %0.2f\n", ((double)pObj->total_frames*1000000)/pObj->total_time);
+  }
 
   pObj->codec->destroy(pObj->codec);
 
