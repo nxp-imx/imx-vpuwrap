@@ -109,6 +109,11 @@ typedef enum
   VPU_DEC_STATE_CORRUPT
 }VpuDecState;
 
+typedef struct {
+  int offset;
+  int is_valid;
+} RvDecSliceInfo;
+
 typedef struct
 {
   /* open parameters */
@@ -174,6 +179,8 @@ typedef struct
   int nOutFrameCount;
   int total_frames;
   long long total_time;
+  int slice_info_num;
+  RvDecSliceInfo slice_info[128];
 }VpuDecObj;
 
 typedef struct 
@@ -249,8 +256,7 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
   VpuDecHandleInternal* pVpuObj;
   OMX_VIDEO_PARAM_G2CONFIGTYPE g2Conf;
   OMX_VIDEO_PARAM_G1CONFIGTYPE g1Conf;
-  bool bDeblock, bIsRV8, bIsMvcStream;
-  unsigned int imageSize;
+  bool bDeblock = true, bIsMvcStream;
   VpuDecObj* pObj;
   struct DWLInitParam dwlInit;
 
@@ -305,6 +311,7 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
   VPU_LOG("format: %d \r\n",pInParam->CodecFormat);
   switch (pInParam->CodecFormat) {
     case VPU_V_AVC:
+      bIsMvcStream = false;
       pObj->codec = HantroHwDecOmx_decoder_create_h264(pObj->pdwl,
           bIsMvcStream, &g1Conf);
       VPU_LOG("open H.264 \r\n");
@@ -324,6 +331,11 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
           bDeblock, MPEG4FORMAT_MPEG4, &g1Conf);
       VPU_LOG("open Mpeg4 \r\n");
       break;
+    case VPU_V_SORENSON: 	 /**< Sorenson */
+      pObj->codec = HantroHwDecOmx_decoder_create_mpeg4(pObj->pdwl,
+          bDeblock, MPEG4FORMAT_SORENSON, &g1Conf);
+      VPU_LOG("open Mpeg4 \r\n");
+      break;
     case VPU_V_DIVX4:		/**< DIVX 4 */
     case VPU_V_DIVX56:		/**< DIVX 5/6 */
       pObj->codec = HantroHwDecOmx_decoder_create_mpeg4(pObj->pdwl,
@@ -332,6 +344,8 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
       VPU_LOG("open DIVX 56 \r\n");
       break;
     case VPU_V_XVID:		/**< XVID */
+      pObj->codec = HantroHwDecOmx_decoder_create_mpeg4(pObj->pdwl,
+          bDeblock, MPEG4FORMAT_MPEG4, &g1Conf);
       VPU_LOG("open XVID \r\n");
       break;
     case VPU_V_DIVX3:		/**< DIVX 3 */
@@ -340,20 +354,17 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
       VPU_LOG("open DIVX 3 \r\n");
       break;
     case VPU_V_RV:		
-      pObj->codec =
-        HantroHwDecOmx_decoder_create_rv(pObj->pdwl,
-            bIsRV8, imageSize,
-            pInParam->nPicWidth, pInParam->nPicHeight,
-            &g1Conf);
       VPU_LOG("open RV \r\n");
       break;
     case VPU_V_VC1:		 /**< all versions of Windows Media Video */
     case VPU_V_VC1_AP:
+    case VPU_V_WMV78:
       pObj->codec = HantroHwDecOmx_decoder_create_vc1(pObj->pdwl,
           &g1Conf);
       VPU_LOG("open VC1 \r\n");
       break;
     case VPU_V_AVC_MVC:
+      bIsMvcStream = true;
       pObj->codec = HantroHwDecOmx_decoder_create_h264(pObj->pdwl,
           bIsMvcStream, &g1Conf);
       VPU_LOG("open H.264 MVC \r\n");
@@ -366,6 +377,11 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
       pObj->codec = HantroHwDecOmx_decoder_create_avs(pObj->pdwl,
           &g1Conf);
       VPU_LOG("open AVS \r\n");
+      break;
+    case VPU_V_VP6:
+      pObj->codec = HantroHwDecOmx_decoder_create_vp6(pObj->pdwl,
+          &g1Conf);
+      VPU_LOG("open VP8 \r\n");
       break;
     case VPU_V_VP8:
       pObj->codec = HantroHwDecOmx_decoder_create_vp8(pObj->pdwl,
@@ -391,9 +407,10 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
 
   PP_ARGS pp_args;  // post processor parameters
   memset(&pp_args, 0, sizeof(PP_ARGS));
-  if (pObj->codec->setppargs(pObj->codec, &pp_args) != CODEC_OK)
-  {
-  }
+  if (pObj->codec)
+    if (pObj->codec->setppargs(pObj->codec, &pp_args) != CODEC_OK)
+    {
+    }
 
   pObj->CodecFormat= pInParam->CodecFormat;
   pObj->pBsBufVirtStart= pMemPhy->pVirtAddr;
@@ -637,13 +654,14 @@ static int VpuSearchFrameIndex(VpuDecObj* pObj, unsigned char *pInPhysY)
 
 static VpuDecRetCode VPU_DecGetFrame(VpuDecObj* pObj, int* pOutBufRetCode)
 {
-  CODEC_STATE state = CODEC_HAS_FRAME;
+  CODEC_STATE state = CODEC_OK;
   FRAME frm;
   int index;
 
   memset(&frm, 0, sizeof(FRAME));
 
-  state = pObj->codec->getframe(pObj->codec, &frm, pObj->eosing);
+  if (pObj->codec)
+    state = pObj->codec->getframe(pObj->codec, &frm, pObj->eosing);
   switch (state)
   {
     case CODEC_HAS_FRAME:
@@ -695,7 +713,7 @@ static VpuDecRetCode VPU_DecDecode(VpuDecObj* pObj, int* pOutBufRetCode)
   {
     unsigned int first = 0;
     unsigned int last = 0;
-    STREAM_BUFFER stream;
+    STREAM_BUFFER stream = { 0 };
 
     stream.bus_data = pObj->pBsBufVirtStart + pObj->nBsBufOffset;
     stream.bus_address = pObj->pBsBufPhyStart + pObj->nBsBufOffset;
@@ -728,8 +746,8 @@ static VpuDecRetCode VPU_DecDecode(VpuDecObj* pObj, int* pOutBufRetCode)
     stream.buf_data = pObj->pBsBufVirtStart;
     stream.bus_address = pObj->pBsBufPhyStart + pObj->nBsBufOffset + first;
     stream.buf_address = pObj->pBsBufPhyStart;
-    //stream.sliceInfoNum =  pObj->sliceInfoNum;
-    //stream.pSliceInfo =  pObj->pSliceInfo;
+    stream.sliceInfoNum =  pObj->slice_info_num;
+    stream.pSliceInfo = pObj->slice_info;
     //stream.picId = pObj->propagateData.picIndex;
 
     unsigned int bytes = 0;
@@ -819,6 +837,101 @@ static VpuDecRetCode VPU_DecDecode(VpuDecObj* pObj, int* pOutBufRetCode)
   return VPU_DEC_RET_SUCCESS;
 }
 
+static VpuDecRetCode RvParseHeader(VpuDecObj* pObj, VpuBufferNode* pInData)
+{
+  u32 tmp, length;
+  u8 *buff;
+  OMX_VIDEO_PARAM_G1CONFIGTYPE g1Conf;
+  unsigned int imageSize;
+  bool bIsRV8;
+  int i, nPicWidth, nPicHeight;
+  u32 num_frame_sizes = 0;
+  u32 frame_sizes[18];
+  u32 size[9] = {0,1,1,2,2,3,3,3,3};
+
+
+  if (!pObj->codec)
+  {
+    buff = pInData->sCodecData.pData;
+
+    if (pInData->sCodecData.nSize < 20)
+      return VPU_DEC_RET_SUCCESS;
+
+    length = (buff[0] << 24) |
+      (buff[1] << 16) |
+      (buff[2] <<  8) |
+      (buff[3] <<  0);
+
+    VPU_LOG("sequence len: %d\n", length);
+
+    if (strncmp(buff+8, "RV30", 4) == 0)
+      bIsRV8 = true;
+    else
+      bIsRV8 = false;
+
+    nPicWidth = (buff[12] << 8) | buff[13];
+    nPicHeight = (buff[14] << 8) | buff[15];
+
+    if (bIsRV8) {
+      u8 *p = buff + 26;
+      num_frame_sizes = 1 + (p[1] & 0x7);
+      p += 8;
+      frame_sizes[0] = nPicWidth;
+      frame_sizes[1] = nPicHeight;
+      for (i = 1; i < num_frame_sizes; i++) {
+        frame_sizes[2*i + 0] = (*p++) << 2;
+        frame_sizes[2*i + 1] = (*p++) << 2;
+      }
+    }
+
+    g1Conf.bEnableTiled = false;
+    g1Conf.bAllowFieldDBP = false;
+    pObj->codec =
+      HantroHwDecOmx_decoder_create_rv(pObj->pdwl,
+          bIsRV8, size[num_frame_sizes], frame_sizes,
+          nPicWidth, nPicHeight,
+          &g1Conf);
+  }
+
+  pInData->sCodecData.nSize = 0;
+  pObj->nBsBufOffset = 0;
+  buff = pInData->pVirAddr;
+
+  if (pInData->nSize < 20)
+    return VPU_DEC_RET_SUCCESS;
+
+  length = (buff[0] << 24) |
+    (buff[1] << 16) |
+    (buff[2] <<  8) |
+    (buff[3] <<  0);
+
+  VPU_LOG("frame len: %d\n", length);
+
+  buff += 16;
+  pObj->slice_info_num = (buff[0] << 24) |
+    (buff[1] << 16) |
+    (buff[2] <<  8) |
+    (buff[3] <<  0);
+  VPU_LOG("slice info num: %d\n", pObj->slice_info_num);
+  for (i = 0; i < pObj->slice_info_num; i ++)
+  {
+    buff += 4;
+    pObj->slice_info[i].is_valid = (buff[0] << 24) |
+      (buff[1] << 16) |
+      (buff[2] <<  8) |
+      (buff[3] <<  0);
+    buff += 4;
+    pObj->slice_info[i].offset = (buff[0] << 24) |
+      (buff[1] << 16) |
+      (buff[2] <<  8) |
+      (buff[3] <<  0);
+  }
+  pInData->pVirAddr += 20 + pObj->slice_info_num * 8;
+  pInData->nSize -= 20 + pObj->slice_info_num * 8;
+
+  return VPU_DEC_RET_SUCCESS;
+}
+
 VpuDecRetCode VPU_DecDecodeBuf(VpuDecHandle InHandle, VpuBufferNode* pInData,
     int* pOutBufRetCode)
 {
@@ -845,6 +958,8 @@ VpuDecRetCode VPU_DecDecodeBuf(VpuDecHandle InHandle, VpuBufferNode* pInData,
 
   if(!pObj->nBsBufLen)
   {
+    if(pObj->CodecFormat==VPU_V_RV)
+      RvParseHeader(pObj, pInData);
     VPU_DecProcessInBuf(pObj, pInData);
     *pOutBufRetCode |= VPU_DEC_INPUT_USED;
   }

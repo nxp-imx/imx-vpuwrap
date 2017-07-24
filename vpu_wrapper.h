@@ -70,6 +70,9 @@ typedef enum {
 	VPU_V_VP8,
 	VPU_V_VP9,
 	VPU_V_HEVC,
+	VPU_V_SORENSON,
+	VPU_V_VP6,
+	VPU_V_WMV78,
 } VpuCodStd;
 
 typedef enum {
