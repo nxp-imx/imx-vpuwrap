@@ -41,7 +41,7 @@
 #include "vpu_wrapper.h"
 
 static int nVpuLogLevel=0;		//bit 0: api log; bit 1: raw dump; bit 2: yuv dump
-#ifdef ANDROID_BUILD
+#ifdef ANDROID
 #include "Log.h"
 #define LOG_PRINTF LogOutput
 #define VPU_LOG_LEVELFILE "/data/vpu_log_level"
@@ -256,7 +256,8 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
   VpuDecHandleInternal* pVpuObj;
   OMX_VIDEO_PARAM_G2CONFIGTYPE g2Conf;
   OMX_VIDEO_PARAM_G1CONFIGTYPE g1Conf;
-  bool bDeblock = true, bIsMvcStream;
+  bool bDeblock = true;
+  bool bIsMvcStream = false;
   VpuDecObj* pObj;
   struct DWLInitParam dwlInit;
 
@@ -311,7 +312,6 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
   VPU_LOG("format: %d \r\n",pInParam->CodecFormat);
   switch (pInParam->CodecFormat) {
     case VPU_V_AVC:
-      bIsMvcStream = false;
       pObj->codec = HantroHwDecOmx_decoder_create_h264(pObj->pdwl,
           bIsMvcStream, &g1Conf);
       VPU_LOG("open H.264 \r\n");
@@ -572,7 +572,7 @@ static VpuDecRetCode VPU_DecProcessInBuf(VpuDecObj* pObj, VpuBufferNode* pInData
   unsigned int headerLen=0;
   unsigned int headerAllocated=0;
 
-  if(pInData->pVirAddr == 0x01 && pInData->nSize == 0)
+  if(pInData->pVirAddr == (unsigned char *)0x01 && pInData->nSize == 0)
     pObj->eosing = true;
 
   if(pInData->pVirAddr == NULL || pInData->nSize == 0)
@@ -665,7 +665,7 @@ static VpuDecRetCode VPU_DecGetFrame(VpuDecObj* pObj, int* pOutBufRetCode)
   switch (state)
   {
     case CODEC_HAS_FRAME:
-      index=VpuSearchFrameIndex(pObj, frm.fb_bus_address);
+      index=VpuSearchFrameIndex(pObj, (unsigned char *)frm.fb_bus_address);
       if (-1==index)
       {
         VPU_ERROR("%s: failure: vpu can not find the frame buf, pInFrameBuf=0x%X \r\n",__FUNCTION__,(unsigned int)frm.fb_bus_address);
@@ -713,10 +713,11 @@ static VpuDecRetCode VPU_DecDecode(VpuDecObj* pObj, int* pOutBufRetCode)
   {
     unsigned int first = 0;
     unsigned int last = 0;
-    STREAM_BUFFER stream = { 0 };
+    STREAM_BUFFER stream;
+    memset(&stream, 0, sizeof(STREAM_BUFFER));
 
     stream.bus_data = pObj->pBsBufVirtStart + pObj->nBsBufOffset;
-    stream.bus_address = pObj->pBsBufPhyStart + pObj->nBsBufOffset;
+    stream.bus_address = (OSAL_BUS_WIDTH)pObj->pBsBufPhyStart + pObj->nBsBufOffset;
     stream.streamlen = pObj->nBsBufLen;
     stream.allocsize = VPU_BITS_BUF_SIZE;
 
@@ -744,10 +745,10 @@ static VpuDecRetCode VPU_DecDecode(VpuDecObj* pObj, int* pOutBufRetCode)
     // got at least one complete frame between first and last
     stream.bus_data = pObj->pBsBufVirtStart + pObj->nBsBufOffset + first;
     stream.buf_data = pObj->pBsBufVirtStart;
-    stream.bus_address = pObj->pBsBufPhyStart + pObj->nBsBufOffset + first;
-    stream.buf_address = pObj->pBsBufPhyStart;
+    stream.bus_address = (OSAL_BUS_WIDTH)pObj->pBsBufPhyStart + pObj->nBsBufOffset + first;
+    stream.buf_address = (OSAL_BUS_WIDTH)pObj->pBsBufPhyStart;
     stream.sliceInfoNum =  pObj->slice_info_num;
-    stream.pSliceInfo = pObj->slice_info;
+    stream.pSliceInfo = (OMX_U8 *)pObj->slice_info;
     //stream.picId = pObj->propagateData.picIndex;
 
     unsigned int bytes = 0;
@@ -761,11 +762,11 @@ static VpuDecRetCode VPU_DecDecode(VpuDecObj* pObj, int* pOutBufRetCode)
     pObj->total_time += monotonic_time() - start_time;
     VPU_LOG("decoder return: %d byte consumed: %d\n", codec, bytes);
 
-    pObj->nBsBufLen -= bytes + first;
-    pObj->nBsBufOffset += bytes + first;
+    pObj->nBsBufLen -= (int)bytes + (int)first;
+    pObj->nBsBufOffset += (int)bytes + (int)first;
     if(pObj->nBsBufOffset >= VPU_BITS_BUF_SIZE)
       pObj->nBsBufOffset -= VPU_BITS_BUF_SIZE;
-    pObj->nAccumulatedConsumedFrmBytes += bytes + first;
+    pObj->nAccumulatedConsumedFrmBytes += (int)bytes + (int)first;
     bool dobreak = false;
 
     switch (codec)
@@ -864,7 +865,7 @@ static VpuDecRetCode RvParseHeader(VpuDecObj* pObj, VpuBufferNode* pInData)
 
     VPU_LOG("sequence len: %d\n", length);
 
-    if (strncmp(buff+8, "RV30", 4) == 0)
+    if (strncmp((const char*)(buff+8), "RV30", 4) == 0)
       bIsRV8 = true;
     else
       bIsRV8 = false;
@@ -873,14 +874,15 @@ static VpuDecRetCode RvParseHeader(VpuDecObj* pObj, VpuBufferNode* pInData)
     nPicHeight = (buff[14] << 8) | buff[15];
 
     if (bIsRV8) {
+      u32 j = 0;
       u8 *p = buff + 26;
       num_frame_sizes = 1 + (p[1] & 0x7);
       p += 8;
       frame_sizes[0] = nPicWidth;
       frame_sizes[1] = nPicHeight;
-      for (i = 1; i < num_frame_sizes; i++) {
-        frame_sizes[2*i + 0] = (*p++) << 2;
-        frame_sizes[2*i + 1] = (*p++) << 2;
+      for (j = 1; j < num_frame_sizes; j++) {
+        frame_sizes[2*j + 0] = (*p++) << 2;
+        frame_sizes[2*j + 1] = (*p++) << 2;
       }
     }
 
@@ -1060,7 +1062,7 @@ VpuDecRetCode VPU_DecRegisterFrameBuffer(VpuDecHandle InHandle,VpuFrameBuffer *p
     pVpuObj->obj.frameBuf[i]=*pInFrameBufArray;
 
     buffer.bus_data = pInFrameBufArray->pbufVirtY;
-    buffer.bus_address = pInFrameBufArray->pbufY;
+		buffer.bus_address = (OSAL_BUS_WIDTH)pInFrameBufArray->pbufY;
     buffer.allocsize = pObj->nFrameSize;
 
     pInFrameBufArray++;
@@ -1149,7 +1151,7 @@ VpuDecRetCode VPU_DecOutFrameDisplayed(VpuDecHandle InHandle, VpuFrameBuffer* pI
   pObj=&pVpuObj->obj;
 
   buff.bus_data = pInFrameBuf->pbufVirtY;
-  buff.bus_address = pInFrameBuf->pbufY;
+  buff.bus_address = (OSAL_BUS_WIDTH)pInFrameBuf->pbufY;
 
   pObj->codec->pictureconsumed(pObj->codec, &buff);
   pObj->nOutFrameCount --;
@@ -1306,7 +1308,7 @@ VpuDecRetCode VPU_DecGetMem(VpuMemDesc* pInOutMem)
   }
 
   pInOutMem->nPhyAddr=info.bus_address;
-  pInOutMem->nVirtAddr=info.virtual_address;
+  pInOutMem->nVirtAddr=(unsigned long)info.virtual_address;
   pInOutMem->nCpuAddr=info.ion_fd;
 
   if (pdwl)
@@ -1323,7 +1325,7 @@ VpuDecRetCode VPU_DecFreeMem(VpuMemDesc* pInMem)
   const void *pdwl = NULL;
 
   info.size = pInMem->nSize;
-  info.virtual_address = pInMem->nVirtAddr;
+  info.virtual_address = (u32*)pInMem->nVirtAddr;
   info.bus_address = pInMem->nPhyAddr;
   info.ion_fd = pInMem->nCpuAddr;
 
