@@ -80,6 +80,14 @@ static int g_seek_dump=DUMP_ALL_DATA;	/*0: only dump data after seeking; otherwi
 #define VPU_MEM_ALIGN			0x10
 #define VPU_BITS_BUF_SIZE		(3*1024*1024)		//bitstream buffer size : big enough contain two big frames
 
+#define VC1_MAX_SEQ_HEADER_SIZE	256		//for clip: WVC1_stress_a0_stress06.wmv, its header length = 176 (>128)
+#define VC1_MAX_FRM_HEADER_SIZE	32
+#define RCV_HEADER_LEN_HANTRO			20
+#define VP8_SEQ_HEADER_SIZE	32
+#define VP8_FRM_HEADER_SIZE	12
+#define DIV3_SEQ_HEADER_SIZE	32
+#define DIV3_FRM_HEADER_SIZE	12
+
 #define VPU_MAX_FRAME_INDEX	30
 
 #define VIRT_INDEX	0
@@ -133,6 +141,10 @@ typedef struct
   int initDataCountThd;
   VpuDecErrInfo nLastErrorInfo;  /*it record the last error info*/
 
+  /*resolution for some special formats, such as package VC1 header,...*/
+  int picWidth;
+  int picHeight;
+
   /* init info */
   VpuDecInitInfo initInfo;
 
@@ -185,7 +197,7 @@ typedef struct
 
 typedef struct 
 {
-	VpuDecObj obj;
+  VpuDecObj obj;
 }VpuDecHandleInternal;
 
 VpuDecRetCode VPU_DecLoad()
@@ -301,7 +313,7 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
   g2Conf.bEnableTiled = false;
   if (pInParam->nTiled2LinearEnable)
     g2Conf.bEnableTiled = true;
-  g2Conf.ePixelFormat = OMX_VIDEO_G2PixelFormat_8bit;
+  g2Conf.ePixelFormat = OMX_VIDEO_G2PixelFormat_Default;
   g2Conf.bEnableRFC = false;
   if (pInParam->nEnableVideoCompressor)
     g2Conf.bEnableRFC = true;
@@ -358,7 +370,6 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
       break;
     case VPU_V_VC1:		 /**< all versions of Windows Media Video */
     case VPU_V_VC1_AP:
-    case VPU_V_WMV78:
       pObj->codec = HantroHwDecOmx_decoder_create_vc1(pObj->pdwl,
           &g1Conf);
       VPU_LOG("open VC1 \r\n");
@@ -411,6 +422,11 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
     if (pObj->codec->setppargs(pObj->codec, &pp_args) != CODEC_OK)
     {
     }
+
+  //record resolution for some special formats (such as VC1,...)
+  pObj->picWidth = pInParam->nPicWidth;	
+  pObj->picHeight = pInParam->nPicHeight;
+
 
   pObj->CodecFormat= pInParam->CodecFormat;
   pObj->pBsBufVirtStart= pMemPhy->pVirtAddr;
@@ -571,6 +587,7 @@ static VpuDecRetCode VPU_DecProcessInBuf(VpuDecObj* pObj, VpuBufferNode* pInData
   unsigned char* pHeader=NULL;
   unsigned int headerLen=0;
   unsigned int headerAllocated=0;
+  int pNoErr = 1;
 
   if(pInData->pVirAddr == (unsigned char *)0x01 && pInData->nSize == 0)
     pObj->eosing = true;
@@ -578,37 +595,91 @@ static VpuDecRetCode VPU_DecProcessInBuf(VpuDecObj* pObj, VpuBufferNode* pInData
   if(pInData->pVirAddr == NULL || pInData->nSize == 0)
     return VPU_DEC_RET_SUCCESS;
 
-  if(pObj->nPrivateSeqHeaderInserted == 0 && 0 != pInData->sCodecData.nSize)
+  if(pObj->nPrivateSeqHeaderInserted == 0)
   {
-    if((pObj->CodecFormat==VPU_V_AVC || pObj->CodecFormat==VPU_V_HEVC)
-        &&(0==pObj->nIsAvcc)){
-      if(pObj->CodecFormat==VPU_V_AVC)
-        VpuDetectAvcc(pInData->sCodecData.pData,pInData->sCodecData.nSize,
-            &pObj->nIsAvcc,&pObj->nNalSizeLen,&pObj->nNalNum);
-      else
-        VpuDetectHvcc(pInData->sCodecData.pData,pInData->sCodecData.nSize,
-            &pObj->nIsAvcc,&pObj->nNalSizeLen,&pObj->nNalNum);
-    }
-    if(pObj->nIsAvcc){
-      if(pObj->CodecFormat==VPU_V_AVC)
-        VpuConvertAvccHeader(pInData->sCodecData.pData,pInData->sCodecData.nSize,
-            &pHeader,&headerLen);
-      else
-        VpuConvertHvccHeader(pInData->sCodecData.pData,pInData->sCodecData.nSize,
-            &pHeader,&headerLen);
-      if(pInData->sCodecData.pData != pHeader){
-        headerAllocated=1;
-      }
-    }
-    else{
-      pHeader=pInData->sCodecData.pData;
-      headerLen=pInData->sCodecData.nSize;
-    }
-    VpuPutInBuf(pObj, pHeader, headerLen);
-    pObj->nAccumulatedConsumedFrmBytes -= headerLen;
 
-    if(headerAllocated){
-      free(pHeader);
+    if(pObj->CodecFormat==VPU_V_DIVX3)
+    {
+      unsigned char aDivx3Head[8];
+      int nWidth = pObj->picWidth;
+      int nHeight = pObj->picHeight;
+      int i;
+      pHeader=aDivx3Head;
+      headerLen = 8;
+
+      VPU_LOG("%s: [width x height]=[%d x %d] , frame size =%d \r\n",
+          __FUNCTION__,pObj->picWidth,pObj->picHeight,pInData->nSize);
+      //Width
+      pHeader[i++] = (unsigned char)nWidth;
+      pHeader[i++] = (unsigned char)(((nWidth >> 8) & 0xff));
+      pHeader[i++] = (unsigned char)(((nWidth >> 16) & 0xff)); 
+      pHeader[i++] = (unsigned char)(((nWidth >> 24) & 0xff));
+      //Height
+      pHeader[i++] = (unsigned char)nHeight;
+      pHeader[i++] = (unsigned char)(((nHeight >> 8) & 0xff));
+      pHeader[i++] = (unsigned char)(((nHeight >> 16) & 0xff));
+      pHeader[i++] = (unsigned char)(((nHeight >> 24) & 0xff));
+      VpuPutInBuf(pObj, pHeader, headerLen);
+    }
+
+    if(0 != pInData->sCodecData.nSize)
+    {
+      if((pObj->CodecFormat==VPU_V_AVC || pObj->CodecFormat==VPU_V_HEVC)
+          &&(0==pObj->nIsAvcc)){
+        if(pObj->CodecFormat==VPU_V_AVC)
+          VpuDetectAvcc(pInData->sCodecData.pData,pInData->sCodecData.nSize,
+              &pObj->nIsAvcc,&pObj->nNalSizeLen,&pObj->nNalNum);
+        else
+          VpuDetectHvcc(pInData->sCodecData.pData,pInData->sCodecData.nSize,
+              &pObj->nIsAvcc,&pObj->nNalSizeLen,&pObj->nNalNum);
+      }
+      if(pObj->nIsAvcc){
+        if(pObj->CodecFormat==VPU_V_AVC)
+          VpuConvertAvccHeader(pInData->sCodecData.pData,pInData->sCodecData.nSize,
+              &pHeader,&headerLen);
+        else
+          VpuConvertHvccHeader(pInData->sCodecData.pData,pInData->sCodecData.nSize,
+              &pHeader,&headerLen);
+        if(pInData->sCodecData.pData != pHeader){
+          headerAllocated=1;
+        }
+      }
+      else if(pObj->CodecFormat==VPU_V_VC1_AP)
+      {
+        if((pInData->pVirAddr==NULL) || (pInData->nSize<4))
+        {
+          //we need pInData->pVirAddr to create correct VC1 header
+          //TODO: or define one default value when pInData->pVirAddr is NULL
+          VPU_LOG("%s: no input buffer, return and do nothing \r\n",__FUNCTION__);	
+          return VPU_DEC_RET_SUCCESS;
+        }
+        pHeader = malloc(VC1_MAX_SEQ_HEADER_SIZE);
+        headerAllocated=1;
+        VC1CreateNALSeqHeader(pHeader, (int*)(&headerLen),pInData->sCodecData.pData,
+            (int)pInData->sCodecData.nSize, (unsigned int*)pInData->pVirAddr,
+            VC1_MAX_SEQ_HEADER_SIZE);
+      }
+      else if(pObj->CodecFormat==VPU_V_VC1)
+      {
+        //1 nSize must == frame size ??? 
+        VPU_LOG("%s: [width x height]=[%d x %d] , frame size =%d \r\n",
+            __FUNCTION__,pObj->picWidth,pObj->picHeight,pInData->nSize);
+        pHeader = malloc(VC1_MAX_SEQ_HEADER_SIZE);
+        headerAllocated=1;
+        VC1CreateRCVSeqHeader(pHeader, (int*)(&headerLen),pInData->sCodecData.pData,
+            pInData->nSize,pObj->picWidth,pObj->picHeight, &pNoErr);
+        headerLen = RCV_HEADER_LEN_HANTRO;
+      }
+      else{
+        pHeader=pInData->sCodecData.pData;
+        headerLen=pInData->sCodecData.nSize;
+      }
+      VpuPutInBuf(pObj, pHeader, headerLen);
+      pObj->nAccumulatedConsumedFrmBytes -= headerLen;
+
+      if(headerAllocated){
+        free(pHeader);
+      }
     }
     pObj->nPrivateSeqHeaderInserted=1;
   }			
@@ -622,6 +693,12 @@ static VpuDecRetCode VPU_DecProcessInBuf(VpuDecObj* pObj, VpuBufferNode* pInData
     if(pFrm!=pInData->pVirAddr){
       free(pFrm);
     }
+  } else if(pObj->CodecFormat==VPU_V_VC1_AP) {
+    unsigned char aVC1Head[VC1_MAX_FRM_HEADER_SIZE];
+    pHeader=aVC1Head;
+    VC1CreateNalFrameHeader(pHeader,(int*)(&headerLen),(unsigned int*)(pInData->pVirAddr));
+    VpuPutInBuf(pObj, pHeader, headerLen);
+    VpuPutInBuf(pObj, pInData->pVirAddr, pInData->nSize);
   } else {
     VpuPutInBuf(pObj, pInData->pVirAddr, pInData->nSize);
   }
@@ -960,6 +1037,21 @@ VpuDecRetCode VPU_DecDecodeBuf(VpuDecHandle InHandle, VpuBufferNode* pInData,
 
   if(!pObj->nBsBufLen)
   {
+#if 0
+    printf ("\n");
+    {
+      char *tmp = pInData->sCodecData.pData;
+      for (int i=0; i<pInData->sCodecData.nSize; i++)
+        printf ("%02x", tmp[i]);
+    }
+    printf ("\n");
+    {
+      char *tmp = pInData->pVirAddr;
+      for (int i=0; i<100; i++)
+        printf ("%02x", tmp[i]);
+    }
+    printf ("\n");
+#endif
     if(pObj->CodecFormat==VPU_V_RV)
       RvParseHeader(pObj, pInData);
     VPU_DecProcessInBuf(pObj, pInData);
@@ -1002,6 +1094,10 @@ VpuDecRetCode VPU_DecGetInitialInfo(VpuDecHandle InHandle, VpuDecInitInfo * pOut
   pOutInitInfo->nPicWidth = info.width;
   pOutInitInfo->nPicHeight = info.height;
   pOutInitInfo->nMinFrameBufferCount = info.frame_buffers;
+  if (info.bit_depth == 0)
+    pOutInitInfo->nBitDepth = 8;
+  else
+    pOutInitInfo->nBitDepth = info.bit_depth;
   if (info.crop_available)
   {
     pOutInitInfo->PicCropRect.nLeft = info.crop_left;
@@ -1062,7 +1158,7 @@ VpuDecRetCode VPU_DecRegisterFrameBuffer(VpuDecHandle InHandle,VpuFrameBuffer *p
     pVpuObj->obj.frameBuf[i]=*pInFrameBufArray;
 
     buffer.bus_data = pInFrameBufArray->pbufVirtY;
-		buffer.bus_address = (OSAL_BUS_WIDTH)pInFrameBufArray->pbufY;
+    buffer.bus_address = (OSAL_BUS_WIDTH)pInFrameBufArray->pbufY;
     buffer.allocsize = pObj->nFrameSize;
 
     pInFrameBufArray++;

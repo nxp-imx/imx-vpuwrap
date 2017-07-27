@@ -25,6 +25,13 @@ int VpuConvertHvccHeader(unsigned char* pCodecData, unsigned int nSize,
 int VpuConvertAvccFrame(unsigned char* pData, unsigned int nSize, int
     nNalSizeLength, unsigned char** ppFrm, unsigned int* pSize, int * pNalNum);
 
+int VC1CreateNALSeqHeader(unsigned char* pHeader, int* pHeaderLen, 
+	unsigned char* pCodecPri,int nCodecSize, unsigned int* pData, int nMaxHeader);
+int VC1CreateRCVSeqHeader(unsigned char* pHeader, int* pHeaderLen, 
+	unsigned char* pCodecPri,unsigned int nFrameSize,int nWidth,int nHeight,int* pNoError);
+int VC1CreateNalFrameHeader(unsigned char* pHeader, int* pHeaderLen,unsigned int*pInData );
+int VC1CreateRCVFrameHeader(unsigned char* pHeader, int* pHeaderLen,unsigned int nInSize );
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
