@@ -603,7 +603,7 @@ static VpuDecRetCode VPU_DecProcessInBuf(VpuDecObj* pObj, VpuBufferNode* pInData
       unsigned char aDivx3Head[8];
       int nWidth = pObj->picWidth;
       int nHeight = pObj->picHeight;
-      int i;
+      int i = 0;
       pHeader=aDivx3Head;
       headerLen = 8;
 
