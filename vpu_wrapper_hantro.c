@@ -193,6 +193,7 @@ typedef struct
   long long total_time;
   int slice_info_num;
   RvDecSliceInfo slice_info[128];
+  int frame_size;
 }VpuDecObj;
 
 typedef struct 
@@ -314,6 +315,8 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
   if (pInParam->nTiled2LinearEnable)
     g2Conf.bEnableTiled = true;
   g2Conf.ePixelFormat = OMX_VIDEO_G2PixelFormat_Default;
+  if (pInParam->nPixelFormat)
+    g2Conf.ePixelFormat = OMX_VIDEO_G2PixelFormat_8bit;
   g2Conf.bEnableRFC = false;
   if (pInParam->nEnableVideoCompressor)
     g2Conf.bEnableRFC = true;
@@ -383,6 +386,10 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
     case VPU_V_MJPG:
       pObj->codec = HantroHwDecOmx_decoder_create_jpeg(true);
       VPU_LOG("open MJPEG \r\n");
+      break;
+    case VPU_V_WEBP:
+      pObj->codec = HantroHwDecOmx_decoder_create_webp(pObj->pdwl);
+      VPU_LOG("open WEBP \r\n");
       break;
     case VPU_V_AVS:
       pObj->codec = HantroHwDecOmx_decoder_create_avs(pObj->pdwl,
@@ -550,6 +557,8 @@ VpuDecRetCode VPU_DecConfig(VpuDecHandle InHandle, VpuDecConfig InDecConf, void*
       }
       pObj->initDataCountThd=para;
       break;
+    case VPU_DEC_CONF_ENABLE_TILED:
+      break;
     default:
       VPU_ERROR("%s: failure: invalid setting \r\n",__FUNCTION__);
       return VPU_DEC_RET_INVALID_PARAM;
@@ -620,6 +629,29 @@ static VpuDecRetCode VPU_DecProcessInBuf(VpuDecObj* pObj, VpuBufferNode* pInData
       pHeader[i++] = (unsigned char)(((nHeight >> 16) & 0xff));
       pHeader[i++] = (unsigned char)(((nHeight >> 24) & 0xff));
       VpuPutInBuf(pObj, pHeader, headerLen);
+    }
+    else if(pObj->CodecFormat==VPU_V_WEBP)
+    {
+      char signature[] = "WEBP";
+      char format_[] = "VP8 ";
+      u8 tmp[4];
+      if(pInData->nSize < 20)
+        return VPU_DEC_RET_SUCCESS;
+
+      memcpy(tmp, pInData->pVirAddr+8, 4);
+      if (strncmp(signature, tmp, 4))
+        return VPU_DEC_RET_FAILURE;
+      memcpy(tmp, pInData->pVirAddr+12, 4);
+      if (strncmp(format_, tmp, 4))
+        return VPU_DEC_RET_FAILURE;
+      memcpy(tmp, pInData->pVirAddr+16, 4);
+      pObj->frame_size =
+        tmp[0] +
+        (tmp[1] << 8) +
+        (tmp[2] << 16) +
+        (tmp[3] << 24);
+      pInData->pVirAddr += 20;
+      pInData->nSize -= 20;
     }
 
     if(0 != pInData->sCodecData.nSize)
@@ -1035,7 +1067,7 @@ VpuDecRetCode VPU_DecDecodeBuf(VpuDecHandle InHandle, VpuBufferNode* pInData,
     return VPU_DEC_RET_SUCCESS;
   }
 
-  if(!pObj->nBsBufLen)
+  if(!pObj->nBsBufLen || pObj->frame_size)
   {
 #if 0
     printf ("\n");
@@ -1056,6 +1088,12 @@ VpuDecRetCode VPU_DecDecodeBuf(VpuDecHandle InHandle, VpuBufferNode* pInData,
       RvParseHeader(pObj, pInData);
     VPU_DecProcessInBuf(pObj, pInData);
     *pOutBufRetCode |= VPU_DEC_INPUT_USED;
+
+    if(pObj->nBsBufLen < pObj->frame_size)
+    {
+      *pOutBufRetCode |= VPU_DEC_NO_ENOUGH_INBUF;
+      return VPU_DEC_RET_SUCCESS;
+    }
   }
 
   return VPU_DecDecode(pObj, pOutBufRetCode);

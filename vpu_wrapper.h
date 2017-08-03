@@ -72,6 +72,7 @@ typedef enum {
 	VPU_V_HEVC,
 	VPU_V_SORENSON,
 	VPU_V_VP6,
+	VPU_V_WEBP,
 } VpuCodStd;
 
 typedef enum {
@@ -100,6 +101,8 @@ typedef enum {
 	VPU_DEC_CONF_BUFDELAY,		/*for stream mode:
 									    parameter represent buf size(unit: bytes), buffer size==0 indicate no any delay*/
 	VPU_DEC_CONF_INIT_CNT_THRESHOLD,  /*at seqinit stage: vpu will report error if data count reach the threshold*/
+
+	VPU_DEC_CONF_ENABLE_TILED,  /*configure output frame to tiled after parsed sequence header and before register frame buffer */
 } VpuDecConfig;
 
 typedef enum 
@@ -240,8 +243,9 @@ typedef struct {
 	//int block;
 	int nEnableFileMode;
 	int nEnableVideoCompressor;
+	int nPixelFormat; /*output 10 bit or cut to 8 bit for Hantro G2. 0 for output 10 bit, 1 for cut to 8 bit */
 
-	int nReserved[2];			/*reserved for future extension*/
+	int nReserved[1];			/*reserved for future extension*/
 	void* pAppCxt;			/*reserved for future application extension*/
 } VpuDecOpenParam;
 
