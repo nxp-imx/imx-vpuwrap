@@ -1007,7 +1007,7 @@ static VpuDecRetCode RvParseHeader(VpuDecObj* pObj, VpuBufferNode* pInData)
   }
   pInData->pVirAddr += 20 + pObj->slice_info_num * 8;
   pInData->nSize -= 20 + pObj->slice_info_num * 8;
-
+  pObj->nAccumulatedConsumedStufferBytes += 20 + pObj->slice_info_num * 8;
   return VPU_DEC_RET_SUCCESS;
 }
 
