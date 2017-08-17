@@ -882,6 +882,9 @@ static VpuDecRetCode VPU_DecDecode(VpuDecObj* pObj, int* pOutBufRetCode)
     {
       case CODEC_OK:
         break;
+      case CODEC_PENDING_FLUSH:
+        dobreak = true;
+        break;
       case CODEC_NEED_MORE:
         *pOutBufRetCode |= VPU_DEC_NO_ENOUGH_INBUF;
         break;
@@ -1287,6 +1290,8 @@ VpuDecRetCode VPU_DecOutFrameDisplayed(VpuDecHandle InHandle, VpuFrameBuffer* pI
   buff.bus_data = pInFrameBuf->pbufVirtY;
   buff.bus_address = (OSAL_BUS_WIDTH)pInFrameBuf->pbufY;
 
+  VpuSearchFrameIndex(pObj, (unsigned char *)buff.bus_address);
+
   pObj->codec->pictureconsumed(pObj->codec, &buff);
   pObj->nOutFrameCount --;
 
@@ -1318,6 +1323,7 @@ VpuDecRetCode VPU_DecFlushAll(VpuDecHandle InHandle)
   pObj->nAccumulatedConsumedBytes=0;
   pObj->pLastDecodedFrm=NULL;
   pObj->nOutFrameCount = 0;
+  pObj->eosing = false;
 
   pObj->state=VPU_DEC_STATE_EOS;
 
