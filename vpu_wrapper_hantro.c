@@ -1311,8 +1311,11 @@ VpuDecRetCode VPU_DecFlushAll(VpuDecHandle InHandle)
   pVpuObj=(VpuDecHandleInternal *)InHandle;
   pObj=&pVpuObj->obj;
 
-  pObj->codec->abort(pObj->codec);
-  pObj->codec->abortafter(pObj->codec);
+  if (pObj->codec)
+  {
+    pObj->codec->abort(pObj->codec);
+    pObj->codec->abortafter(pObj->codec);
+  }
 
   pObj->nBsBufLen=0;
   pObj->nBsBufOffset=0;
@@ -1380,7 +1383,8 @@ VpuDecRetCode VPU_DecClose(VpuDecHandle InHandle)
     VPU_LOG("Video decode fps: %0.2f\n", ((double)pObj->total_frames*1000000)/pObj->total_time);
   }
 
-  pObj->codec->destroy(pObj->codec);
+  if (pObj->codec)
+    pObj->codec->destroy(pObj->codec);
 
   if (pObj->pdwl)
     DWLRelease(pObj->pdwl);
@@ -1408,8 +1412,11 @@ VpuDecRetCode VPU_DecReset(VpuDecHandle InHandle)
   pVpuObj=(VpuDecHandleInternal *)InHandle;
   pObj=&pVpuObj->obj;
 
-  pObj->codec->abort(pObj->codec);
-  pObj->codec->abortafter(pObj->codec);
+  if (pObj->codec)
+  {
+    pObj->codec->abort(pObj->codec);
+    pObj->codec->abortafter(pObj->codec);
+  }
 
   return VPU_DEC_RET_SUCCESS;
 }
