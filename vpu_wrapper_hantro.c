@@ -413,7 +413,6 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
       VPU_LOG("open HEVC \r\n");
       break;
     case VPU_V_VP9:
-      g2Conf.bEnableRingBuffer = pObj->ringbuffer = true;
       pObj->codec = HantroHwDecOmx_decoder_create_vp9(pObj->pdwl,
           &g2Conf);
       VPU_LOG("open VP9 \r\n");
