@@ -724,13 +724,16 @@ static VpuDecRetCode VPU_DecProcessInBuf(VpuDecObj* pObj, VpuBufferNode* pInData
     if(pFrm!=pInData->pVirAddr){
       free(pFrm);
     }
-  } else if(pObj->CodecFormat==VPU_V_VC1_AP) {
-    unsigned char aVC1Head[VC1_MAX_FRM_HEADER_SIZE];
-    pHeader=aVC1Head;
-    VC1CreateNalFrameHeader(pHeader,(int*)(&headerLen),(unsigned int*)(pInData->pVirAddr));
-    VpuPutInBuf(pObj, pHeader, headerLen);
-    VpuPutInBuf(pObj, pInData->pVirAddr, pInData->nSize);
   } else {
+    if(pObj->CodecFormat==VPU_V_VC1_AP) {
+      unsigned char aVC1Head[VC1_MAX_FRM_HEADER_SIZE];
+      pHeader=aVC1Head;
+      VC1CreateNalFrameHeader(pHeader,(int*)(&headerLen),(unsigned int*)(pInData->pVirAddr));
+      VpuPutInBuf(pObj, pHeader, headerLen);
+    } else if(pObj->CodecFormat==VPU_V_MJPG) {
+      pObj->nBsBufOffset = 0;
+    }
+
     VpuPutInBuf(pObj, pInData->pVirAddr, pInData->nSize);
   }
 
