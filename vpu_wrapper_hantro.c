@@ -54,7 +54,7 @@ static int nVpuLogLevel=0;		//bit 0: api log; bit 1: raw dump; bit 2: yuv dump
 #define VPU_DUMP_YUVFILE "temp_wrapper.yuv"
 #endif
 
-#define MAX_YUV_FRAME  (1000)
+#define MAX_YUV_FRAME  (20)
 #define DUMP_ALL_DATA		1
 static int g_seek_dump=DUMP_ALL_DATA;	/*0: only dump data after seeking; otherwise: dump all data*/
 
@@ -399,7 +399,7 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
     case VPU_V_VP6:
       pObj->codec = HantroHwDecOmx_decoder_create_vp6(pObj->pdwl,
           &g1Conf);
-      VPU_LOG("open VP8 \r\n");
+      VPU_LOG("open VP6 \r\n");
       break;
     case VPU_V_VP8:
       pObj->codec = HantroHwDecOmx_decoder_create_vp8(pObj->pdwl,
@@ -565,7 +565,48 @@ VpuDecRetCode VPU_DecConfig(VpuDecHandle InHandle, VpuDecConfig InDecConf, void*
 
   return VPU_DEC_RET_SUCCESS;
 }
+static void WrapperFileDumpBitstrem(unsigned char* pBits, unsigned int nSize)
+{
+    int nWriteSize=0;
+    if(nSize==0)
+    {
+        return;
+    }
 
+    FILE * pfile;
+    pfile = fopen(VPU_DUMP_RAWFILE,"ab");
+    if(pfile){
+        fwrite(pBits,1,nSize,pfile);
+        fclose(pfile);
+    }
+	return;
+}
+static void WrapperFileDumpYUV(VpuDecObj* pObj, VpuFrameBuffer *pDisplayBuf)
+{
+    static int cnt=0;
+    int nCScale=1;
+    int nWriteSize=0;
+#define FRAME_ALIGN	 (16)
+#define Alignment(ptr,align)	(((unsigned int)(ptr)+(align)-1)/(align)*(align))
+    int colorformat=0;
+    int nPadStride=0;
+    int nFrameSize = 0;
+    nPadStride = Alignment(pObj->picWidth,FRAME_ALIGN);
+    nFrameSize = nPadStride * pObj->picHeight;
+    if(cnt<MAX_YUV_FRAME)
+    {
+        FILE * pfile;
+        pfile = fopen(VPU_DUMP_YUVFILE,"ab");
+        if(pfile){
+            fwrite(pDisplayBuf->pbufVirtY,1,nFrameSize,pfile);
+            fwrite(pDisplayBuf->pbufVirtCb,1,nFrameSize/4,pfile);
+            fwrite(pDisplayBuf->pbufVirtCr,1,nFrameSize/4,pfile);
+            fclose(pfile);
+        }
+        cnt++;
+    }
+    return;
+}
 static void VpuPutInBuf(VpuDecObj* pObj, unsigned char *pIn, unsigned int len)
 {
   if(pObj->nBsBufOffset+pObj->nBsBufLen+len > VPU_BITS_BUF_SIZE)
@@ -588,6 +629,8 @@ static void VpuPutInBuf(VpuDecObj* pObj, unsigned char *pIn, unsigned int len)
     memcpy(pObj->pBsBufVirtStart+pObj->nBsBufOffset+pObj->nBsBufLen, pIn, len);
   }
   pObj->nBsBufLen += len;
+  if(VPU_DUMP_RAW)
+    WrapperFileDumpBitstrem(pIn,len);
 }
 
 static VpuDecRetCode VPU_DecProcessInBuf(VpuDecObj* pObj, VpuBufferNode* pInData)
@@ -638,10 +681,10 @@ static VpuDecRetCode VPU_DecProcessInBuf(VpuDecObj* pObj, VpuBufferNode* pInData
         return VPU_DEC_RET_SUCCESS;
 
       memcpy(tmp, pInData->pVirAddr+8, 4);
-      if (strncmp(signature, tmp, 4))
+      if (strncmp(signature, (const char *)tmp, 4))
         return VPU_DEC_RET_FAILURE;
       memcpy(tmp, pInData->pVirAddr+12, 4);
-      if (strncmp(format_, tmp, 4))
+      if (strncmp(format_, (const char *)tmp, 4))
         return VPU_DEC_RET_FAILURE;
       memcpy(tmp, pInData->pVirAddr+16, 4);
       pObj->frame_size =
@@ -797,6 +840,8 @@ static VpuDecRetCode VPU_DecGetFrame(VpuDecObj* pObj, int* pOutBufRetCode)
       pObj->total_frames ++;
       //if (pObj->nOutFrameCount > 5)
       //*pOutBufRetCode |= VPU_DEC_NO_ENOUGH_BUF;
+      if(VPU_DUMP_YUV)
+        WrapperFileDumpYUV(pObj,pObj->frameInfo.pDisplayFrameBuf);
       break;
     case CODEC_END_OF_STREAM:
       VPU_ERROR("Got EOS from video decoder.\n");
@@ -1321,7 +1366,7 @@ VpuDecRetCode VPU_DecFlushAll(VpuDecHandle InHandle)
     if (OutBufRetCode & VPU_DEC_OUTPUT_DIS)
     {
       buff.bus_data = pVpuObj->obj.frameInfo.pDisplayFrameBuf->pbufVirtY;
-      buff.bus_address = pVpuObj->obj.frameInfo.pDisplayFrameBuf->pbufY;
+      buff.bus_address = (OSAL_BUS_WIDTH)pVpuObj->obj.frameInfo.pDisplayFrameBuf->pbufY;
       pObj->codec->pictureconsumed(pObj->codec, &buff);
       pObj->nOutFrameCount --;
     }
