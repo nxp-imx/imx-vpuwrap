@@ -78,7 +78,7 @@ static int g_seek_dump=DUMP_ALL_DATA;	/*0: only dump data after seeking; otherwi
    SEPARATOR __DATE__ SEPARATOR __TIME__)
 
 #define VPU_MEM_ALIGN			0x10
-#define VPU_BITS_BUF_SIZE		(3*1024*1024)		//bitstream buffer size : big enough contain two big frames
+#define VPU_BITS_BUF_SIZE		(12*1024*1024)		//bitstream buffer size : big enough contain two big frames
 
 #define VC1_MAX_SEQ_HEADER_SIZE	256		//for clip: WVC1_stress_a0_stress06.wmv, its header length = 176 (>128)
 #define VC1_MAX_FRM_HEADER_SIZE	32
@@ -1304,6 +1304,8 @@ VpuDecRetCode VPU_DecFlushAll(VpuDecHandle InHandle)
 {
   VpuDecHandleInternal * pVpuObj;
   VpuDecObj* pObj;
+  BUFFER buff;
+  int OutBufRetCode;
 
   if(InHandle==NULL) 
   {
@@ -1312,6 +1314,18 @@ VpuDecRetCode VPU_DecFlushAll(VpuDecHandle InHandle)
   }
   pVpuObj=(VpuDecHandleInternal *)InHandle;
   pObj=&pVpuObj->obj;
+
+  do {
+    OutBufRetCode = 0;
+    VPU_DecGetFrame(pObj, &OutBufRetCode);
+    if (OutBufRetCode & VPU_DEC_OUTPUT_DIS)
+    {
+      buff.bus_data = pVpuObj->obj.frameInfo.pDisplayFrameBuf->pbufVirtY;
+      buff.bus_address = pVpuObj->obj.frameInfo.pDisplayFrameBuf->pbufY;
+      pObj->codec->pictureconsumed(pObj->codec, &buff);
+      pObj->nOutFrameCount --;
+    }
+  } while(OutBufRetCode & VPU_DEC_OUTPUT_DIS);
 
   if (pObj->codec)
   {
