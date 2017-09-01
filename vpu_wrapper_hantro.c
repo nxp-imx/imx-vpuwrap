@@ -87,6 +87,7 @@ static int g_seek_dump=DUMP_ALL_DATA;	/*0: only dump data after seeking; otherwi
 #define VP8_FRM_HEADER_SIZE	12
 #define DIV3_SEQ_HEADER_SIZE	32
 #define DIV3_FRM_HEADER_SIZE	12
+#define VC1_IS_NOT_NAL(id)		(( id & 0x00FFFFFF) != 0x00010000)
 
 #define VPU_MAX_FRAME_INDEX	30
 
@@ -267,8 +268,8 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
   VpuMemSubBlockInfo * pMemPhy;
   VpuMemSubBlockInfo * pMemVirt;
   VpuDecHandleInternal* pVpuObj;
-  OMX_VIDEO_PARAM_G2CONFIGTYPE g2Conf;
-  OMX_VIDEO_PARAM_G1CONFIGTYPE g1Conf;
+  OMX_VIDEO_PARAM_G2CONFIGTYPE g2Conf = {0};
+  OMX_VIDEO_PARAM_G1CONFIGTYPE g1Conf = {0};
   bool bDeblock = true;
   bool bIsMvcStream = false;
   VpuDecObj* pObj;
@@ -732,6 +733,8 @@ static VpuDecRetCode VPU_DecProcessInBuf(VpuDecObj* pObj, VpuBufferNode* pInData
         VC1CreateNALSeqHeader(pHeader, (int*)(&headerLen),pInData->sCodecData.pData,
             (int)pInData->sCodecData.nSize, (unsigned int*)pInData->pVirAddr,
             VC1_MAX_SEQ_HEADER_SIZE);
+        if(VC1_IS_NOT_NAL(((unsigned int*)pInData->pVirAddr)[0]))
+          headerLen -= 4;
       }
       else if(pObj->CodecFormat==VPU_V_VC1)
       {
@@ -910,6 +913,15 @@ static VpuDecRetCode VPU_DecDecode(VpuDecObj* pObj, int* pOutBufRetCode)
     unsigned int bytes = 0;
     FRAME frm;
     memset(&frm, 0, sizeof(FRAME));
+#if 0
+    printf ("\n");
+    {
+      char *tmp = stream.bus_data;
+      for (int i=0; i<100; i++)
+        printf ("%02x", tmp[i]);
+    }
+    printf ("\n");
+#endif
 
     VPU_LOG("decoder input stream length: %d\n", stream.streamlen);
     long long start_time = monotonic_time();
@@ -933,7 +945,6 @@ static VpuDecRetCode VPU_DecDecode(VpuDecObj* pObj, int* pOutBufRetCode)
         dobreak = true;
         break;
       case CODEC_NEED_MORE:
-        *pOutBufRetCode |= VPU_DEC_NO_ENOUGH_INBUF;
         break;
       case CODEC_BUFFER_EMPTY:
         break;
@@ -1001,7 +1012,7 @@ static VpuDecRetCode RvParseHeader(VpuDecObj* pObj, VpuBufferNode* pInData)
 {
   u32 tmp, length;
   u8 *buff;
-  OMX_VIDEO_PARAM_G1CONFIGTYPE g1Conf;
+  OMX_VIDEO_PARAM_G1CONFIGTYPE g1Conf = {0};
   unsigned int imageSize;
   bool bIsRV8;
   int i, nPicWidth, nPicHeight;
