@@ -202,8 +202,40 @@ typedef struct
   VpuDecObj obj;
 }VpuDecHandleInternal;
 
+int VpuLogLevelParse(int * pLogLevel)
+{
+  int level=0;
+  FILE* fpVpuLog;
+  fpVpuLog=fopen(VPU_LOG_LEVELFILE,"r");
+  if (NULL==fpVpuLog){
+    //LOG_PRINTF("no vpu log level file: %s \r\n",VPU_LOG_LEVELFILE);
+  }
+  else	{
+    char symbol;
+    int readLen = 0;
+
+    readLen = fread(&symbol,1,1,fpVpuLog);
+    if(feof(fpVpuLog) != 0){
+      //LOG_PRINTF("\n End of file reached.");
+    }
+    else	{
+      level=atoi(&symbol);
+      //LOG_PRINTF("vpu log level: %d \r\n",level);
+      if((level<0) || (level>255)){
+        level=0;
+      }
+    }
+    fclose(fpVpuLog);
+  }
+  nVpuLogLevel=level;
+  //*pLogLevel=level;
+  return 1;
+}
+
 VpuDecRetCode VPU_DecLoad()
 {
+  VpuLogLevelParse(NULL);
+
   return VPU_DEC_RET_SUCCESS;
 }
 
@@ -836,6 +868,7 @@ static VpuDecRetCode VPU_DecGetFrame(VpuDecObj* pObj, int* pOutBufRetCode)
       pObj->frameInfo.pExtInfo->FrmCropRect.nRight=frm.outBufPrivate.nFrameWidth;
       pObj->frameInfo.pExtInfo->FrmCropRect.nBottom=frm.outBufPrivate.nFrameHeight;
       //pObj->frameInfo.pExtInfo->nQ16ShiftWidthDivHeightRatio=pSrcInfo->Q16ShiftWidthDivHeightRatio;
+      VPU_LOG("crop: %d %d\n", frm.outBufPrivate.nFrameWidth, frm.outBufPrivate.nFrameHeight);
 
       *pOutBufRetCode |= VPU_DEC_OUTPUT_DIS;
       pObj->state=VPU_DEC_STATE_OUTOK;
@@ -1215,6 +1248,9 @@ VpuDecRetCode VPU_DecGetInitialInfo(VpuDecHandle InHandle, VpuDecInitInfo * pOut
   pObj->nFrameSize = info.framesize;
   pOutInitInfo->nFrameSize = info.framesize;
   VPU_LOG("%s: min frame count: %d \r\n",__FUNCTION__, pOutInitInfo->nMinFrameBufferCount);
+  VPU_LOG("%s: buffer resolution: %dx%d image: %dx%d crop: %d %d %d %d \r\n",
+      __FUNCTION__, info.stride, info.sliceheight, info.width, info.height,
+      info.crop_left, info.crop_top, info.crop_width, info.crop_height);
   VPU_ERROR("%s: frame size: %d\n",__FUNCTION__, info.framesize);
   //update state
   pVpuObj->obj.state=VPU_DEC_STATE_REGFRMOK;
