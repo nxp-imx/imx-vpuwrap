@@ -29,7 +29,7 @@ extern "C" {
 /**************************** version info ***********************************/
 #define VPU_WRAPPER_VERSION(major, minor, release)	 \
 	(((major) << 16) + ((minor) << 8) + (release))
-#define VPU_WRAPPER_VERSION_CODE	VPU_WRAPPER_VERSION(2, 0, 0)
+#define VPU_WRAPPER_VERSION_CODE	VPU_WRAPPER_VERSION(2, 1, 0)
 
 /**************************** decoder part **********************************/
 
