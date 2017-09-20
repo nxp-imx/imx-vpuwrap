@@ -245,7 +245,7 @@ typedef struct {
 	int nEnableVideoCompressor;
 	int nPixelFormat; /*output 10 bit or cut to 8 bit for Hantro G2. 0 for output 10 bit, 1 for cut to 8 bit */
 
-	int nReserved[1];			/*reserved for future extension*/
+	int nAdaptiveMode;
 	void* pAppCxt;			/*reserved for future application extension*/
 } VpuDecOpenParam;
 

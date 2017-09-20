@@ -357,6 +357,14 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
   g2Conf.bEnableRingBuffer = pObj->ringbuffer = false;
   g1Conf.bEnableTiled = false;
   g1Conf.bAllowFieldDBP = false;
+  
+  if(pInParam->nAdaptiveMode == 1){
+    g1Conf.bEnableAdaptiveBuffers = true;
+    g1Conf.nGuardSize = 0;
+    g2Conf.bEnableAdaptiveBuffers = true;
+    g2Conf.nGuardSize = 0;
+    VPU_LOG("VPU_DecOpen enable nAdaptiveMode");
+  }
 
   VPU_LOG("format: %d \r\n",pInParam->CodecFormat);
   switch (pInParam->CodecFormat) {
