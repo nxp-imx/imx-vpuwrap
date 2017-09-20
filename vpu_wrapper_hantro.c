@@ -300,8 +300,8 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
   VpuMemSubBlockInfo * pMemPhy;
   VpuMemSubBlockInfo * pMemVirt;
   VpuDecHandleInternal* pVpuObj;
-  OMX_VIDEO_PARAM_G2CONFIGTYPE g2Conf = {0};
-  OMX_VIDEO_PARAM_G1CONFIGTYPE g1Conf = {0};
+  OMX_VIDEO_PARAM_G2CONFIGTYPE g2Conf;
+  OMX_VIDEO_PARAM_G1CONFIGTYPE g1Conf;
   bool bDeblock = true;
   bool bIsMvcStream = false;
   VpuDecObj* pObj;
@@ -343,7 +343,8 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
     VPU_ERROR("%s: DWLInit failed !! \r\n",__FUNCTION__);
     return VPU_DEC_RET_FAILURE;
   }
-
+  memset(&g2Conf, 0, sizeof(OMX_VIDEO_PARAM_G2CONFIGTYPE));
+  memset(&g1Conf, 0, sizeof(OMX_VIDEO_PARAM_G1CONFIGTYPE));
   g2Conf.bEnableTiled = false;
   if (pInParam->nTiled2LinearEnable)
     g2Conf.bEnableTiled = true;
@@ -1045,7 +1046,7 @@ static VpuDecRetCode RvParseHeader(VpuDecObj* pObj, VpuBufferNode* pInData)
 {
   u32 tmp, length;
   u8 *buff;
-  OMX_VIDEO_PARAM_G1CONFIGTYPE g1Conf = {0};
+  OMX_VIDEO_PARAM_G1CONFIGTYPE g1Conf;
   unsigned int imageSize;
   bool bIsRV8;
   int i, nPicWidth, nPicHeight;
@@ -1088,7 +1089,7 @@ static VpuDecRetCode RvParseHeader(VpuDecObj* pObj, VpuBufferNode* pInData)
         frame_sizes[2*j + 1] = (*p++) << 2;
       }
     }
-
+    memset(&g1Conf, 0, sizeof(OMX_VIDEO_PARAM_G1CONFIGTYPE));
     g1Conf.bEnableTiled = false;
     g1Conf.bAllowFieldDBP = false;
     pObj->codec =
