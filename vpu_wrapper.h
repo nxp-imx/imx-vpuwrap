@@ -247,6 +247,7 @@ typedef struct {
 
 	int nAdaptiveMode;
 	void* pAppCxt;			/*reserved for future application extension*/
+    int nSecureMode;
 } VpuDecOpenParam;
 
 
@@ -422,13 +423,19 @@ typedef struct
 	void* pPrivate;				/*reserved for future special extension*/
 }VpuBufferNode;
 
+typedef enum{
+    VPU_MEM_DESC_NORMAL = 0,
+    VPU_MEM_DESC_SECURE = 1,
+}VpuMemDescType;
+
 typedef struct 
 {
 	int nSize;				/*!requested memory size */
 	unsigned long nPhyAddr;	/*!physical memory address allocated */
 	unsigned long nCpuAddr;	/*!cpu addr for system free usage */
 	unsigned long nVirtAddr;	/*!virtual user space address */	
-	int nReserved[4];			/*reserved for future extension*/
+    VpuMemDescType nType;
+	int nReserved[3];			/*reserved for future extension*/
 }VpuMemDesc;
 
 typedef struct {

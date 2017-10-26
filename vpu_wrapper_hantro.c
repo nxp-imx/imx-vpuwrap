@@ -195,6 +195,8 @@ typedef struct
   int slice_info_num;
   RvDecSliceInfo slice_info[128];
   int frame_size;
+  bool bSecureMode;
+  bool bConsumeInputLater;
 }VpuDecObj;
 
 typedef struct 
@@ -365,6 +367,11 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
     g2Conf.nGuardSize = 0;
     VPU_LOG("VPU_DecOpen enable nAdaptiveMode");
   }
+  if(pInParam->nSecureMode == 1){
+    g1Conf.bEnableSecureMode = true;
+    g2Conf.bEnableSecureMode = true;
+    pObj->bSecureMode = true;
+  }
 
   VPU_LOG("format: %d \r\n",pInParam->CodecFormat);
   switch (pInParam->CodecFormat) {
@@ -449,7 +456,9 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
       VPU_LOG("open VP8 \r\n");
       break;
     case VPU_V_HEVC:
-      g2Conf.bEnableRingBuffer = pObj->ringbuffer = true;
+      if(!pObj->bSecureMode){
+        g2Conf.bEnableRingBuffer = pObj->ringbuffer = true;
+      }
       pObj->codec = HantroHwDecOmx_decoder_create_hevc(pObj->pdwl,
           &g2Conf);
       VPU_LOG("open HEVC \r\n");
@@ -651,6 +660,16 @@ static void WrapperFileDumpYUV(VpuDecObj* pObj, VpuFrameBuffer *pDisplayBuf)
 }
 static void VpuPutInBuf(VpuDecObj* pObj, unsigned char *pIn, unsigned int len)
 {
+  //do not use ring buffer in secure mode
+  if(pObj->bSecureMode){
+    pObj->pBsBufVirtStart = pIn;
+    pObj->nBsBufLen = len;
+    VPU_LOG("VpuPutInBuf size=%d",len);
+    if(VPU_DUMP_RAW)
+        WrapperFileDumpBitstrem(pIn,len);
+    return;
+  }
+
   if(pObj->nBsBufOffset+pObj->nBsBufLen+len > VPU_BITS_BUF_SIZE)
   {
     if(pObj->ringbuffer)
@@ -860,6 +879,8 @@ static VpuDecRetCode VPU_DecGetFrame(VpuDecObj* pObj, int* pOutBufRetCode)
 
   if (pObj->codec)
     state = pObj->codec->getframe(pObj->codec, &frm, pObj->eosing);
+
+  VPU_LOG("VPU_DecGetFrame state=%d",state);
   switch (state)
   {
     case CODEC_HAS_FRAME:
@@ -883,6 +904,7 @@ static VpuDecRetCode VPU_DecGetFrame(VpuDecObj* pObj, int* pOutBufRetCode)
       pObj->state=VPU_DEC_STATE_OUTOK;
       pObj->nOutFrameCount ++;
       pObj->total_frames ++;
+      VPU_LOG("nOutFrameCount=%d",pObj->nOutFrameCount);
       //if (pObj->nOutFrameCount > 5)
       //*pOutBufRetCode |= VPU_DEC_NO_ENOUGH_BUF;
       if(VPU_DUMP_YUV)
@@ -965,6 +987,7 @@ static VpuDecRetCode VPU_DecDecode(VpuDecObj* pObj, int* pOutBufRetCode)
     printf ("\n");
 #endif
 
+    VPU_LOG("stream.pBsBufPhyStart = %p,offset=%d",(char*)pObj->pBsBufPhyStart,pObj->nBsBufOffset);
     VPU_LOG("decoder input stream length: %d\n", stream.streamlen);
     long long start_time = monotonic_time();
     CODEC_STATE codec =
@@ -1151,7 +1174,7 @@ VpuDecRetCode VPU_DecDecodeBuf(VpuDecHandle InHandle, VpuBufferNode* pInData,
 {
   VpuDecHandleInternal * pVpuObj;
   VpuDecObj* pObj;
-
+  VpuDecRetCode ret = VPU_DEC_RET_SUCCESS;
   if(InHandle==NULL)
   {
     VPU_ERROR("%s: failure: handle is null\n",__FUNCTION__);
@@ -1187,6 +1210,10 @@ VpuDecRetCode VPU_DecDecodeBuf(VpuDecHandle InHandle, VpuBufferNode* pInData,
     }
     printf ("\n");
 #endif
+
+    if(pObj->bSecureMode)
+        pObj->nBsBufOffset = 0;
+
     if(pObj->CodecFormat==VPU_V_RV)
       RvParseHeader(pObj, pInData);
     VPU_DecProcessInBuf(pObj, pInData);
@@ -1197,9 +1224,33 @@ VpuDecRetCode VPU_DecDecodeBuf(VpuDecHandle InHandle, VpuBufferNode* pInData,
       *pOutBufRetCode |= VPU_DEC_NO_ENOUGH_INBUF;
       return VPU_DEC_RET_SUCCESS;
     }
+
+    if(pInData->pPhyAddr != NULL){
+     pObj->pBsBufPhyStart = pInData->pPhyAddr;
+    }
   }
 
-  return VPU_DecDecode(pObj, pOutBufRetCode);
+  if(pObj->bConsumeInputLater && pObj->bSecureMode){
+    *pOutBufRetCode |= VPU_DEC_INPUT_USED;
+    pObj->bConsumeInputLater = false;
+    VPU_ERROR("VPU_DecDecodeBuf bConsume VPU_DEC_INPUT_USED");
+  }
+
+  ret = VPU_DecDecode(pObj, pOutBufRetCode);
+
+  if(!pObj->bSecureMode)
+    return ret;
+
+  if(*pOutBufRetCode & VPU_DEC_INIT_OK){
+    *pOutBufRetCode &= ~VPU_DEC_INPUT_USED;
+    pObj->bConsumeInputLater = true;
+    VPU_ERROR("VPU_DecDecodeBuf VPU_DEC_INIT_OK not used");
+  }else if(*pOutBufRetCode & VPU_DEC_NO_ENOUGH_BUF){
+    *pOutBufRetCode &= ~VPU_DEC_INPUT_USED;
+    pObj->bConsumeInputLater = true;
+  }
+
+  return ret;
 }
 
 VpuDecRetCode VPU_DecGetInitialInfo(VpuDecHandle InHandle, VpuDecInitInfo * pOutInitInfo)
@@ -1272,6 +1323,7 @@ VpuDecRetCode VPU_DecRegisterFrameBuffer(VpuDecHandle InHandle,VpuFrameBuffer *p
   VpuDecHandleInternal * pVpuObj;
   VpuDecObj* pObj;
   int i;
+  int targetNum;
 
   if(InHandle==NULL) 
   {
@@ -1280,20 +1332,24 @@ VpuDecRetCode VPU_DecRegisterFrameBuffer(VpuDecHandle InHandle,VpuFrameBuffer *p
   }
   pVpuObj=(VpuDecHandleInternal *)InHandle;
   pObj=&pVpuObj->obj;
+  targetNum = pVpuObj->obj.frameNum;
 
-  if(pVpuObj->obj.state!=VPU_DEC_STATE_REGFRMOK)
-  {
-    VPU_ERROR("%s: failure: error state %d \r\n",__FUNCTION__,pVpuObj->obj.state);
-    return VPU_DEC_RET_WRONG_CALL_SEQUENCE;
+  //nNum should be only 1 or nMinFrameBufferCount after resolution changed.
+  //we has no interface to reset the frameNum to 0 when resolution changed.
+  //so reset it when number count is larger than 1
+  if(nNum > 1){
+    pVpuObj->obj.frameNum = 0;
+    targetNum = 0;
+    VPU_LOG("reset buffer cnt to 0");
   }
 
-  if(nNum>VPU_MAX_FRAME_INDEX)
+  if(targetNum + nNum >VPU_MAX_FRAME_INDEX)
   {
     VPU_ERROR("%s: failure: register frame number is too big(%d) \r\n",__FUNCTION__,nNum);
     return VPU_DEC_RET_INVALID_PARAM;
   }
 
-  for(i=0;i<nNum;i++)
+  for(i=targetNum;i<targetNum + nNum;i++)
   {
     BUFFER buffer;
     CODEC_STATE ret = CODEC_ERROR_UNSPECIFIED;
@@ -1313,7 +1369,7 @@ VpuDecRetCode VPU_DecRegisterFrameBuffer(VpuDecHandle InHandle,VpuFrameBuffer *p
       return VPU_DEC_RET_INVALID_PARAM;
     }
   }
-  pVpuObj->obj.frameNum=nNum;
+  pVpuObj->obj.frameNum += nNum;
 
   //update state
   pVpuObj->obj.state=VPU_DEC_STATE_DEC;
@@ -1397,7 +1453,7 @@ VpuDecRetCode VPU_DecOutFrameDisplayed(VpuDecHandle InHandle, VpuFrameBuffer* pI
 
   pObj->codec->pictureconsumed(pObj->codec, &buff);
   pObj->nOutFrameCount --;
-
+  VPU_LOG("VPU_DecOutFrameDisplayed nOutFrameCount=%d",pObj->nOutFrameCount);
   return VPU_DEC_RET_SUCCESS;
 }
 
@@ -1565,6 +1621,11 @@ VpuDecRetCode VPU_DecGetMem(VpuMemDesc* pInOutMem)
     return VPU_DEC_RET_FAILURE;
   }
 
+  if(pInOutMem->nType == VPU_MEM_DESC_NORMAL)
+    info.mem_type = DWL_MEM_TYPE_CPU;
+  else if(pInOutMem->nType == VPU_MEM_DESC_SECURE)
+    info.mem_type = DWL_MEM_TYPE_SLICE;
+
   int ret = DWLMallocLinear(pdwl, pInOutMem->nSize, &info);
   if (ret < 0)
   {
@@ -1592,6 +1653,10 @@ VpuDecRetCode VPU_DecFreeMem(VpuMemDesc* pInMem)
   info.virtual_address = (u32*)pInMem->nVirtAddr;
   info.bus_address = pInMem->nPhyAddr;
   info.ion_fd = pInMem->nCpuAddr;
+  if(pInMem->nType == VPU_MEM_DESC_NORMAL)
+    info.mem_type = DWL_MEM_TYPE_CPU;
+  else if(pInMem->nType == VPU_MEM_DESC_SECURE)
+    info.mem_type = DWL_MEM_TYPE_SLICE;
 
   dwlInit.client_type = DWL_CLIENT_TYPE_HEVC_DEC;
   pdwl = (void*)DWLInit(&dwlInit);
@@ -1600,7 +1665,7 @@ VpuDecRetCode VPU_DecFreeMem(VpuMemDesc* pInMem)
     VPU_ERROR("%s: DWLInit failed !! \r\n",__FUNCTION__);
     return VPU_DEC_RET_FAILURE;
   }
-
+  VPU_LOG("VPU_DecFreeMem fd=%d",info.ion_fd);
   DWLFreeLinear(pdwl, &info);
 
   if (pdwl)
