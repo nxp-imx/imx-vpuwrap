@@ -40,9 +40,16 @@ if test "x$HAVE_HANTRO_LIB" = "xyes"; then
 fi
 AM_CONDITIONAL(USE_HANTRO_LIB, test "x$HAVE_HANTRO_LIB" = "xyes")
 
+AC_CHECK_HEADERS([malone/hevc_defines.h], [HAVE_AMPHION_LIB=yes], [HAVE_AMPHION_LIB=no])
+if test "x$HAVE_AMPHION_LIB" = "xyes"; then
+    IMX_AMPHION_LIB="-lvpu-malone"
+fi
+AM_CONDITIONAL(USE_AMPHION_LIB, test "x$HAVE_AMPHION_LIB" = "xyes")
+
 AC_SUBST(LIBTOOL_VERSION_INFO)
 AC_SUBST(IMX_VPU_LIB)
 AC_SUBST(IMX_HANTRO_LIB)
+AC_SUBST(IMX_AMPHION_LIB)
 
 AC_OUTPUT([
 Makefile

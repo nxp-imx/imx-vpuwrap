@@ -17,6 +17,7 @@
  *	2011-12-22		eagle zhou		1.0				refine api
  *	2012-01-**		eagle zhou		1.0.*			add new features: including tile format,etc
  *	2016-12-30	  Song Bing			2.0.0			Add Hantro video decoder support
+ *	2017-11-20	  Song Bing			3.0.0			Add Amphion video decoder support
  */
 
 #ifndef VPU_WRAPPER_H
@@ -29,7 +30,7 @@ extern "C" {
 /**************************** version info ***********************************/
 #define VPU_WRAPPER_VERSION(major, minor, release)	 \
 	(((major) << 16) + ((minor) << 8) + (release))
-#define VPU_WRAPPER_VERSION_CODE	VPU_WRAPPER_VERSION(2, 1, 0)
+#define VPU_WRAPPER_VERSION_CODE	VPU_WRAPPER_VERSION(3, 0, 0)
 
 /**************************** decoder part **********************************/
 
