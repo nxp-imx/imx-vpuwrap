@@ -294,6 +294,27 @@ typedef struct {
 //	VpuDecAvcSliceBufInfo avcSliceBufInfo;
 //} VpuDecBufInfo;
 
+typedef struct VpuHDR10Meta {
+        unsigned int redPrimary[2];
+        unsigned int greenPrimary[2];
+        unsigned int bluePrimary[2];
+        unsigned int whitePoint[2];
+        unsigned int maxMasteringLuminance;
+        unsigned int minMasteringLuminance;
+        unsigned int maxContentLightLevel;
+        unsigned int maxFrameAverageLightLevel;
+} VpuHDR10Meta;
+
+typedef struct VpuColourDesc {
+  unsigned int colourPrimaries;
+  unsigned int transferCharacteristics;
+  unsigned int matrixCoeffs;
+} VpuColourDesc;
+
+typedef struct VpuChromaLocInfo {
+  unsigned int chromaSampleLocTypeTopField;
+  unsigned int chromaSampleLocTypeBottomField;
+} VpuChromaLocInfo;
 
 typedef struct {
 	int nPicWidth;		// {(PicX+15)/16} * 16
@@ -332,6 +353,11 @@ typedef struct {
 
 	int nReserved[3];			/*reserved for future extension*/
 	void* pSpecialInfo;		/*reserved for future special extension*/
+
+        int hasHdr10Meta;
+        VpuHDR10Meta Hdr10Meta; /* HDR10 meta data */
+        VpuColourDesc ColourDesc;
+        VpuChromaLocInfo ChromaLocInfo;
 } VpuDecInitInfo;
 
 /*

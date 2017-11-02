@@ -1305,6 +1305,40 @@ VpuDecRetCode VPU_DecGetInitialInfo(VpuDecHandle InHandle, VpuDecInitInfo * pOut
     pOutInitInfo->PicCropRect.nBottom = info.height;
   }
 
+  if (info.hdr10_available)
+  {
+    pOutInitInfo->hasHdr10Meta = true;
+    pOutInitInfo->Hdr10Meta.redPrimary[0] = info.hdr10_metadata.redPrimary[0];
+    pOutInitInfo->Hdr10Meta.redPrimary[1] = info.hdr10_metadata.redPrimary[1];
+    pOutInitInfo->Hdr10Meta.greenPrimary[0] = info.hdr10_metadata.greenPrimary[0];
+    pOutInitInfo->Hdr10Meta.greenPrimary[1] = info.hdr10_metadata.greenPrimary[1];
+    pOutInitInfo->Hdr10Meta.bluePrimary[0] = info.hdr10_metadata.bluePrimary[0];
+    pOutInitInfo->Hdr10Meta.bluePrimary[1] = info.hdr10_metadata.bluePrimary[1];
+    pOutInitInfo->Hdr10Meta.whitePoint[0] = info.hdr10_metadata.whitePoint[0];
+    pOutInitInfo->Hdr10Meta.whitePoint[1] = info.hdr10_metadata.whitePoint[1];
+    pOutInitInfo->Hdr10Meta.maxMasteringLuminance = info.hdr10_metadata.maxMasteringLuminance;
+    pOutInitInfo->Hdr10Meta.minMasteringLuminance = info.hdr10_metadata.minMasteringLuminance;
+    pOutInitInfo->Hdr10Meta.maxContentLightLevel = info.hdr10_metadata.maxContentLightLevel;
+    pOutInitInfo->Hdr10Meta.maxFrameAverageLightLevel = info.hdr10_metadata.maxFrameAverageLightLevel;
+  }
+  else
+  {
+    pOutInitInfo->hasHdr10Meta = false;
+  }
+
+  if (info.colour_desc_available)
+  {
+    pOutInitInfo->ColourDesc.colourPrimaries = info.colour_primaries;
+    pOutInitInfo->ColourDesc.transferCharacteristics = info.transfer_characteristics;
+    pOutInitInfo->ColourDesc.matrixCoeffs = info.matrix_coeffs;
+  }
+
+  if (info.chroma_loc_info_available)
+  {
+    pOutInitInfo->ChromaLocInfo.chromaSampleLocTypeTopField = info.chroma_sample_loc_type_top_field;
+    pOutInitInfo->ChromaLocInfo.chromaSampleLocTypeBottomField = info.chroma_sample_loc_type_bottom_field;
+  }
+
   pObj->nFrameSize = info.framesize;
   pOutInitInfo->nFrameSize = info.framesize;
   VPU_LOG("%s: min frame count: %d \r\n",__FUNCTION__, pOutInitInfo->nMinFrameBufferCount);
