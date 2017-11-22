@@ -480,41 +480,43 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
       pObj->format = MEDIA_IP_FMT_AVC;
       break;
     case VPU_V_MPEG2: 	 /**< AKA: H.262 */
+      pObj->format = MEDIA_IP_FMT_MP2;
       break;
     case VPU_V_H263:		 /**< H.263 */
+    case VPU_V_SORENSON: 	 /**< Sorenson */
+      pObj->format = MEDIA_IP_FMT_SPK;
       break;
     case VPU_V_MPEG4: 	 /**< MPEG-4 */
-      break;
-    case VPU_V_SORENSON: 	 /**< Sorenson */
-      break;
     case VPU_V_DIVX4:		/**< DIVX 4 */
     case VPU_V_DIVX56:		/**< DIVX 5/6 */
-      break;
     case VPU_V_XVID:		/**< XVID */
-      break;
     case VPU_V_DIVX3:		/**< DIVX 3 */
+      pObj->format = MEDIA_IP_FMT_ASP;
       break;
     case VPU_V_RV:		
+      pObj->format = MEDIA_IP_FMT_RV;
       break;
     case VPU_V_VC1:		 /**< all versions of Windows Media Video */
     case VPU_V_VC1_AP:
+      pObj->format = MEDIA_IP_FMT_VC1;
       break;
     case VPU_V_AVC_MVC:
+      pObj->format = MEDIA_IP_FMT_MVC;
       break;
     case VPU_V_MJPG:
-      break;
-    case VPU_V_WEBP:
+      pObj->format = MEDIA_IP_FMT_JPG;
       break;
     case VPU_V_AVS:
+      pObj->format = MEDIA_IP_FMT_AVS;
       break;
     case VPU_V_VP6:
+      pObj->format = MEDIA_IP_FMT_VP6;
       break;
     case VPU_V_VP8:
+      pObj->format = MEDIA_IP_FMT_VP8;
       break;
     case VPU_V_HEVC:
       pObj->format = MEDIA_IP_FMT_HEVC;
-      break;
-    case VPU_V_VP9:
       break;
     default:
       VPU_ERROR("%s: failure: invalid format !!! \r\n",__FUNCTION__);
@@ -1102,7 +1104,8 @@ static VpuDecRetCode TestVPU_Event_Thread(VpuDecObj* pObj, VpuBufferNode* pInDat
             break;
 
           pObj->state=VPU_DEC_STATE_DEC;
-          //*pOutBufRetCode |= VPU_DEC_NO_ENOUGH_BUF;
+          *pOutBufRetCode |= VPU_DEC_NO_ENOUGH_BUF;
+          VPU_LOG("output status: %d\n", *pOutBufRetCode);
           return VPU_DEC_RET_SUCCESS;
         }
       case VPU_EventPictureDecoded:
@@ -1162,15 +1165,18 @@ static VpuDecRetCode TestVPU_Event_Thread(VpuDecObj* pObj, VpuBufferNode* pInDat
           *pOutBufRetCode |= VPU_DEC_ONE_FRM_CONSUMED;
           pObj->state=VPU_DEC_STATE_OUTOK;
           pObj->nInFrameCount --;
+          VPU_LOG("output buffer, buffer in vpu: %d\n", pObj->nInFrameCount);
 
           if(VPU_DUMP_YUV)
             WrapperFileDumpYUV(pObj,pObj->frameInfo.pDisplayFrameBuf);
 
+          VPU_LOG("output status: %d\n", *pOutBufRetCode);
           return VPU_DEC_RET_SUCCESS;
         }
       case VPU_EventEndofStreamScodeFound:
         VPU_LOG("Got EOS from video decoder.\n");
         *pOutBufRetCode |= VPU_DEC_OUTPUT_EOS;
+        VPU_LOG("output status: %d\n", *pOutBufRetCode);
         return VPU_DEC_RET_SUCCESS;
       default:
         break;
@@ -1190,6 +1196,7 @@ VpuDecRetCode VPU_DecDecodeBuf(VpuDecHandle InHandle, VpuBufferNode* pInData,
     return VPU_DEC_RET_INVALID_HANDLE;
   }
 
+  VPU_LOG("input length: %d\n", pInData->nSize);
   pVpuObj=(VpuDecHandleInternal *)InHandle;
   pObj=&pVpuObj->obj;
 
@@ -1218,17 +1225,21 @@ VpuDecRetCode VPU_DecDecodeBuf(VpuDecHandle InHandle, VpuBufferNode* pInData,
     *pOutBufRetCode |= VPU_DEC_INPUT_USED;
     *pOutBufRetCode |= VPU_DEC_NO_ENOUGH_INBUF;
     pObj->nInputCnt ++;
+    VPU_LOG("output status: %d\n", *pOutBufRetCode);
     return VPU_DEC_RET_SUCCESS;
   }
 #endif
+#if 0
   if(pObj->state>=VPU_DEC_STATE_DEC)
   {
     if(pObj->nInFrameCount < pObj->nMinFrameBufferCount)
     {
       *pOutBufRetCode |= VPU_DEC_NO_ENOUGH_BUF;
+      VPU_LOG("output status: %d\n", *pOutBufRetCode);
       return VPU_DEC_RET_SUCCESS;
     }
   }
+#endif
 
   return TestVPU_Event_Thread(pObj, pInData, pOutBufRetCode);
 }
@@ -1362,11 +1373,9 @@ VpuDecRetCode VPU_DecOutFrameDisplayed(VpuDecHandle InHandle, VpuFrameBuffer* pI
 
   sVPUFsParams.ulFsId            = index;
   sVPUFsParams.ulFsLumaBase[0]   = pInFrameBuf->pbufY;
-  //FIXME: for interlace
-  sVPUFsParams.ulFsLumaBase[1]   = pInFrameBuf->pbufY;
+  sVPUFsParams.ulFsLumaBase[1]   = pInFrameBuf->pbufY + pInFrameBuf->nStrideY * pObj->picHeight / 2;
   sVPUFsParams.ulFsChromaBase[0] = pInFrameBuf->pbufCb;
-  //FIXME: for interlace
-  sVPUFsParams.ulFsChromaBase[1] = pInFrameBuf->pbufCb;
+  sVPUFsParams.ulFsChromaBase[1] = pInFrameBuf->pbufCb + pInFrameBuf->nStrideY * pObj->picHeight / 4;
   sVPUFsParams.ulFsStride        = pInFrameBuf->nStrideY;
   sVPUFsParams.ulFsType          = VPU_FS_FRAME_REQ;                                                                 
 
@@ -1385,8 +1394,8 @@ VpuDecRetCode VPU_DecOutFrameDisplayed(VpuDecHandle InHandle, VpuFrameBuffer* pI
     VPU_Frame_Alloc ( pObj->uStrIdx, &sVPUFsParams );
   }
 
-  VPU_LOG("Feed frame buffer, id: %d\n", index);
   pObj->nInFrameCount ++;
+  VPU_LOG("Feed frame buffer, id: %d buffer in vpu: %d\n", index, pObj->nInFrameCount);
 
   return VPU_DEC_RET_SUCCESS;
 }
