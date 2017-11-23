@@ -203,5 +203,5 @@ $(LIBNAME).a: $(OBJ)
 
 .PHONY: clean
 clean:
-	rm -f $(LIBNAME).* $(OBJ)
+	rm -f $(LIBNAME).so* $(LIBNAME).a $(OBJ)
 

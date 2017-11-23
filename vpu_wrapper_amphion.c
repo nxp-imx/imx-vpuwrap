@@ -1223,7 +1223,8 @@ VpuDecRetCode VPU_DecDecodeBuf(VpuDecHandle InHandle, VpuBufferNode* pInData,
   {
     VPU_DecProcessInBuf(pObj, pInData);
     *pOutBufRetCode |= VPU_DEC_INPUT_USED;
-    *pOutBufRetCode |= VPU_DEC_NO_ENOUGH_INBUF;
+    if(pObj->eosing == false)
+      *pOutBufRetCode |= VPU_DEC_NO_ENOUGH_INBUF;
     pObj->nInputCnt ++;
     VPU_LOG("output status: %d\n", *pOutBufRetCode);
     return VPU_DEC_RET_SUCCESS;
@@ -1416,12 +1417,13 @@ VpuDecRetCode VPU_DecFlushAll(VpuDecHandle InHandle)
   VPU_LOG("%s: flush \r\n",__FUNCTION__);
 
   VPU_Flush(pObj->uStrIdx, TRUE);     
+  VPU_LOG("%s: flush done \r\n",__FUNCTION__);
 
   pObj->nBsBufLen=0;
-  pObj->nInputCnt=0;
   pObj->nBsBufOffset=0;
   //pObj->nPrivateSeqHeaderInserted=0;
 
+  pObj->nInputCnt=0;
   pObj->nAccumulatedConsumedStufferBytes=0;
   pObj->nAccumulatedConsumedFrmBytes=0;
   pObj->nAccumulatedConsumedBytes=0;
@@ -1490,7 +1492,9 @@ VpuDecRetCode VPU_DecUnLoad()
     nInitCnt--;
     if(nInitCnt == 0)
     {
+      VPU_LOG("VPU_Term.\n");
       VPU_Term();
+      VPU_LOG("VPU_Term done.\n");
     }
   }
 
