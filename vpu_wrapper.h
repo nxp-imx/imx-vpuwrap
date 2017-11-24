@@ -1,6 +1,7 @@
 /*
  *  Copyright (c) 2010-2016, Freescale Semiconductor Inc.,
  *  All Rights Reserved.
+ * Copyright 2017 NXP
  *
  *  The following programs are the sole property of Freescale Semiconductor Inc.,
  *  and contain its proprietary and confidential information.

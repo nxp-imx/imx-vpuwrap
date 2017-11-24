@@ -193,6 +193,7 @@ typedef struct
   int nInFrameCount;
   int nMinFrameBufferCount;
   u_int32 uStrIdx;
+  u_int32 uPictureStartLocationPre;
 }VpuDecObj;
 
 typedef struct 
@@ -561,6 +562,7 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
   pObj->CodecFormat= pInParam->CodecFormat;
   pObj->pBsBufVirtStart= pMemPhy->pVirtAddr;
   pObj->pBsBufPhyStart= pMemPhy->pPhyAddr;
+  pObj->uPictureStartLocationPre = pObj->pBsBufPhyStart;
   pObj->pBsBufPhyEnd=pMemPhy->pPhyAddr+VPU_BITS_BUF_SIZE;
   pObj->bPendingFeed = true;
   pObj->state=VPU_DEC_STATE_OPEN;
@@ -748,6 +750,7 @@ static void VpuUpdatePos(VpuDecObj* pObj, unsigned int len)
     VPU_Stream_FeedBuffer(pObj->uStrIdx, pObj->pBsBufPhyStart + pObj->nBsBufOffset
         + pObj->nBsBufLen, len, &uStreamConsumed);
   }
+  //if(len)
   VPU_LOG("%s: feed len: %d, feeded len: %d\n",__FUNCTION__, len, uStreamConsumed);
   pObj->nBsBufLen += len;
   pObj->nBsBufOffset += uStreamConsumed;
@@ -1113,8 +1116,10 @@ static VpuDecRetCode TestVPU_Event_Thread(VpuDecObj* pObj, VpuBufferNode* pInDat
           u_int32 uFsId= peEventData->uEventData[10];
           u_int32 uActiveDpbmcCrc;
           u_int32 uStreamBytesConsumed;
+          u_int32 uPictureStartLocation;
           MediaIPFW_Video_PicPerfInfo      *psPerfInfo;
           MediaIPFW_Video_PicPerfDcpInfo   *psPerfDcpInfo;
+          MediaIPFW_Video_PicInfo          *psDecPicInfo;
 
           if(pObj->format==MEDIA_IP_FMT_HEVC)
           {
@@ -1137,11 +1142,26 @@ static VpuDecRetCode TestVPU_Event_Thread(VpuDecObj* pObj, VpuBufferNode* pInDat
             uActiveDpbmcCrc = psPerfInfo->uDpbmcCrc;
             uStreamBytesConsumed = psPerfInfo->uRbspBytesCount;
           }   
+
+          if(VPU_Get_Decode_Status( pObj->uStrIdx, VPU_STATUS_TYPE_PIC_DECODE_INFO, uFsId, (void ** )&psDecPicInfo ))
+          {
+            VPU_ERROR("%s: failure: can not get consumed info \r\n",__FUNCTION__);
+            return VPU_DEC_RET_INVALID_PARAM;
+          }
+
+          uPictureStartLocation = psDecPicInfo->uPicStAddr;
+          uStreamBytesConsumed = uPictureStartLocation>pObj->uPictureStartLocationPre
+            ?uPictureStartLocation-pObj->uPictureStartLocationPre:VPU_BITS_BUF_SIZE
+            +uPictureStartLocation-pObj->uPictureStartLocationPre;
+          pObj->uPictureStartLocationPre = uPictureStartLocation;
+
           pObj->nAccumulatedConsumedFrmBytes += uStreamBytesConsumed;
+          VPU_LOG("vpu report consumed len: %d\n", uStreamBytesConsumed);
           pObj->bPendingFeed = true;
           pObj->nInputCnt --;
         }
-        break;
+        *pOutBufRetCode |= VPU_DEC_ONE_FRM_CONSUMED;
+        return VPU_DEC_RET_SUCCESS;
       case VPU_EventFrameResourceReady:
         {
           u_int32 uFsId = 0;
@@ -1162,7 +1182,6 @@ static VpuDecRetCode TestVPU_Event_Thread(VpuDecObj* pObj, VpuBufferNode* pInDat
           VPU_LOG("crop: %d %d\n", pObj->frameInfo.pExtInfo->FrmCropRect.nRight, pObj->frameInfo.pExtInfo->FrmCropRect.nBottom);
 
           *pOutBufRetCode |= VPU_DEC_OUTPUT_DIS;
-          *pOutBufRetCode |= VPU_DEC_ONE_FRM_CONSUMED;
           pObj->state=VPU_DEC_STATE_OUTOK;
           pObj->nInFrameCount --;
           VPU_LOG("output buffer, buffer in vpu: %d\n", pObj->nInFrameCount);
