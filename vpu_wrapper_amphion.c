@@ -857,6 +857,7 @@ static VpuDecRetCode VPU_DecProcessInBuf(VpuDecObj* pObj, VpuBufferNode* pInData
 
   if(pInData->pVirAddr == (unsigned char *)0x01 && pInData->nSize == 0)
   {
+    VPU_LOG("received eos.\n");
     pObj->eosing = true;
     VpuFeedEOS(pObj);
   }
@@ -1244,6 +1245,9 @@ static VpuDecRetCode TestVPU_Event_Thread(VpuDecObj* pObj, VpuBufferNode* pInDat
           VPU_LOG("output status: %d\n", *pOutBufRetCode);
           return VPU_DEC_RET_SUCCESS;
         }
+      case VPU_EventStreamDecodeError:
+        VPU_LOG("stream error.\n");
+        return VPU_DEC_RET_SUCCESS;
       case VPU_EventEndofStreamScodeFound:
         VPU_LOG("Got EOS from video decoder.\n");
         *pOutBufRetCode |= VPU_DEC_OUTPUT_EOS;
