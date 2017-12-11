@@ -190,10 +190,13 @@ typedef struct
   bool eosing;
   bool ringbuffer;
   bool bPendingFeed;
+  bool needDiscardEvent;
   int nInFrameCount;
   int nMinFrameBufferCount;
   u_int32 uStrIdx;
   u_int32 uPictureStartLocationPre;
+  sPALMemDesc sPalMemReqInfo;
+  int nFsIdReady;
 }VpuDecObj;
 
 typedef struct 
@@ -263,7 +266,9 @@ char *event2str[] = {
   "VPU_EventDebugPing",
   "VPU_EventStreamDecodeError",
   "VPU_EventEndofStreamScodeFound",
-  "VPU_EventFlushDone"
+  "VPU_EventFlushDone",
+  "VPU_EventFrameResourceCheck",
+  "VPU_EventStreamBufferResetDone"
 };
 
 void TestVPU_DriverEvent_Callback(  u_int32 uStrIdx,
@@ -565,6 +570,8 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
   pObj->uPictureStartLocationPre = pObj->pBsBufPhyStart;
   pObj->pBsBufPhyEnd=pMemPhy->pPhyAddr+VPU_BITS_BUF_SIZE;
   pObj->bPendingFeed = true;
+  pObj->nFsIdReady = 0;
+  pObj->needDiscardEvent = false;
   pObj->state=VPU_DEC_STATE_OPEN;
 
   *pOutHandle=(VpuDecHandle)pVpuObj;
@@ -937,6 +944,7 @@ static VpuDecRetCode VPU_DecProcessInBuf(VpuDecObj* pObj, VpuBufferNode* pInData
         pHeader=pInData->sCodecData.pData;
         headerLen=pInData->sCodecData.nSize;
       }
+      VPU_LOG("copy codec data: %d\n", headerLen);
       VpuPutInBuf(pObj, pHeader, headerLen);
       pObj->nAccumulatedConsumedFrmBytes -= headerLen;
 
@@ -1042,6 +1050,44 @@ static VpuDecRetCode TestVPU_Event_Thread(VpuDecObj* pObj, VpuBufferNode* pInDat
 
 
     TestVPU_Event_Data *peEventData = &eEventQData;
+    if(pObj->needDiscardEvent)
+    {
+      switch(peEventData->uEventID)
+      {
+        case VPU_EventStreamBufferResetDone:
+          VPU_LOG("Stream buffer reset done\n");
+          pObj->needDiscardEvent = false;
+          return VPU_DEC_RET_SUCCESS;
+        case VPU_EventFrameResourceRelease:
+          {
+            u_int32 uFsId = 0;
+
+            uFsId = (u_int32)peEventData->uEventData[0];
+            if (uFsId == MEDIA_PLAYER_SKIPPED_FRAME_ID || uFsId == pObj->nFsIdReady)
+              break;
+            VPU_LOG("Process frame resource release event, id: %d\n", uFsId);
+            pObj->frameInfo.pDisplayFrameBuf = &pObj->frameBuf[uFsId];
+            pObj->frameInfo.pExtInfo=&pObj->frmExtInfo;
+            pObj->frameInfo.pExtInfo->FrmCropRect.nRight=pObj->picWidth<=1920?pObj->picWidth:1920;//psPicInfo->DispInfo.uDispVerRes;
+            pObj->frameInfo.pExtInfo->FrmCropRect.nBottom=pObj->picHeight<=1080?pObj->picHeight:1080;//psPicInfo->DispInfo.uDispHorRes;
+            VPU_LOG("fs id: %d crop: %d %d\n", uFsId, pObj->frameInfo.pExtInfo->FrmCropRect.nRight, pObj->frameInfo.pExtInfo->FrmCropRect.nBottom);
+
+            *pOutBufRetCode |= VPU_DEC_OUTPUT_DIS;
+            pObj->state=VPU_DEC_STATE_OUTOK;
+            pObj->nInFrameCount --;
+            VPU_LOG("output buffer, buffer in vpu: %d\n", pObj->nInFrameCount);
+
+            if(VPU_DUMP_YUV)
+              WrapperFileDumpYUV(pObj,pObj->frameInfo.pDisplayFrameBuf);
+
+            VPU_LOG("output status: %d\n", *pOutBufRetCode);
+            return VPU_DEC_RET_SUCCESS;
+          }
+        default:
+          break;
+      }
+    }
+
     switch(peEventData->uEventID)
     {
       case VPU_EventStarted:
@@ -1084,10 +1130,9 @@ static VpuDecRetCode TestVPU_Event_Thread(VpuDecObj* pObj, VpuBufferNode* pInDat
             /* Currently setting this to 48MB each! */
             u_int32 uBufferSize = TESTVPU_FIXED_DCP_SIZE_MULTIPLE;
 
-            sPALMemDesc sPalMemReqInfo;
-            sPalMemReqInfo.size = uBufferSize;
+            pObj->sPalMemReqInfo.size = uBufferSize;
             // FIXME: need release it.
-            if(MEDIAIP_FW_STATUS_OK!=pal_get_phy_buf(&sPalMemReqInfo))
+            if(MEDIAIP_FW_STATUS_OK!=pal_get_phy_buf(&pObj->sPalMemReqInfo))
             {
               VPU_ERROR("%s: failure: allocate memory fail \r\n",__FUNCTION__);
               return VPU_DEC_RET_FAILURE;
@@ -1096,7 +1141,7 @@ static VpuDecRetCode TestVPU_Event_Thread(VpuDecObj* pObj, VpuBufferNode* pInDat
             VPU_FS_DESC sVPUFsParams;
 
             sVPUFsParams.ulFsId            = uFSIdx;
-            sVPUFsParams.ulFsLumaBase[0]   = sPalMemReqInfo.phy_addr;
+            sVPUFsParams.ulFsLumaBase[0]   = pObj->sPalMemReqInfo.phy_addr;
             sVPUFsParams.ulFsLumaBase[1]   = uBufferSize;
             sVPUFsParams.ulFsType          = pVpuFsType->eType;                                                                 
 
@@ -1120,6 +1165,9 @@ static VpuDecRetCode TestVPU_Event_Thread(VpuDecObj* pObj, VpuBufferNode* pInDat
           MediaIPFW_Video_PicPerfInfo      *psPerfInfo;
           MediaIPFW_Video_PicPerfDcpInfo   *psPerfDcpInfo;
           MediaIPFW_Video_PicInfo          *psDecPicInfo;
+
+          if (uFsId == MEDIA_PLAYER_SKIPPED_FRAME_ID)
+            break;
 
           if(pObj->format==MEDIA_IP_FMT_HEVC)
           {
@@ -1157,6 +1205,7 @@ static VpuDecRetCode TestVPU_Event_Thread(VpuDecObj* pObj, VpuBufferNode* pInDat
 
           pObj->nAccumulatedConsumedFrmBytes += uStreamBytesConsumed;
           VPU_LOG("vpu report consumed len: %d\n", uStreamBytesConsumed);
+
           pObj->bPendingFeed = true;
           pObj->nInputCnt --;
         }
@@ -1168,8 +1217,11 @@ static VpuDecRetCode TestVPU_Event_Thread(VpuDecObj* pObj, VpuBufferNode* pInDat
           MediaIPFW_Video_PicInfo *psPicInfo;
 
           uFsId = (u_int32)peEventData->uEventData[0];
+          if (uFsId == MEDIA_PLAYER_SKIPPED_FRAME_ID)
+            break;
 
           VPU_LOG("Process frame resource ready event, id: %d\n", uFsId);
+          pObj->nFsIdReady = uFsId;
           if(VPU_Get_Decode_Status( pObj->uStrIdx, VPU_STATUS_TYPE_PIC_DECODE_INFO, uFsId, (void ** )&psPicInfo))
           {
             VPU_ERROR("%s: failure: can not find picture info \r\n",__FUNCTION__);
@@ -1177,9 +1229,9 @@ static VpuDecRetCode TestVPU_Event_Thread(VpuDecObj* pObj, VpuBufferNode* pInDat
           }
           pObj->frameInfo.pDisplayFrameBuf = &pObj->frameBuf[uFsId];
           pObj->frameInfo.pExtInfo=&pObj->frmExtInfo;
-          pObj->frameInfo.pExtInfo->FrmCropRect.nRight=pObj->picWidth<=1920?pObj->picWidth:1920;//psPicInfo->DispInfo.uDispVerRes;
-          pObj->frameInfo.pExtInfo->FrmCropRect.nBottom=pObj->picHeight<=1024?pObj->picHeight:1024;//psPicInfo->DispInfo.uDispHorRes;
-          VPU_LOG("crop: %d %d\n", pObj->frameInfo.pExtInfo->FrmCropRect.nRight, pObj->frameInfo.pExtInfo->FrmCropRect.nBottom);
+          pObj->frameInfo.pExtInfo->FrmCropRect.nRight=pObj->picWidth;//<=1920?pObj->picWidth:1920;//psPicInfo->DispInfo.uDispVerRes;
+          pObj->frameInfo.pExtInfo->FrmCropRect.nBottom=pObj->picHeight;//<=1080?pObj->picHeight:1080;//psPicInfo->DispInfo.uDispHorRes;
+          VPU_LOG("fs id: %d crop: %d %d\n", uFsId, pObj->frameInfo.pExtInfo->FrmCropRect.nRight, pObj->frameInfo.pExtInfo->FrmCropRect.nBottom);
 
           *pOutBufRetCode |= VPU_DEC_OUTPUT_DIS;
           pObj->state=VPU_DEC_STATE_OUTOK;
@@ -1221,45 +1273,48 @@ VpuDecRetCode VPU_DecDecodeBuf(VpuDecHandle InHandle, VpuBufferNode* pInData,
 
   *pOutBufRetCode = 0;
 
-  VpuUpdatePos(pObj, 0);
-#if 0
-  if(pObj->bPendingFeed)
+  if(!pObj->needDiscardEvent)
   {
-    if(pInData->pVirAddr != NULL || pInData->nSize != 0)
-      pObj->bPendingFeed = false;
-    VPU_DecProcessInBuf(pObj, pInData);
-    *pOutBufRetCode |= VPU_DEC_INPUT_USED;
+    VpuUpdatePos(pObj, 0);
+#if 0
+    if(pObj->bPendingFeed)
+    {
+      if(pInData->pVirAddr != NULL || pInData->nSize != 0)
+        pObj->bPendingFeed = false;
+      VPU_DecProcessInBuf(pObj, pInData);
+      *pOutBufRetCode |= VPU_DEC_INPUT_USED;
 
-    if(pObj->nBsBufLen < BS_BUFFER_LEN && pObj->eosing == false)
-    {
-      pObj->bPendingFeed = true;
-      *pOutBufRetCode |= VPU_DEC_NO_ENOUGH_INBUF;
-      return VPU_DEC_RET_SUCCESS;
+      if(pObj->nBsBufLen < BS_BUFFER_LEN && pObj->eosing == false)
+      {
+        pObj->bPendingFeed = true;
+        *pOutBufRetCode |= VPU_DEC_NO_ENOUGH_INBUF;
+        return VPU_DEC_RET_SUCCESS;
+      }
     }
-  }
 #else
-  if((pObj->nBsBufLen < BS_BUFFER_LEN || pObj->nInputCnt < BS_BUFFER_CNT) && pObj->eosing == false)
-  {
-    VPU_DecProcessInBuf(pObj, pInData);
-    *pOutBufRetCode |= VPU_DEC_INPUT_USED;
-    if(pObj->eosing == false)
-      *pOutBufRetCode |= VPU_DEC_NO_ENOUGH_INBUF;
-    pObj->nInputCnt ++;
-    VPU_LOG("output status: %d\n", *pOutBufRetCode);
-    return VPU_DEC_RET_SUCCESS;
-  }
-#endif
-#if 0
-  if(pObj->state>=VPU_DEC_STATE_DEC)
-  {
-    if(pObj->nInFrameCount < pObj->nMinFrameBufferCount)
+    if((pObj->nBsBufLen < BS_BUFFER_LEN || pObj->nInputCnt < BS_BUFFER_CNT) && pObj->eosing == false)
     {
-      *pOutBufRetCode |= VPU_DEC_NO_ENOUGH_BUF;
+      VPU_DecProcessInBuf(pObj, pInData);
+      *pOutBufRetCode |= VPU_DEC_INPUT_USED;
+      if(pObj->eosing == false)
+        *pOutBufRetCode |= VPU_DEC_NO_ENOUGH_INBUF;
+      pObj->nInputCnt ++;
       VPU_LOG("output status: %d\n", *pOutBufRetCode);
       return VPU_DEC_RET_SUCCESS;
     }
-  }
 #endif
+#if 0
+    if(pObj->state>=VPU_DEC_STATE_DEC)
+    {
+      if(pObj->nInFrameCount < pObj->nMinFrameBufferCount)
+      {
+        *pOutBufRetCode |= VPU_DEC_NO_ENOUGH_BUF;
+        VPU_LOG("output status: %d\n", *pOutBufRetCode);
+        return VPU_DEC_RET_SUCCESS;
+      }
+    }
+#endif
+  }
 
   return TestVPU_Event_Thread(pObj, pInData, pOutBufRetCode);
 }
@@ -1291,10 +1346,10 @@ VpuDecRetCode VPU_DecGetInitialInfo(VpuDecHandle InHandle, VpuDecInitInfo * pOut
     return VPU_DEC_RET_FAILURE;
   }
 
-  pObj->picWidth = pOutInitInfo->nPicWidth = (psSeqInfo->uHorRes + 255) / 256 * 256;
-  //pObj->picWidth = psSeqInfo->uHorRes / 256 * 256;
-  pObj->picHeight = pOutInitInfo->nPicHeight = (psSeqInfo->uVerRes + 255) / 256 * 256;
-  //pObj->picHeight = psSeqInfo->uVerRes / 256 * 256;
+  pOutInitInfo->nPicWidth = psSeqInfo->uHorRes;
+  pObj->picWidth = psSeqInfo->uHorRes;
+  pOutInitInfo->nPicHeight = (psSeqInfo->uVerRes + 255) / 256 * 256;
+  pObj->picHeight = psSeqInfo->uVerRes;
   pOutInitInfo->nMinFrameBufferCount = psSeqInfo->uNumDPBFrms;
   pOutInitInfo->nBitDepth = psSeqInfo->uBitDepthLuma;
   pObj->nMinFrameBufferCount = psSeqInfo->uNumDPBFrms;
@@ -1434,15 +1489,16 @@ VpuDecRetCode VPU_DecFlushAll(VpuDecHandle InHandle)
   pObj=&pVpuObj->obj;
 
   VPU_LOG("%s: flush \r\n",__FUNCTION__);
-
+  pObj->needDiscardEvent = true;
   VPU_Flush(pObj->uStrIdx, TRUE);     
   VPU_LOG("%s: flush done \r\n",__FUNCTION__);
 
   pObj->nBsBufLen=0;
   pObj->nBsBufOffset=0;
-  //pObj->nPrivateSeqHeaderInserted=0;
+  pObj->nPrivateSeqHeaderInserted=0;
 
   pObj->nInputCnt=0;
+  pObj->uPictureStartLocationPre = pObj->pBsBufPhyStart;
   pObj->nAccumulatedConsumedStufferBytes=0;
   pObj->nAccumulatedConsumedFrmBytes=0;
   pObj->nAccumulatedConsumedBytes=0;
@@ -1499,6 +1555,8 @@ VpuDecRetCode VPU_DecClose(VpuDecHandle InHandle)
   pObj=&pVpuObj->obj;
 
   VPU_Stop(pObj->uStrIdx);
+  //pal_qu_destroy(gTestVPUEventQu[pObj->uStrIdx]);
+  pal_free_phy_buf(&pObj->sPalMemReqInfo);
 
   return VPU_DEC_RET_SUCCESS;
 }
