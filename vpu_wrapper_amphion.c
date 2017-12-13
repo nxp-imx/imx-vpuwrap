@@ -61,6 +61,7 @@
 #define VPU_MEM_ALIGN			0x10
 #define VPU_BITS_BUF_SIZE		(12*1024*1024)		//bitstream buffer size : big enough contain two big frames
 #define BS_BUFFER_LEN (65*1024)
+#define VPU_AMPHION_LWM (5*1024)
 #define BS_BUFFER_CNT (5)
 #define EOS_PAD_SIZE 128
 
@@ -196,7 +197,6 @@ typedef struct
   u_int32 uStrIdx;
   u_int32 uPictureStartLocationPre;
   sPALMemDesc sPalMemReqInfo;
-  int nFsIdReady;
 }VpuDecObj;
 
 typedef struct 
@@ -319,8 +319,8 @@ VpuDecRetCode VPU_DecLoad()
 {
   VpuLogLevelParse(NULL);
 
-  sPALConfig tPALCfg;
-  VPU_DRIVER_CFG tTestVPUDriverCfg; 
+  sPALConfig tPALCfg = {0};
+  VPU_DRIVER_CFG tTestVPUDriverCfg = {0};
 
   u_int32 iRetCode = 0 ;
   u_int32 iLocalRetCode = 0 ;
@@ -555,6 +555,8 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
   uParamVal[0] = pMemPhy->pPhyAddr;
   uParamVal[1] = VPU_BITS_BUF_SIZE;
   VPU_Set_Params(pObj->uStrIdx, VPU_ParamId_uSharedStreamBufLoc, &uParamVal[0]);          
+  uParamVal[0] = VPU_AMPHION_LWM;
+  VPU_Set_Params(pObj->uStrIdx, VPU_ParamId_StreamLwm, &uParamVal[0]);
 
   VPU_Start(pObj->uStrIdx);
 
@@ -570,7 +572,6 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
   pObj->uPictureStartLocationPre = pObj->pBsBufPhyStart;
   pObj->pBsBufPhyEnd=pMemPhy->pPhyAddr+VPU_BITS_BUF_SIZE;
   pObj->bPendingFeed = true;
-  pObj->nFsIdReady = 0;
   pObj->needDiscardEvent = false;
   pObj->state=VPU_DEC_STATE_OPEN;
 
@@ -1064,25 +1065,16 @@ static VpuDecRetCode TestVPU_Event_Thread(VpuDecObj* pObj, VpuBufferNode* pInDat
             u_int32 uFsId = 0;
 
             uFsId = (u_int32)peEventData->uEventData[0];
-            if (uFsId == MEDIA_PLAYER_SKIPPED_FRAME_ID || uFsId == pObj->nFsIdReady)
-              break;
             VPU_LOG("Process frame resource release event, id: %d\n", uFsId);
-            pObj->frameInfo.pDisplayFrameBuf = &pObj->frameBuf[uFsId];
-            pObj->frameInfo.pExtInfo=&pObj->frmExtInfo;
-            pObj->frameInfo.pExtInfo->FrmCropRect.nRight=pObj->picWidth<=1920?pObj->picWidth:1920;//psPicInfo->DispInfo.uDispVerRes;
-            pObj->frameInfo.pExtInfo->FrmCropRect.nBottom=pObj->picHeight<=1080?pObj->picHeight:1080;//psPicInfo->DispInfo.uDispHorRes;
-            VPU_LOG("fs id: %d crop: %d %d\n", uFsId, pObj->frameInfo.pExtInfo->FrmCropRect.nRight, pObj->frameInfo.pExtInfo->FrmCropRect.nBottom);
+            if (uFsId == MEDIA_PLAYER_SKIPPED_FRAME_ID)
+              break;
 
-            *pOutBufRetCode |= VPU_DEC_OUTPUT_DIS;
-            pObj->state=VPU_DEC_STATE_OUTOK;
-            pObj->nInFrameCount --;
-            VPU_LOG("output buffer, buffer in vpu: %d\n", pObj->nInFrameCount);
-
-            if(VPU_DUMP_YUV)
-              WrapperFileDumpYUV(pObj,pObj->frameInfo.pDisplayFrameBuf);
-
-            VPU_LOG("output status: %d\n", *pOutBufRetCode);
-            return VPU_DEC_RET_SUCCESS;
+            if(pObj->needDiscardEvent)
+            {
+              if(pObj->frameBufState[uFsId] == VPU_FRAME_STATE_FREE)
+                pObj->frameBufState[uFsId] = VPU_FRAME_STATE_DEC;
+              break;
+            }
           }
         default:
           break;
@@ -1094,6 +1086,9 @@ static VpuDecRetCode TestVPU_Event_Thread(VpuDecObj* pObj, VpuBufferNode* pInDat
       case VPU_EventStarted:
         VPU_LOG("Process started event\n");
         break;
+      case VPU_EventStreamDecodeError:
+        VPU_LOG("stream error.\n");
+        return VPU_DEC_RET_SUCCESS;
       case VPU_EventSequenceInfo:
         VPU_LOG("Process sequence info event\n");
         if(pObj->state<VPU_DEC_STATE_INITOK)
@@ -1152,6 +1147,34 @@ static VpuDecRetCode TestVPU_Event_Thread(VpuDecObj* pObj, VpuBufferNode* pInDat
           else if ( pVpuFsType->eType == VPU_FS_MBI_REQ )
             break;
 
+          if(!pObj->needDiscardEvent)
+          {
+            int i;
+
+            for (i=0;i<pObj->frameNum;i++){
+              if (pObj->frameBufState[i] == VPU_FRAME_STATE_DEC){
+                VPU_FS_DESC sVPUFsParams;
+                VpuFrameBuffer* pInFrameBuf = &pObj->frameBuf[i];
+                sVPUFsParams.ulFsId            = i;
+                sVPUFsParams.ulFsLumaBase[0]   = pInFrameBuf->pbufY;
+                sVPUFsParams.ulFsLumaBase[1]   = pInFrameBuf->pbufY + pInFrameBuf->nStrideY * pObj->picHeight / 2;
+                sVPUFsParams.ulFsChromaBase[0] = pInFrameBuf->pbufCb;
+                sVPUFsParams.ulFsChromaBase[1] = pInFrameBuf->pbufCb + pInFrameBuf->nStrideY * pObj->picHeight / 4;
+                sVPUFsParams.ulFsStride        = pInFrameBuf->nStrideY;
+                sVPUFsParams.ulFsType          = VPU_FS_FRAME_REQ;
+
+                VPU_LOG("Alloc from reserve buffer: %d\n", i);
+                VPU_DQ_Release_Frame(pObj->uStrIdx, i);
+                VPU_Frame_Alloc ( pObj->uStrIdx, &sVPUFsParams );
+
+                pObj->frameBufState[i] = VPU_FRAME_STATE_FREE;
+                break;
+              }
+            }
+            if(i<pObj->frameNum)
+              break;
+          }
+
           pObj->state=VPU_DEC_STATE_DEC;
           *pOutBufRetCode |= VPU_DEC_NO_ENOUGH_BUF;
           VPU_LOG("output status: %d\n", *pOutBufRetCode);
@@ -1167,7 +1190,7 @@ static VpuDecRetCode TestVPU_Event_Thread(VpuDecObj* pObj, VpuBufferNode* pInDat
           MediaIPFW_Video_PicPerfDcpInfo   *psPerfDcpInfo;
           MediaIPFW_Video_PicInfo          *psDecPicInfo;
 
-          if (uFsId == MEDIA_PLAYER_SKIPPED_FRAME_ID)
+          if (uFsId == MEDIA_PLAYER_SKIPPED_FRAME_ID || pObj->needDiscardEvent)
             break;
 
           if(pObj->format==MEDIA_IP_FMT_HEVC)
@@ -1218,16 +1241,22 @@ static VpuDecRetCode TestVPU_Event_Thread(VpuDecObj* pObj, VpuBufferNode* pInDat
           MediaIPFW_Video_PicInfo *psPicInfo;
 
           uFsId = (u_int32)peEventData->uEventData[0];
+          VPU_LOG("Process frame resource ready event, id: %d\n", uFsId);
           if (uFsId == MEDIA_PLAYER_SKIPPED_FRAME_ID)
             break;
 
-          VPU_LOG("Process frame resource ready event, id: %d\n", uFsId);
-          pObj->nFsIdReady = uFsId;
+          if(pObj->needDiscardEvent)
+          {
+            if(pObj->frameBufState[uFsId] == VPU_FRAME_STATE_FREE)
+              pObj->frameBufState[uFsId] = VPU_FRAME_STATE_DEC;
+            break;
+          }
           if(VPU_Get_Decode_Status( pObj->uStrIdx, VPU_STATUS_TYPE_PIC_DECODE_INFO, uFsId, (void ** )&psPicInfo))
           {
             VPU_ERROR("%s: failure: can not find picture info \r\n",__FUNCTION__);
             return VPU_DEC_RET_INVALID_PARAM;
           }
+          pObj->frameBufState[uFsId] = VPU_FRAME_STATE_DISP;
           pObj->frameInfo.pDisplayFrameBuf = &pObj->frameBuf[uFsId];
           pObj->frameInfo.pExtInfo=&pObj->frmExtInfo;
           pObj->frameInfo.pExtInfo->FrmCropRect.nRight=pObj->picWidth;//<=1920?pObj->picWidth:1920;//psPicInfo->DispInfo.uDispVerRes;
@@ -1245,9 +1274,6 @@ static VpuDecRetCode TestVPU_Event_Thread(VpuDecObj* pObj, VpuBufferNode* pInDat
           VPU_LOG("output status: %d\n", *pOutBufRetCode);
           return VPU_DEC_RET_SUCCESS;
         }
-      case VPU_EventStreamDecodeError:
-        VPU_LOG("stream error.\n");
-        return VPU_DEC_RET_SUCCESS;
       case VPU_EventEndofStreamScodeFound:
         VPU_LOG("Got EOS from video decoder.\n");
         *pOutBufRetCode |= VPU_DEC_OUTPUT_EOS;
@@ -1393,6 +1419,8 @@ VpuDecRetCode VPU_DecGetOutputFrame(VpuDecHandle InHandle, VpuDecOutFrameInfo * 
   pVpuObj->obj.state=VPU_DEC_STATE_DEC;
   VPU_TRACE;
   *pOutFrameInfo=pVpuObj->obj.frameInfo;
+  VPU_LOG("output Y address: %x\n", pVpuObj->obj.frameInfo.pDisplayFrameBuf->pbufY);
+
   VPU_TRACE;
 
   return VPU_DEC_RET_SUCCESS;
@@ -1473,6 +1501,7 @@ VpuDecRetCode VPU_DecOutFrameDisplayed(VpuDecHandle InHandle, VpuFrameBuffer* pI
     VPU_Frame_Alloc ( pObj->uStrIdx, &sVPUFsParams );
   }
 
+  pObj->frameBufState[index] = VPU_FRAME_STATE_FREE;
   pObj->nInFrameCount ++;
   VPU_LOG("Feed frame buffer, id: %d buffer in vpu: %d\n", index, pObj->nInFrameCount);
 
