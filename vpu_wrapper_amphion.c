@@ -285,6 +285,10 @@ void TestVPU_DriverEvent_Callback(  u_int32 uStrIdx,
   /* Store the actual event data into a local array */
   if(gTestVPUEventData[uTestVPUEventQuWrIdx].uStreamID!=TESTVPU_EVENT_QU_MARKFREEENTRY)
   {
+    /* the entry we are going to write to is still in-use thus we need to re-size the queue
+        this should be an assert to allow us to debug how to fix this */
+    VPU_ERROR("error: event queue over flow \n");
+    pal_assert_impl((u_int32)TestVPU_DriverEvent_Callback, 1);
   }
   gTestVPUEventData[uTestVPUEventQuWrIdx].uStreamID = uStrIdx;
   gTestVPUEventData[uTestVPUEventQuWrIdx].uEventID = tEvent;
@@ -383,6 +387,10 @@ VpuDecRetCode VPU_DecLoad()
       pal_initialise ( &tPALCfg );
 
       iRetCode = VPU_Init(&tTestVPUDriverCfg, TestVPU_DriverEvent_Callback, TestVPU_DriverEvent_Callback) ;
+
+      for(i=0;i<TESTVPU_EVENT_QU_SIZE;i++)
+          gTestVPUEventData[i].uStreamID = TESTVPU_EVENT_QU_MARKFREEENTRY ; /*mark all entries free to write to */
+
     }
     nInitCnt++;
   }
@@ -1492,7 +1500,7 @@ VpuDecRetCode VPU_DecOutFrameDisplayed(VpuDecHandle InHandle, VpuFrameBuffer* pI
   }
   VPU_Frame_Alloc ( pObj->uStrIdx, &sVPUFsParams );
 
-  if(bNewFrame)
+  if(bNewFrame && (index<0x11))  //FIXME: 0x11 is one constant in malone decoder for MBI buffers
   {
     sVPUFsParams.ulFsId            = index;
     sVPUFsParams.ulFsLumaBase[0]   = pInFrameBuf->pbufMvCol;
