@@ -17,11 +17,15 @@
 #include "vpu_wrapper.h"
 #include "utils.h"
 
+#ifdef INTERNAL_BUILD
 #include "basetype.h"
 #include "pal.h"
 
 #include "VPU_types.h"
 #include "VPU_api.h"
+#else
+#include "malone_interface.h"
+#endif
 
 #ifdef ANDROID
 #include "Log.h"
