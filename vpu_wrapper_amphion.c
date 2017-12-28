@@ -1105,8 +1105,8 @@ static VpuDecRetCode TestVPU_Event_Thread(VpuDecObj* pObj, VpuBufferNode* pInDat
         VPU_LOG("Process sequence info event\n");
         if(pObj->state<VPU_DEC_STATE_INITOK)
           *pOutBufRetCode |= VPU_DEC_INIT_OK;
-        else
-          *pOutBufRetCode |= VPU_DEC_RESOLUTION_CHANGED;
+        //else
+          //*pOutBufRetCode |= VPU_DEC_RESOLUTION_CHANGED;
         pObj->state=VPU_DEC_STATE_INITOK;
         return VPU_DEC_RET_SUCCESS;
       case VPU_EventStreamBufferStarved:
