@@ -1600,7 +1600,7 @@ VpuDecRetCode VPU_DecClose(VpuDecHandle InHandle)
   pObj=&pVpuObj->obj;
 
   VPU_Stop(pObj->uStrIdx);
-  //pal_qu_destroy(gTestVPUEventQu[pObj->uStrIdx]);
+  pal_qu_destroy(gTestVPUEventQu[pObj->uStrIdx]);
   pal_free_phy_buf(&pObj->sPalMemReqInfo);
 
   return VPU_DEC_RET_SUCCESS;
