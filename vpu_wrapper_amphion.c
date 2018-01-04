@@ -384,9 +384,9 @@ VpuDecRetCode VPU_DecLoad()
 
   VPU_LOG("VPU_DecLoad.\n");
 
-  if(nBadLoad == 1)
+  //if(nBadLoad == 1)
   {
-    if(nInitCnt == 0)
+    //if(nInitCnt == 0)
     {
       pal_initialise ( &tPALCfg );
 
@@ -1609,10 +1609,10 @@ VpuDecRetCode VPU_DecClose(VpuDecHandle InHandle)
 VpuDecRetCode VPU_DecUnLoad()
 {
   VPU_LOG("VPU_DecUnLoad.\n");
-  if(nBadLoad == 2)
+  //if(nBadLoad == 2)
   {
     nInitCnt--;
-    if(nInitCnt == 0)
+    //if(nInitCnt == 0)
     {
       VPU_LOG("VPU_Term.\n");
       VPU_Term();
