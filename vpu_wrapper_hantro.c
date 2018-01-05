@@ -348,8 +348,12 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
   memset(&g2Conf, 0, sizeof(OMX_VIDEO_PARAM_G2CONFIGTYPE));
   memset(&g1Conf, 0, sizeof(OMX_VIDEO_PARAM_G1CONFIGTYPE));
   g2Conf.bEnableTiled = false;
+  g1Conf.bEnableTiled = false;
   if (pInParam->nTiled2LinearEnable)
+  {
     g2Conf.bEnableTiled = true;
+    g1Conf.bEnableTiled = true;
+  }
   g2Conf.ePixelFormat = OMX_VIDEO_G2PixelFormat_Default;
   if (pInParam->nPixelFormat)
     g2Conf.ePixelFormat = OMX_VIDEO_G2PixelFormat_8bit;
@@ -357,7 +361,6 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
   if (pInParam->nEnableVideoCompressor)
     g2Conf.bEnableRFC = true;
   g2Conf.bEnableRingBuffer = pObj->ringbuffer = false;
-  g1Conf.bEnableTiled = false;
   g1Conf.bAllowFieldDBP = false;
   
   if(pInParam->nAdaptiveMode == 1){
