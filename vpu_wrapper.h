@@ -383,7 +383,9 @@ typedef struct {
 	int nFrmHeight;			/*support dynamic resolution*/
 	VpuRect FrmCropRect;	/*support dynamic resolution*/
 	unsigned int nQ16ShiftWidthDivHeightRatio;	/*support dynamic ratio, refer to definition in struct 'VpuDecInitInfo'*/
-	int nReserved[9];		/*reserved for recording other info*/
+	int rfc_luma_offset;
+	int rfc_chroma_offset;
+	int nReserved[7];		/*reserved for recording other info*/
 }VpuFrameExtInfo;
 
 typedef struct {
