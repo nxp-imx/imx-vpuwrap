@@ -311,6 +311,7 @@ typedef struct VpuColourDesc {
   unsigned int colourPrimaries;
   unsigned int transferCharacteristics;
   unsigned int matrixCoeffs;
+  unsigned int fullRange;
 } VpuColourDesc;
 
 typedef struct VpuChromaLocInfo {
@@ -355,11 +356,11 @@ typedef struct {
 
 	int nReserved[3];			/*reserved for future extension*/
 	void* pSpecialInfo;		/*reserved for future special extension*/
-
-        int hasHdr10Meta;
-        VpuHDR10Meta Hdr10Meta; /* HDR10 meta data */
-        VpuColourDesc ColourDesc;
-        VpuChromaLocInfo ChromaLocInfo;
+	int hasColorDesc;
+	int hasHdr10Meta;
+	VpuHDR10Meta Hdr10Meta; /* HDR10 meta data */
+	VpuColourDesc ColourDesc;
+	VpuChromaLocInfo ChromaLocInfo;
 } VpuDecInitInfo;
 
 /*
