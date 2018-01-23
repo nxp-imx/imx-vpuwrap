@@ -358,6 +358,7 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
   if (pInParam->nEnableVideoCompressor)
     pObj->config.g2_conf.bEnableRFC = true;
   pObj->config.g2_conf.bEnableRingBuffer = pObj->ringbuffer = false;
+  pObj->config.g2_conf.bEnableFetchOnePic = true;
   pObj->config.g1_conf.bAllowFieldDBP = false;
   
   if(pInParam->nAdaptiveMode == 1){
