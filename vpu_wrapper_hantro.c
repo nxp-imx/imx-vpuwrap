@@ -667,10 +667,10 @@ static void WrapperFileDumpYUV(VpuDecObj* pObj, VpuFrameBuffer *pDisplayBuf)
     }
     return;
 }
-static void VpuPutInBuf(VpuDecObj* pObj, unsigned char *pIn, unsigned int len)
+static void VpuPutInBuf(VpuDecObj* pObj, unsigned char *pIn, unsigned int len, unsigned char *pInPhyc)
 {
   //do not use ring buffer in secure mode
-  if(pObj->bSecureMode){
+  if(pObj->bSecureMode && pInPhyc != NULL){
     pObj->pBsBufVirtStart = pIn;
     pObj->nBsBufLen = len;
     VPU_LOG("VpuPutInBuf size=%d",len);
@@ -740,7 +740,7 @@ static VpuDecRetCode VPU_DecProcessInBuf(VpuDecObj* pObj, VpuBufferNode* pInData
       pHeader[i++] = (unsigned char)(((nHeight >> 8) & 0xff));
       pHeader[i++] = (unsigned char)(((nHeight >> 16) & 0xff));
       pHeader[i++] = (unsigned char)(((nHeight >> 24) & 0xff));
-      VpuPutInBuf(pObj, pHeader, headerLen);
+      VpuPutInBuf(pObj, pHeader, headerLen, pInData->pPhyAddr);
     }
     else if(pObj->CodecFormat==VPU_V_WEBP)
     {
@@ -820,7 +820,8 @@ static VpuDecRetCode VPU_DecProcessInBuf(VpuDecObj* pObj, VpuBufferNode* pInData
         pHeader=pInData->sCodecData.pData;
         headerLen=pInData->sCodecData.nSize;
       }
-      VpuPutInBuf(pObj, pHeader, headerLen);
+      VPU_LOG("put CodecData len=%d",headerLen);
+      VpuPutInBuf(pObj, pHeader, headerLen, pInData->pPhyAddr);
       pObj->nAccumulatedConsumedFrmBytes -= headerLen;
 
       if(headerAllocated){
@@ -835,7 +836,7 @@ static VpuDecRetCode VPU_DecProcessInBuf(VpuDecObj* pObj, VpuBufferNode* pInData
     unsigned int nFrmSize;
     VpuConvertAvccFrame(pInData->pVirAddr,pInData->nSize,pObj->nNalSizeLen,
         &pFrm,&nFrmSize,&pObj->nNalNum);
-    VpuPutInBuf(pObj, pFrm, nFrmSize);
+    VpuPutInBuf(pObj, pFrm, nFrmSize,pInData->pPhyAddr);
     if(pFrm!=pInData->pVirAddr){
       free(pFrm);
     }
@@ -844,12 +845,12 @@ static VpuDecRetCode VPU_DecProcessInBuf(VpuDecObj* pObj, VpuBufferNode* pInData
       unsigned char aVC1Head[VC1_MAX_FRM_HEADER_SIZE];
       pHeader=aVC1Head;
       VC1CreateNalFrameHeader(pHeader,(int*)(&headerLen),(unsigned int*)(pInData->pVirAddr));
-      VpuPutInBuf(pObj, pHeader, headerLen);
+      VpuPutInBuf(pObj, pHeader, headerLen,pInData->pPhyAddr);
     } else if(pObj->CodecFormat==VPU_V_MJPG) {
       pObj->nBsBufOffset = 0;
     }
 
-    VpuPutInBuf(pObj, pInData->pVirAddr, pInData->nSize);
+    VpuPutInBuf(pObj, pInData->pVirAddr, pInData->nSize,pInData->pPhyAddr);
   }
 
   return VPU_DEC_RET_SUCCESS;
@@ -1023,6 +1024,8 @@ static VpuDecRetCode VPU_DecDecode(VpuDecObj* pObj, int* pOutBufRetCode)
       case CODEC_OK:
         break;
       case CODEC_PENDING_FLUSH:
+        if(pObj->nBsBufLen > 0 && bytes > 0 && pObj->bSecureMode)
+            *pOutBufRetCode &= ~VPU_DEC_INPUT_USED;
         dobreak = true;
         break;
       case CODEC_NEED_MORE:
@@ -1259,6 +1262,9 @@ VpuDecRetCode VPU_DecDecodeBuf(VpuDecHandle InHandle, VpuBufferNode* pInData,
     VPU_ERROR("VPU_DecDecodeBuf VPU_DEC_INIT_OK not used");
   }else if(*pOutBufRetCode & VPU_DEC_NO_ENOUGH_BUF){
     *pOutBufRetCode &= ~VPU_DEC_INPUT_USED;
+    pObj->bConsumeInputLater = true;
+  //when pObj->codec->decode return CODEC_PENDING_FLUSH
+  }else if( !(*pOutBufRetCode&VPU_DEC_INPUT_USED)){
     pObj->bConsumeInputLater = true;
   }
 
