@@ -1343,6 +1343,8 @@ VpuDecRetCode VPU_DecGetInitialInfo(VpuDecHandle InHandle, VpuDecInitInfo * pOut
     pOutInitInfo->ColourDesc.colourPrimaries = info.colour_primaries;
     pOutInitInfo->ColourDesc.transferCharacteristics = info.transfer_characteristics;
     pOutInitInfo->ColourDesc.matrixCoeffs = info.matrix_coeffs;
+    pOutInitInfo->ColourDesc.fullRange = info.video_full_range_flag;
+    pOutInitInfo->hasColorDesc = true;
   }
 
   if (info.chroma_loc_info_available)
