@@ -1312,6 +1312,17 @@ VpuDecRetCode VPU_DecGetInitialInfo(VpuDecHandle InHandle, VpuDecInitInfo * pOut
     return VPU_DEC_RET_FAILURE;
   }
 
+  switch (info.format) {
+    case OMX_COLOR_FormatYUV444PackedSemiPlanar:
+      pOutInitInfo->nMjpgSourceFormat = VPU_COLOR_444;
+      break;
+    case OMX_COLOR_FormatYUV422PackedSemiPlanar:
+      pOutInitInfo->nMjpgSourceFormat = VPU_COLOR_422H;
+      break;
+    default:
+      break;
+  }
+
   pOutInitInfo->nPicWidth = info.width;
   pOutInitInfo->nPicHeight = info.height;
   pOutInitInfo->nMinFrameBufferCount = info.frame_buffers;
@@ -1376,7 +1387,7 @@ VpuDecRetCode VPU_DecGetInitialInfo(VpuDecHandle InHandle, VpuDecInitInfo * pOut
   VPU_LOG("%s: buffer resolution: %dx%d image: %dx%d crop: %d %d %d %d \r\n",
       __FUNCTION__, info.stride, info.sliceheight, info.width, info.height,
       info.crop_left, info.crop_top, info.crop_width, info.crop_height);
-  VPU_ERROR("%s: frame size: %d\n",__FUNCTION__, info.framesize);
+  VPU_ERROR("%s: frame size: %d format: %d\n",__FUNCTION__, info.framesize, info.format);
   //update state
   pVpuObj->obj.state=VPU_DEC_STATE_REGFRMOK;
 
