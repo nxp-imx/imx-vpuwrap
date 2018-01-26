@@ -78,7 +78,7 @@ static int g_seek_dump=DUMP_ALL_DATA;	/*0: only dump data after seeking; otherwi
    SEPARATOR __DATE__ SEPARATOR __TIME__)
 
 #define VPU_MEM_ALIGN			0x10
-#define VPU_BITS_BUF_SIZE		(12*1024*1024)		//bitstream buffer size : big enough contain two big frames
+#define VPU_BITS_BUF_SIZE		(16*1024*1024)		//bitstream buffer size : big enough contain two big frames
 
 #define VC1_MAX_SEQ_HEADER_SIZE	256		//for clip: WVC1_stress_a0_stress06.wmv, its header length = 176 (>128)
 #define VC1_MAX_FRM_HEADER_SIZE	32
