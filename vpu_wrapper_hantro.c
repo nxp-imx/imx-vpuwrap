@@ -189,6 +189,7 @@ typedef struct
   int nNalNum; /*added for nal_size_length = 1 or 2*/
   bool eosing;
   bool ringbuffer;
+  bool config_tile;
   int nFrameSize;
   int nOutFrameCount;
   int total_frames;
@@ -373,10 +374,12 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
     pObj->config.g2_conf.bEnableSecureMode = true;
     pObj->bSecureMode = true;
   }
+  pObj->config_tile = false;
 
   VPU_LOG("format: %d \r\n",pInParam->CodecFormat);
   switch (pInParam->CodecFormat) {
     case VPU_V_AVC:
+      pObj->config_tile = true;
       pObj->codec = HantroHwDecOmx_decoder_create_h264(pObj->pdwl,
           bIsMvcStream, &pObj->config.g1_conf);
       VPU_LOG("open H.264 \r\n");
@@ -457,6 +460,7 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
       VPU_LOG("open VP8 \r\n");
       break;
     case VPU_V_HEVC:
+      pObj->config_tile = true;
       if(!pObj->bSecureMode){
         pObj->config.g2_conf.bEnableRingBuffer = pObj->ringbuffer = true;
       }
@@ -465,6 +469,7 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
       VPU_LOG("open HEVC \r\n");
       break;
     case VPU_V_VP9:
+      pObj->config_tile = true;
       pObj->codec = HantroHwDecOmx_decoder_create_vp9(pObj->pdwl,
           &pObj->config.g2_conf);
       VPU_LOG("open VP9 \r\n");
@@ -1038,11 +1043,16 @@ static VpuDecRetCode VPU_DecDecode(VpuDecObj* pObj, int* pOutBufRetCode)
         break;
       case CODEC_HAS_INFO:
         pObj->state = VPU_DEC_STATE_INITOK;
-        if(pObj->nFrameSize == 0)
-          *pOutBufRetCode |= VPU_DEC_INIT_OK;
+        if (pObj->config_tile == true)
+        {
+          if(pObj->nFrameSize == 0)
+            *pOutBufRetCode |= VPU_DEC_INIT_OK;
+          else
+            *pOutBufRetCode |= VPU_DEC_RESOLUTION_CHANGED;
+          return VPU_DEC_RET_SUCCESS;
+        }
         else
-          *pOutBufRetCode |= VPU_DEC_RESOLUTION_CHANGED;
-        return VPU_DEC_RET_SUCCESS;
+          break;
       case CODEC_HAS_FRAME:
         *pOutBufRetCode |= VPU_DEC_ONE_FRM_CONSUMED;
         dobreak = true;
@@ -1050,6 +1060,13 @@ static VpuDecRetCode VPU_DecDecode(VpuDecObj* pObj, int* pOutBufRetCode)
       case CODEC_ABORTED:
         return VPU_DEC_RET_SUCCESS;
       case CODEC_WAITING_FRAME_BUFFER:
+        if (pObj->config_tile == false)
+        {
+          if(pObj->nFrameSize == 0)
+            *pOutBufRetCode |= VPU_DEC_INIT_OK;
+          else
+            *pOutBufRetCode |= VPU_DEC_RESOLUTION_CHANGED;
+        }
         return VPU_DEC_RET_SUCCESS;
       case CODEC_PIC_SKIPPED:
         break;
