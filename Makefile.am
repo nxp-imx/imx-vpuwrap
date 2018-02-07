@@ -180,7 +180,7 @@ DEFINES +=        -D NXP_MX_REAL_TARGET
 DEFINES +=        -D VPU_TEST_APP=7
 DEFINES +=        -D TARGET_APP=7
 
-libfslvpuwrap_la_CFLAGS += -I$(PKG_CONFIG_LIBDIR)/../../../usr/include/malone $(DEFINES)
+libfslvpuwrap_la_CFLAGS += -I$(PKG_CONFIG_SYSROOT_DIR)$(PKG_CONFIG_SYSTEM_INCLUDE_PATH)/malone $(DEFINES)
 endif
 
 libfslvpuwrap_la_OBJCFLAGS =
