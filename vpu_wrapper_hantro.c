@@ -1383,6 +1383,7 @@ VpuDecRetCode VPU_DecGetInitialInfo(VpuDecHandle InHandle, VpuDecInitInfo * pOut
 
   pObj->nFrameSize = info.framesize;
   pOutInitInfo->nFrameSize = info.framesize;
+  pOutInitInfo->nInterlace = info.interlaced;
   VPU_LOG("%s: min frame count: %d \r\n",__FUNCTION__, pOutInitInfo->nMinFrameBufferCount);
   VPU_LOG("%s: buffer resolution: %dx%d image: %dx%d crop: %d %d %d %d \r\n",
       __FUNCTION__, info.stride, info.sliceheight, info.width, info.height,
