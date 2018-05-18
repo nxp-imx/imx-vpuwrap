@@ -345,35 +345,51 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
     VPU_ERROR("%s: DWLInit failed !! \r\n",__FUNCTION__);
     return VPU_DEC_RET_FAILURE;
   }
-  pObj->config.g2_conf.bEnableTiled = false;
-  pObj->config.g1_conf.bEnableTiled = false;
-  if (pInParam->nTiled2LinearEnable)
-  {
-    pObj->config.g2_conf.bEnableTiled = true;
-    pObj->config.g1_conf.bEnableTiled = true;
-  }
-  pObj->config.g2_conf.ePixelFormat = OMX_VIDEO_G2PixelFormat_Default;
-  if (pInParam->nPixelFormat)
-    pObj->config.g2_conf.ePixelFormat = OMX_VIDEO_G2PixelFormat_8bit;
-  pObj->config.g2_conf.bEnableRFC = false;
-  if (pInParam->nEnableVideoCompressor)
-    pObj->config.g2_conf.bEnableRFC = true;
-  pObj->config.g2_conf.bEnableRingBuffer = pObj->ringbuffer = false;
-  pObj->config.g2_conf.bEnableFetchOnePic = true;
-  pObj->config.g1_conf.bAllowFieldDBP = false;
   
-  if(pInParam->nAdaptiveMode == 1){
-    pObj->config.g1_conf.bEnableAdaptiveBuffers = true;
-    pObj->config.g1_conf.nGuardSize = 0;
-    pObj->config.g2_conf.bEnableAdaptiveBuffers = true;
-    pObj->config.g2_conf.nGuardSize = 0;
-    VPU_LOG("VPU_DecOpen enable nAdaptiveMode");
+  if (pInParam->CodecFormat == VPU_V_HEVC || pInParam->CodecFormat == VPU_V_VP9)
+  {
+    pObj->config.g2_conf.bEnableTiled = false;
+    if (pInParam->nTiled2LinearEnable)
+    {
+      pObj->config.g2_conf.bEnableTiled = true;
+    }
+    pObj->config.g2_conf.ePixelFormat = OMX_VIDEO_G2PixelFormat_Default;
+    if (pInParam->nPixelFormat)
+      pObj->config.g2_conf.ePixelFormat = OMX_VIDEO_G2PixelFormat_8bit;
+    pObj->config.g2_conf.bEnableRFC = false;
+    if (pInParam->nEnableVideoCompressor)
+      pObj->config.g2_conf.bEnableRFC = true;
+    pObj->config.g2_conf.bEnableRingBuffer = pObj->ringbuffer = false;
+    pObj->config.g2_conf.bEnableFetchOnePic = true;
+    if(pInParam->nAdaptiveMode == 1){
+      pObj->config.g2_conf.bEnableAdaptiveBuffers = true;
+      pObj->config.g2_conf.nGuardSize = 0;
+      VPU_LOG("VPU_DecOpen enable nAdaptiveMode");
+    }
+    if(pInParam->nSecureMode == 1){
+      pObj->config.g2_conf.bEnableSecureMode = true;
+      pObj->bSecureMode = true;
+    }
   }
-  if(pInParam->nSecureMode == 1){
-    pObj->config.g1_conf.bEnableSecureMode = true;
-    pObj->config.g2_conf.bEnableSecureMode = true;
-    pObj->bSecureMode = true;
+  else
+  {
+    pObj->config.g1_conf.bEnableTiled = false;
+    if (pInParam->nTiled2LinearEnable)
+    {
+      pObj->config.g1_conf.bEnableTiled = true;
+    }
+    pObj->config.g1_conf.bAllowFieldDBP = false;
+    if(pInParam->nAdaptiveMode == 1){
+      pObj->config.g1_conf.bEnableAdaptiveBuffers = true;
+      pObj->config.g1_conf.nGuardSize = 0;
+      VPU_LOG("VPU_DecOpen enable nAdaptiveMode");
+    }
+    if(pInParam->nSecureMode == 1){
+      pObj->config.g1_conf.bEnableSecureMode = true;
+      pObj->bSecureMode = true;
+    }
   }
+ 
   pObj->config_tile = false;
 
   VPU_LOG("format: %d \r\n",pInParam->CodecFormat);
@@ -614,12 +630,18 @@ VpuDecRetCode VPU_DecConfig(VpuDecHandle InHandle, VpuDecConfig InDecConf, void*
       pObj->initDataCountThd=para;
       break;
     case VPU_DEC_CONF_ENABLE_TILED:
-      pObj->config.g2_conf.bEnableTiled = false;
-      pObj->config.g1_conf.bEnableTiled = false;
-      if ((*((int*)pInParam)) == 1)
-      {
-        pObj->config.g2_conf.bEnableTiled = true;
-        pObj->config.g1_conf.bEnableTiled = true;
+      if (pObj->CodecFormat == VPU_V_HEVC || pObj->CodecFormat == VPU_V_VP9) {
+        pObj->config.g2_conf.bEnableTiled = false;
+        if ((*((int*)pInParam)) == 1)
+        {
+          pObj->config.g2_conf.bEnableTiled = true;
+        }
+      } else {
+        pObj->config.g1_conf.bEnableTiled = false;
+        if ((*((int*)pInParam)) == 1)
+        {
+          pObj->config.g1_conf.bEnableTiled = true;
+        }
       }
       pObj->codec->setinfo(pObj->codec, &pObj->config);
       break;
