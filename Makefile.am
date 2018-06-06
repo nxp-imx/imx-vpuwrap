@@ -11,6 +11,9 @@ endif
 if USE_HANTRO_LIB
 libfslvpuwrap_la_SOURCES += vpu_wrapper_hantro.c
 endif
+if USE_HANTRO_ENC_LIB
+libfslvpuwrap_la_SOURCES += vpu_wrapper_hantro_encoder.c
+endif
 if USE_AMPHION_LIB
 libfslvpuwrap_la_SOURCES += vpu_wrapper_amphion.c
 endif
@@ -19,11 +22,15 @@ libfslvpuwrapincludedir = $(includedir)/imx-mm/vpu
 
 libfslvpuwrapinclude_HEADERS = vpu_wrapper.h utils.h
 
+libfslvpuwrap_la_LIBADD =
 if USE_VPU_LIB
 libfslvpuwrap_la_LIBADD = $(IMX_VPU_LIB)
 endif
 if USE_HANTRO_LIB
 libfslvpuwrap_la_LIBADD = $(IMX_HANTRO_LIB)
+endif
+if USE_HANTRO_ENC_LIB
+libfslvpuwrap_la_LIBADD += $(IMX_HANTRO_ENC_LIB)
 endif
 if USE_AMPHION_LIB
 libfslvpuwrap_la_LIBADD = $(IMX_AMPHION_LIB)
@@ -32,6 +39,10 @@ endif
 libfslvpuwrap_la_CFLAGS =
 if USE_HANTRO_LIB
 libfslvpuwrap_la_CFLAGS += -DSET_OUTPUT_CROP_RECT -DUSE_EXTERNAL_BUFFER -DVSI_API -DENABLE_CODEC_VP8
+endif
+if USE_HANTRO_ENC_LIB
+libfslvpuwrap_la_CFLAGS += -DENCH1 -DOMX_ENCODER_VIDEO_DOMAIN -DENABLE_HANTRO_ENC
+libfslvpuwrap_la_CFLAGS += -I$(PKG_CONFIG_SYSROOT_DIR)/usr/include/hantro_enc
 endif
 if USE_AMPHION_LIB
 #libfslvpuwrap_la_CFLAGS += -Werror=format-security -Wno-unused -Winit-self -Wpointer-arith -Werror=int-conversion -Wno-reserved-id-macro -Wno-format-pedantic -Wno-unused-command-line-argument -Wno-expansion-to-defined -Werror=return-type -Werror=non-virtual-dtor -Werror=address -Werror=sequence-point -Werror=date-time -Wsign-promo -Wno-inconsistent-missing-override -Wno-null-dereference -Wno-unused-parameter -Werror -Werror=int-to-pointer-cast -Werror=pointer-to-int-cast -Werror=address-of-temporary -Werror=return-type

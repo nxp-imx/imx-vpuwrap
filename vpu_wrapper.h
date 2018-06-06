@@ -1,7 +1,7 @@
 /*
  *  Copyright (c) 2010-2016, Freescale Semiconductor Inc.,
  *  All Rights Reserved.
- * Copyright 2017 NXP
+ * Copyright 2017-2018 NXP
  *
  *  The following programs are the sole property of Freescale Semiconductor Inc.,
  *  and contain its proprietary and confidential information.
@@ -478,7 +478,7 @@ typedef struct {
 
 /**************************** encoder part **********************************/
 
-typedef unsigned int VpuEncHandle;
+typedef void* VpuEncHandle;
 
 typedef enum
 {
@@ -644,11 +644,11 @@ typedef struct {
 	int nFrameRate;
 	int nQuantParam;
 
-	unsigned int nInPhyInput;	//input buffer address
-	unsigned int nInVirtInput;
+	unsigned long nInPhyInput;	//input buffer address
+	unsigned long nInVirtInput;
 	int nInInputSize;	
-	unsigned int nInPhyOutput;	//output frame address
-	unsigned int nInVirtOutput;
+	unsigned long nInPhyOutput;	//output frame address
+	unsigned long nInVirtOutput;
 	unsigned int nInOutputBufLen;
 
 	/*advanced options*/

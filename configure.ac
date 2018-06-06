@@ -28,28 +28,45 @@ dnl remove API = c+1:0:0
 dnl *************************************************
 eval LIBTOOL_VERSION_INFO="3:0:0"
 
+HAVE_VPU=no
+
 AC_CHECK_HEADERS([vpu_lib.h], [HAVE_VPU_LIB=yes], [HAVE_VPU_LIB=no])
 if test "x$HAVE_VPU_LIB" = "xyes"; then
     IMX_VPU_LIB="-lvpu"
+    HAVE_VPU=yes
 fi
 AM_CONDITIONAL(USE_VPU_LIB, test "x$HAVE_VPU_LIB" = "xyes")
 
 AC_CHECK_HEADERS([codec.h dwl.h], [HAVE_HANTRO_LIB=yes], [HAVE_HANTRO_LIB=no])
 if test "x$HAVE_HANTRO_LIB" = "xyes"; then
     IMX_HANTRO_LIB="-lcodec"
+    HAVE_VPU=yes
 fi
 AM_CONDITIONAL(USE_HANTRO_LIB, test "x$HAVE_HANTRO_LIB" = "xyes")
+
+AC_CHECK_HEADERS([hantro_enc/ewl.h], [HAVE_HANTRO_ENC_LIB=yes], [HAVE_HANTRO_ENC_LIB=no])
+if test "x$HAVE_HANTRO_ENC_LIB" = "xyes"; then
+    IMX_HANTRO_ENC_LIB="-lcodec_enc"
+    HAVE_VPU=yes
+fi
+AM_CONDITIONAL(USE_HANTRO_ENC_LIB, test "x$HAVE_HANTRO_ENC_LIB" = "xyes")
 
 AC_CHECK_HEADERS([malone/malone_interface.h], [HAVE_AMPHION_LIB=yes], [HAVE_AMPHION_LIB=no])
 if test "x$HAVE_AMPHION_LIB" = "xyes"; then
     IMX_AMPHION_LIB="-lvpu-malone"
+    HAVE_VPU=yes
 fi
 AM_CONDITIONAL(USE_AMPHION_LIB, test "x$HAVE_AMPHION_LIB" = "xyes")
+
+if test "x$HAVE_VPU" = "xno"; then
+    AC_MSG_ERROR([no vpu headers stop building vpu_wrapper])
+fi
 
 AC_SUBST(LIBTOOL_VERSION_INFO)
 AC_SUBST(IMX_VPU_LIB)
 AC_SUBST(IMX_HANTRO_LIB)
 AC_SUBST(IMX_AMPHION_LIB)
+AC_SUBST(IMX_HANTRO_ENC_LIB)
 
 AC_OUTPUT([
 Makefile

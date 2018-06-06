@@ -4,7 +4,7 @@
  *	and contain its proprietary and confidential information.
  *	Copyright (c) 2016, Freescale Semiconductor Inc.,
  *	All Rights Reserved
- *	Copyright 2017 NXP
+ *	Copyright 2017-2018 NXP
  *
  *	History :
  *	Date	(y.m.d)		Author			Version			Description
@@ -1773,6 +1773,7 @@ VpuDecRetCode VPU_DecFreeMem(VpuMemDesc* pInMem)
   return VPU_DEC_RET_SUCCESS;
 }
 
+#ifndef ENABLE_HANTRO_ENC
 VpuEncRetCode VPU_EncLoad()
 {
   return VPU_ENC_RET_SUCCESS;
@@ -1804,11 +1805,6 @@ VpuEncRetCode VPU_EncClose(VpuEncHandle InHandle)
 }
 
 VpuEncRetCode VPU_EncGetInitialInfo(VpuEncHandle InHandle, VpuEncInitInfo * pOutInitInfo)
-{
-  return VPU_ENC_RET_SUCCESS;
-}
-
-VpuEncRetCode VPU_EncGetVersionInfo(VpuVersionInfo * pOutVerInfo)
 {
   return VPU_ENC_RET_SUCCESS;
 }
@@ -1848,3 +1844,4 @@ VpuEncRetCode VPU_EncEncodeFrame(VpuEncHandle InHandle, VpuEncEncParam* pInOutPa
 {
   return VPU_ENC_RET_SUCCESS;
 }
+#endif
