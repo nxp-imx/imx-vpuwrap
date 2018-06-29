@@ -1809,6 +1809,11 @@ VpuEncRetCode VPU_EncGetInitialInfo(VpuEncHandle InHandle, VpuEncInitInfo * pOut
   return VPU_ENC_RET_SUCCESS;
 }
 
+VpuEncRetCode VPU_EncGetVersionInfo(VpuVersionInfo * pOutVerInfo)
+{
+  return VPU_ENC_RET_SUCCESS;
+}
+
 VpuEncRetCode VPU_EncGetWrapperVersionInfo(VpuWrapperVersionInfo * pOutVerInfo)
 {
   return VPU_ENC_RET_SUCCESS;
