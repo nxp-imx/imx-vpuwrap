@@ -7922,6 +7922,7 @@ VpuEncRetCode VPU_EncGetInitialInfo(VpuEncHandle InHandle, VpuEncInitInfo * pOut
 	}
 	pOutInitInfo->nMinFrameBufferCount=sInitInfo.minFrameBufferCount;
 	pOutInitInfo->nAddressAlignment=1;
+	pOutInitInfo->eType = VPU_TYPE_CHIPSMEDIA;
 
 	if (CPU_IS_MX6X())
 	{

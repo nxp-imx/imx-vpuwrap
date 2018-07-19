@@ -49,6 +49,13 @@ typedef void * VpuDecHandle;
 //typedef DecParam VpuDecParam;
 
 typedef enum {
+    VPU_TYPE_UNKNOWN = 0,
+    VPU_TYPE_CHIPSMEDIA,
+    VPU_TYPE_MALONE,
+    VPU_TYPE_HANTRO,
+} VpuType;
+
+typedef enum {
 	VPU_DEC_ERR_UNFOUND=0,
 	VPU_DEC_ERR_NOT_SUPPORTED, /*the profile/level/features/... outrange the vpu's capability*/
 	VPU_DEC_ERR_CORRUPT, /*some syntax errors are detected*/
@@ -500,6 +507,7 @@ typedef enum {
 typedef struct {
 	int nMinFrameBufferCount;
 	int nAddressAlignment;		/*address alignment for Y/Cb/Cr (unit: bytes)*/
+	VpuType eType;
 } VpuEncInitInfo;
 
 typedef enum 

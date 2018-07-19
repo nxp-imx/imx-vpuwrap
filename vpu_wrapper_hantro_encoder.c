@@ -73,13 +73,18 @@ static int g_seek_dump=DUMP_ALL_DATA;   /*0: only dump data after seeking; other
 #define VIRT_INDEX  0
 #define PHY_INDEX   1
 
+#define MAX_WIDTH 1920
+#define MIN_WIDTH 132
+#define MAX_HEIGHT 1088
+#define MIN_HEIGHT 96
+
 #define H264_ENC_MAX_BITRATE (50000*1200)    /* Level 4.1 limit */
 #define VP8_ENC_MAX_BITRATE 60000000
 
 #define H264_ENC_QP_DEFAULT 42
 #define VP8_ENC_QP_DEFAULT 10
 
-#define ALIGN(ptr,align)       ((align) ? ((((unsigned long)(ptr))+(align)-1)/(align)*(align)) : ((unsigned long)(ptr)))
+#define ALIGN(ptr,align)       ((align) ? (((unsigned long)(ptr))/(align)*(align)) : ((unsigned long)(ptr)))
 #define MemAlign(mem,align) ((((unsigned int)mem)%(align))==0)
 #define MemNotAlign(mem,align)  ((((unsigned int)mem)%(align))!=0)
 
@@ -89,6 +94,27 @@ static int g_seek_dump=DUMP_ALL_DATA;   /*0: only dump data after seeking; other
 #define VPU_ENC_ERROR(...) if(nVpuLogLevel&0x1) {LOG_PRINTF(__VA_ARGS__);}
 #define VPU_ENC_ASSERT(exp) if((!(exp))&&(nVpuLogLevel&0x1)) {LOG_PRINTF("%s: %d : assert condition !!!\r\n",__FUNCTION__,__LINE__);}
 
+
+static int AlignWidth(int width, int align)
+{
+  if (!align)
+    return width;
+  else if (width - align < MIN_WIDTH)
+    return MIN_WIDTH;
+  else
+    return ((width) / align * align);
+}
+
+
+static int AlignHeight(int height, int align)
+{
+  if (!align)
+    return height;
+  else if (height - align < MIN_HEIGHT)
+    return MIN_HEIGHT;
+  else
+    return (height) / align * align;
+}
 
 int VpuEncLogLevelParse(int * pLogLevel)
 {
@@ -134,8 +160,8 @@ typedef struct
 {
   /* open parameters */
   VpuCodStd CodecFormat;
-  bool bStreamStarted;
-  bool bAvcc;
+  int bStreamStarted;
+  int bAvcc;
 
   /* output frame buffer info */
   STREAM_BUFFER outputStreamBuf[VPU_ENC_MAX_FRAME_INDEX];
@@ -163,6 +189,16 @@ static void dumpStream(unsigned char* pBuf, unsigned int len)
 {
    FILE * pfile;
    pfile = fopen(VPU_DUMP_RAWFILE,"ab");
+   if(pfile){
+     fwrite((void*)pBuf, 1, len, pfile);
+     fclose(pfile);
+   }
+}
+
+static void dumpYUV(unsigned char* pBuf, unsigned int len)
+{
+   FILE * pfile;
+   pfile = fopen(VPU_DUMP_YUVFILE,"ab");
    if(pfile){
      fwrite((void*)pBuf, 1, len, pfile);
      fclose(pfile);
@@ -313,7 +349,7 @@ static VpuEncRetCode VPU_EncSetBitrateDefaults(VpuEncObj* pEncObj, unsigned int 
   return VPU_ENC_RET_SUCCESS;
 }
 
-static VpuEncRetCode VPU_EncSetCommonConfig(
+static VpuEncRetCode  VPU_EncSetCommonConfig(
     VpuEncObj* pEncObj,
     ENCODER_COMMON_CONFIG* pCommonCfg,
     RATE_CONTROL_CONFIG* pRateCfg,
@@ -326,8 +362,8 @@ static VpuEncRetCode VPU_EncSetCommonConfig(
 {
   int validWidth, validHeight;
 
-  pPpCfg->origWidth = pEncObj->encConfig.crop.nWidth;
-  pPpCfg->origHeight = pEncObj->encConfig.crop.nHeight;
+  pPpCfg->origWidth = AlignWidth(pEncObj->encConfig.crop.nWidth, 8);
+  pPpCfg->origHeight = AlignHeight(pEncObj->encConfig.crop.nHeight, 4);
   pPpCfg->formatType = VPU_EncConvertColorFmtVpu2Omx(colorFmt, chromaInterleave);
   pPpCfg->angle = pEncObj->encConfig.rotation.nRotation;
   pPpCfg->frameStabilization = OMX_FALSE; // disable stabilization as default ?
@@ -522,8 +558,6 @@ VpuEncRetCode VPU_EncOpen(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEn
   VpuMemSubBlockInfo * pMemPhy;
   VpuMemSubBlockInfo * pMemVirt;
   VpuEncHandleInternal* pVpuObj;
-  bool bDeblock = true;
-  bool bIsMvcStream = false;
   VpuEncObj* pObj;
   struct EWLInitParam ewlInit;
 
@@ -614,10 +648,16 @@ VpuEncRetCode VPU_EncOpen(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEn
   pObj->encConfig.deblocking.bDeblocking = OMX_FALSE;
   pObj->encConfig.rotation.nRotation = pInParam->nRotAngle;
 
+  VPU_ENC_LOG("VPU_EncOpen param w %d h %d bitrate %d gop %d frame rate %d qpmin %d qpmax %d\n",
+    pInParam->nPicWidth, pInParam->nPicHeight, pInParam->nBitRate, pInParam->nGOPSize,
+    pInParam->nFrameRate, pInParam->nUserQpMin, pInParam->nUserQpMax);
+
   switch (pInParam->eFormat) {
     case VPU_V_AVC:
     {
       H264_CONFIG config;
+
+      memset(&config, 0, sizeof(H264_CONFIG));
 
       VPU_EncSetAvcDefaults(pObj);
       VPU_EncSetCommonConfig(pObj, &config.common_config, &config.rate_config, &config.pp_config,
@@ -691,7 +731,7 @@ VpuEncRetCode VPU_EncOpenSimp(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,V
   sEncOpenParamMore.nPicHeight = pInParam->nPicHeight;
   sEncOpenParamMore.nRotAngle = pInParam->nRotAngle;
   sEncOpenParamMore.nFrameRate = pInParam->nFrameRate;
-  sEncOpenParamMore.nBitRate = pInParam->nBitRate;
+  sEncOpenParamMore.nBitRate = pInParam->nBitRate * 1000; //kbps->bps
   sEncOpenParamMore.nGOPSize = pInParam->nGOPSize;
 
   sEncOpenParamMore.nChromaInterleave = pInParam->nChromaInterleave;
@@ -798,6 +838,7 @@ VpuEncRetCode VPU_EncGetInitialInfo(VpuEncHandle InHandle, VpuEncInitInfo * pOut
 {
   pOutInitInfo->nMinFrameBufferCount = 4; // Fixme later, hantro enc has no api to query out init info
   pOutInitInfo->nAddressAlignment = 1;    // Fixme later, hantro enc has no api to query out init info
+  pOutInitInfo->eType = VPU_TYPE_HANTRO;
   return VPU_ENC_RET_SUCCESS;
 }
 
@@ -896,9 +937,10 @@ VpuEncRetCode VPU_EncGetMem(VpuMemDesc* pInOutMem)
 
   ewlInit.clientType = EWL_CLIENT_TYPE_H264_ENC;
   pewl = (void*)EWLInit(&ewlInit);
+
   if (!pewl)
   {
-    VPU_ENC_ERROR("%s: EWLInit failed !! \r\n",__FUNCTION__);
+    VPU_ENC_ERROR("%s: EWLInit failed !! pewl %p\r\n", __FUNCTION__, pewl);
     return VPU_ENC_RET_FAILURE;
   }
 
@@ -907,12 +949,15 @@ VpuEncRetCode VPU_EncGetMem(VpuMemDesc* pInOutMem)
   int ret = EWLMallocLinear(pewl, pInOutMem->nSize, &info);
   if (ret < 0)
   {
+    VPU_ENC_ERROR("%s: EWLMallocLinear failed !! ret %d\r\n", __FUNCTION__, ret);
     return VPU_ENC_RET_FAILURE;
   }
 
   pInOutMem->nPhyAddr = info.busAddress;
   pInOutMem->nVirtAddr = (unsigned long)info.virtualAddress;
   pInOutMem->nCpuAddr = info.ion_fd;
+  VPU_ENC_LOG("EWLMallocLinear pewl %p, size %d, virt 0x%x phy 0x%x\n",
+    pewl, pInOutMem->nSize, info.virtualAddress, info.busAddress);
 
   if (pewl)
     EWLRelease(pewl);
@@ -936,7 +981,7 @@ VpuEncRetCode VPU_EncFreeMem(VpuMemDesc* pInMem)
   pewl = (void*)EWLInit(&ewlInit);
   if (!pewl)
   {
-    VPU_ENC_ERROR("%s: DWLInit failed !! \r\n",__FUNCTION__);
+    VPU_ENC_ERROR("%s: EWLInit failed !! \r\n",__FUNCTION__);
     return VPU_ENC_RET_FAILURE;
   }
   VPU_ENC_LOG("VPU_EncFreeMem fd=%d",info.ion_fd);
@@ -974,7 +1019,7 @@ VpuEncRetCode VPU_EncConfig(VpuEncHandle InHandle, VpuEncConfig InEncConf, void*
         VPU_ENC_ERROR("%s: invalid bit rate parameter: %d \r\n",__FUNCTION__,para);
         return VPU_ENC_RET_INVALID_PARAM;
       }
-      pObj->encConfig.bitrate.nTargetBitrate = para;
+      pObj->encConfig.bitrate.nTargetBitrate = para * 1000;  //kbps->bps
       break;
     case VPU_ENC_CONF_INTRA_REFRESH:
       para =* ((int*)pInParam);
@@ -1027,9 +1072,9 @@ VpuEncRetCode VPU_EncEncodeFrame(VpuEncHandle InHandle, VpuEncEncParam* pInOutPa
   VpuEncRetCode ret = VPU_ENC_RET_SUCCESS;
   FRAME frame;
   STREAM_BUFFER stream;
+  int copy = 0;
 
-  if(InHandle == NULL)
-  {
+  if(InHandle == NULL){
     VPU_ENC_ERROR("%s: failure: handle is null \r\n", __FUNCTION__);
     return VPU_ENC_RET_INVALID_HANDLE;
   }
@@ -1038,16 +1083,21 @@ VpuEncRetCode VPU_EncEncodeFrame(VpuEncHandle InHandle, VpuEncEncParam* pInOutPa
   pObj = &(pVpuObj->obj);
 
   memset(&stream, 0, sizeof(STREAM_BUFFER));
-/*
-  stream.buf_max_size = pInOutParam->nInOutputBufLen;
-  stream.bus_data = (OMX_U8*)pInOutParam->nInVirtOutput;
-  stream.bus_address = pInOutParam->nInPhyOutput;
-*/
 
   /* set output buffer */
-  memcpy(&stream, &(pObj->outputStreamBuf[pObj->outputIndex]), sizeof(STREAM_BUFFER));
+  if (pObj->outputStreamBuf[pObj->outputIndex].bus_address) {
+    memcpy(&stream, &(pObj->outputStreamBuf[pObj->outputIndex]), sizeof(STREAM_BUFFER));
+    pObj->outputIndex = (pObj->outputIndex + 1) % pObj->outputNum;
+    copy = 1;
+  } else if (pInOutParam->nInPhyOutput){
+    stream.bus_data = (OMX_U8*)pInOutParam->nInVirtOutput;
+    stream.bus_address = (OSAL_BUS_WIDTH)pInOutParam->nInPhyOutput;
+  } else {
+    VPU_ENC_ERROR("invalid output buffer\n");
+    return VPU_ENC_RET_FAILURE;
+  }
+
   stream.buf_max_size = pInOutParam->nInOutputBufLen;
-  pObj->outputIndex = (pObj->outputIndex + 1) % pObj->outputNum;
 
   pInOutParam->eOutRetCode |= VPU_ENC_INPUT_NOT_USED;
 
@@ -1055,12 +1105,15 @@ VpuEncRetCode VPU_EncEncodeFrame(VpuEncHandle InHandle, VpuEncEncParam* pInOutPa
   if (!pObj->bStreamStarted) {
     ret = VPU_EncStartEncode(pObj, &stream);
     if (VPU_ENC_RET_SUCCESS == ret && stream.streamlen > 0) {
-      memcpy((void*)pInOutParam->nInVirtOutput, stream.bus_data, stream.streamlen);
+      if (copy)
+        memcpy((void*)pInOutParam->nInVirtOutput, stream.bus_data, stream.streamlen);
+
       pInOutParam->nOutOutputSize = stream.streamlen; // codec data
+
       pInOutParam->eOutRetCode |= VPU_ENC_OUTPUT_SEQHEADER;
 
       if (VPU_DUMP_RAW) {
-        dumpStream((unsigned char*)pInOutParam->nInVirtOutput, stream.streamlen);
+        dumpStream((unsigned char*)pInOutParam->nInVirtOutput, pInOutParam->nOutOutputSize);
       }
     }
     /* record encode start time */
@@ -1075,9 +1128,7 @@ VpuEncRetCode VPU_EncEncodeFrame(VpuEncHandle InHandle, VpuEncEncParam* pInOutPa
   if(pInOutParam->pInFrame != NULL) {
     frame.fb_bus_address = (OSAL_BUS_WIDTH)pInOutParam->pInFrame->pbufY;
   } else {
-    //frame.fb_bus_data = (OMX_U8*)pInOutParam->nInVirtInput;
     frame.fb_bus_address = pInOutParam->nInPhyInput;
-    //frame.fb_frameSize = pInOutParam->nInInputSize;
   }
 
   frame.bitrate = pObj->encConfig.bitrate.nTargetBitrate;
@@ -1098,6 +1149,7 @@ VpuEncRetCode VPU_EncEncodeFrame(VpuEncHandle InHandle, VpuEncEncParam* pInOutPa
   }
 
   ret = VPU_EncDoEncode(pObj, &frame, &stream);
+  VPU_ENC_LOG("VPU_EncDoEncode return %d", ret);
 
   if (ret != VPU_ENC_RET_SUCCESS) {
     VPU_ENC_ERROR("%s DoEncode return error %d\n", __FUNCTION__, ret);
@@ -1117,16 +1169,18 @@ VpuEncRetCode VPU_EncEncodeFrame(VpuEncHandle InHandle, VpuEncEncParam* pInOutPa
         return VPU_ENC_RET_INSUFFICIENT_FRAME_BUFFERS;
       }
     }
-  } else {
+  } else if (copy){
     memcpy((void*)pInOutParam->nInVirtOutput, stream.bus_data, stream.streamlen);
   }
 
   pInOutParam->nOutOutputSize = stream.streamlen;
+
   pInOutParam->eOutRetCode |= (VPU_ENC_OUTPUT_DIS | VPU_ENC_INPUT_USED);
   pObj->totalFrameCnt++;
+  VPU_ENC_LOG("Encode out frame cnt %d, size %d", pObj->totalFrameCnt, pInOutParam->nOutOutputSize);
 
   if(VPU_DUMP_RAW) {
-    dumpStream((unsigned char*)pInOutParam->nInVirtOutput, stream.streamlen);
+    dumpStream((unsigned char*)pInOutParam->nInVirtOutput, pInOutParam->nOutOutputSize);
   }
 
   return ret;
