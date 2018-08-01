@@ -39,6 +39,7 @@ endif
 libfslvpuwrap_la_CFLAGS =
 if USE_HANTRO_LIB
 libfslvpuwrap_la_CFLAGS += -DSET_OUTPUT_CROP_RECT -DUSE_EXTERNAL_BUFFER -DVSI_API -DENABLE_CODEC_VP8
+libfslvpuwrap_la_CFLAGS += -I$(PKG_CONFIG_SYSROOT_DIR)/usr/include/hantro_dec
 endif
 if USE_HANTRO_ENC_LIB
 libfslvpuwrap_la_CFLAGS += -DENCH1 -DOMX_ENCODER_VIDEO_DOMAIN -DENABLE_HANTRO_ENC

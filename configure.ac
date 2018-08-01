@@ -37,7 +37,7 @@ if test "x$HAVE_VPU_LIB" = "xyes"; then
 fi
 AM_CONDITIONAL(USE_VPU_LIB, test "x$HAVE_VPU_LIB" = "xyes")
 
-AC_CHECK_HEADERS([codec.h dwl.h], [HAVE_HANTRO_LIB=yes], [HAVE_HANTRO_LIB=no])
+AC_CHECK_HEADERS([hantro_dec/codec.h hantro_dec/dwl.h], [HAVE_HANTRO_LIB=yes], [HAVE_HANTRO_LIB=no])
 if test "x$HAVE_HANTRO_LIB" = "xyes"; then
     IMX_HANTRO_LIB="-lcodec"
     HAVE_VPU=yes
