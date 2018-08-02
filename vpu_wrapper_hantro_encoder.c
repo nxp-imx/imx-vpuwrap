@@ -94,6 +94,31 @@ static int g_seek_dump=DUMP_ALL_DATA;   /*0: only dump data after seeking; other
 #define VPU_ENC_ERROR(...) if(nVpuLogLevel&0x1) {LOG_PRINTF(__VA_ARGS__);}
 #define VPU_ENC_ASSERT(exp) if((!(exp))&&(nVpuLogLevel&0x1)) {LOG_PRINTF("%s: %d : assert condition !!!\r\n",__FUNCTION__,__LINE__);}
 
+/* table for max frame size for each video level */
+typedef struct {
+    int level;
+    int size;    // mbPerFrame, (Width / 16) * (Height / 16)
+}EncLevelSizeMap;
+
+/* H264 level size map table, sync with h1 h264 encoder */
+static const EncLevelSizeMap H264LevelSizeMapTable[] = {
+    {OMX_VIDEO_AVCLevel1,  99},
+    {OMX_VIDEO_AVCLevel1b, 99},
+    {OMX_VIDEO_AVCLevel11, 396},
+    {OMX_VIDEO_AVCLevel12, 396},
+    {OMX_VIDEO_AVCLevel13, 396},
+    {OMX_VIDEO_AVCLevel2,  396},
+    {OMX_VIDEO_AVCLevel21, 792},
+    {OMX_VIDEO_AVCLevel22, 1620},
+    {OMX_VIDEO_AVCLevel3,  1620},
+    {OMX_VIDEO_AVCLevel31, 3600},
+    {OMX_VIDEO_AVCLevel32, 5120},
+    {OMX_VIDEO_AVCLevel4,  8192},
+    {OMX_VIDEO_AVCLevel41, 8192},
+    {OMX_VIDEO_AVCLevel42, 8704},
+    {OMX_VIDEO_AVCLevel5,  22080},
+    {OMX_VIDEO_AVCLevel51, 65025},
+};
 
 static int AlignWidth(int width, int align)
 {
@@ -239,7 +264,7 @@ static VpuEncRetCode VPU_EncSetAvcDefaults(VpuEncObj* pEncObj)
   config = &pEncObj->encConfig.avc;
   config->nPortIndex = 1;
   config->eProfile = OMX_VIDEO_AVCProfileBaseline;
-  config->eLevel = OMX_VIDEO_AVCLevel51;
+  config->eLevel = OMX_VIDEO_AVCLevel1;
   config->eLoopFilterMode = OMX_VIDEO_AVCLoopFilterEnable;
   config->nRefFrames = 1;
   config->nAllowedPictureTypes &= OMX_VIDEO_PictureTypeI | OMX_VIDEO_PictureTypeP;
@@ -665,6 +690,22 @@ VpuEncRetCode VPU_EncOpen(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEn
             pInParam->eColorFormat, pInParam->nChromaInterleave);
 
       pObj->encConfig.avc.nPFrames = pInParam->nGOPSize;
+
+      // adjust H264 level based on video resolution because h1 encoder will check this.
+      int i, mbPerFrame, tableLen;
+      mbPerFrame = (pInParam->nPicWidth / 16) * (pInParam->nPicHeight / 16);
+      tableLen = sizeof(H264LevelSizeMapTable)/sizeof(H264LevelSizeMapTable[0]);
+
+      for (i = 0; i < tableLen; i++) {
+        if (pObj->encConfig.avc.eLevel == H264LevelSizeMapTable[i].level) {
+          if (mbPerFrame <= H264LevelSizeMapTable[i].size)
+            break;
+          else if (i + 1 < tableLen)
+            pObj->encConfig.avc.eLevel = H264LevelSizeMapTable[i + 1].level;
+          else
+            return VPU_ENC_RET_INVALID_PARAM;
+        }
+      }
 
       config.h264_config.eProfile = pObj->encConfig.avc.eProfile;
       config.h264_config.eLevel = pObj->encConfig.avc.eLevel;
