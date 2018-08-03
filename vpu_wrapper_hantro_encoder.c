@@ -453,16 +453,12 @@ static VpuEncRetCode  VPU_EncSetCommonConfig(
     break;
   }
 
-  /* workaround to set check bitrate if nPictureRc enabled */
+  // workaround to set check bitrate if nPictureRc enabled, calculate target bitrate =
+  // bitPerFrame * frameRate / compression, so that resolution from max - min can get a approprite bitrate
   if (pRateCfg->nTargetBitrate < VPU_ENC_MIN_BITRTE && pRateCfg->nPictureRcEnabled) {
-    if (pPpCfg->origWidth >= 1920)
-      pRateCfg->nTargetBitrate = 20000000; // 20Mbps
-    else if (pPpCfg->origWidth >= 1280)
-      pRateCfg->nTargetBitrate = 8000000; // 10Mbps
-    else if (pPpCfg->origWidth >= 720)
-      pRateCfg->nTargetBitrate = 3000000; // 3Mbps
-    else
-      pRateCfg->nTargetBitrate = 1000000; // 1Mbps
+    int bitPerFrame = pPpCfg->origWidth * pPpCfg->origHeight * 8;
+    int compression = 20;
+    pRateCfg->nTargetBitrate = bitPerFrame / compression  * frameRate / 1000 * 1000;
   }
 
   return VPU_ENC_RET_SUCCESS;
