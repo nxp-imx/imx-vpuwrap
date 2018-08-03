@@ -459,6 +459,7 @@ static VpuEncRetCode  VPU_EncSetCommonConfig(
     int bitPerFrame = pPpCfg->origWidth * pPpCfg->origHeight * 8;
     int compression = 20;
     pRateCfg->nTargetBitrate = bitPerFrame / compression  * frameRate / 1000 * 1000;
+    pEncObj->encConfig.bitrate.nTargetBitrate = pRateCfg->nTargetBitrate;
   }
 
   return VPU_ENC_RET_SUCCESS;
@@ -1170,15 +1171,7 @@ VpuEncRetCode VPU_EncEncodeFrame(VpuEncHandle InHandle, VpuEncEncParam* pInOutPa
 
   frame.bitrate = pObj->encConfig.bitrate.nTargetBitrate;
   frame.bus_lumaStab = 0;  // because stabilize is not enabled
-
-  if (pInOutParam->eFormat == VPU_V_AVC)
-    frame.frame_type = (pInOutParam->nForceIPicture ? INTRA_FRAME : PREDICTED_FRAME);
-  else if (pInOutParam->eFormat == VPU_V_VP8)
-    frame.frame_type = PREDICTED_FRAME;
-  else {
-    VPU_ENC_ERROR("%s: not support format %d", __FUNCTION__, pInOutParam->eFormat);
-    return VPU_ENC_RET_INVALID_PARAM;
-  }
+  frame.frame_type = (pInOutParam->nForceIPicture ? INTRA_FRAME : PREDICTED_FRAME);
 
   if (pObj->encConfig.intraRefreshVop.IntraRefreshVOP == OMX_TRUE) {
     frame.frame_type = INTRA_FRAME;
@@ -1214,7 +1207,7 @@ VpuEncRetCode VPU_EncEncodeFrame(VpuEncHandle InHandle, VpuEncEncParam* pInOutPa
 
   pInOutParam->eOutRetCode |= (VPU_ENC_OUTPUT_DIS | VPU_ENC_INPUT_USED);
   pObj->totalFrameCnt++;
-  VPU_ENC_LOG("Encode out frame cnt %d, size %d", pObj->totalFrameCnt, pInOutParam->nOutOutputSize);
+  VPU_ENC_LOG("Encode out frame cnt %d, size %d type %d\n", pObj->totalFrameCnt, pInOutParam->nOutOutputSize, frame.frame_type);
 
   if(VPU_DUMP_RAW) {
     dumpStream((unsigned char*)pInOutParam->nInVirtOutput, pInOutParam->nOutOutputSize);
