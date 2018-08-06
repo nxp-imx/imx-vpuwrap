@@ -78,6 +78,11 @@ static int g_seek_dump=DUMP_ALL_DATA;   /*0: only dump data after seeking; other
 #define MAX_HEIGHT 1088
 #define MIN_HEIGHT 96
 
+#define VPU_ENC_DEFAULT_ALIGNMENT_H 8
+#define VPU_ENC_DEFAULT_ALIGNMENT_V 8
+
+#define H264_ENC_MAX_GOP_SIZE 300
+
 #define H264_ENC_MAX_BITRATE (50000*1200)    /* Level 4.1 limit */
 #define VP8_ENC_MAX_BITRATE 60000000
 
@@ -387,8 +392,8 @@ static VpuEncRetCode  VPU_EncSetCommonConfig(
 {
   int validWidth, validHeight;
 
-  pPpCfg->origWidth = AlignWidth(pEncObj->encConfig.crop.nWidth, 8);
-  pPpCfg->origHeight = AlignHeight(pEncObj->encConfig.crop.nHeight, 4);
+  pPpCfg->origWidth = AlignWidth(pEncObj->encConfig.crop.nWidth, VPU_ENC_DEFAULT_ALIGNMENT_H);
+  pPpCfg->origHeight = AlignHeight(pEncObj->encConfig.crop.nHeight, VPU_ENC_DEFAULT_ALIGNMENT_V);
   pPpCfg->formatType = VPU_EncConvertColorFmtVpu2Omx(colorFmt, chromaInterleave);
   pPpCfg->angle = pEncObj->encConfig.rotation.nRotation;
   pPpCfg->frameStabilization = OMX_FALSE; // disable stabilization as default ?
@@ -686,11 +691,11 @@ VpuEncRetCode VPU_EncOpen(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEn
             pInParam->nFrameRate, pInParam->nUserQpMin, pInParam->nUserQpMax,
             pInParam->eColorFormat, pInParam->nChromaInterleave);
 
-      pObj->encConfig.avc.nPFrames = pInParam->nGOPSize;
+      pObj->encConfig.avc.nPFrames = (pInParam->nGOPSize > H264_ENC_MAX_GOP_SIZE ? H264_ENC_MAX_GOP_SIZE : pInParam->nGOPSize);
 
       // adjust H264 level based on video resolution because h1 encoder will check this.
       int i, mbPerFrame, tableLen;
-      mbPerFrame = (pInParam->nPicWidth / 16) * (pInParam->nPicHeight / 16);
+      mbPerFrame = ((pInParam->nPicWidth + 15) / 16) * ((pInParam->nPicHeight + 15) / 16);
       tableLen = sizeof(H264LevelSizeMapTable)/sizeof(H264LevelSizeMapTable[0]);
 
       for (i = 0; i < tableLen; i++) {
