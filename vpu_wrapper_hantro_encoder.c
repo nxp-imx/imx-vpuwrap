@@ -86,8 +86,8 @@ static int g_seek_dump=DUMP_ALL_DATA;   /*0: only dump data after seeking; other
 #define H264_ENC_MAX_BITRATE (50000*1200)    /* Level 4.1 limit */
 #define VP8_ENC_MAX_BITRATE 60000000
 
-#define H264_ENC_QP_DEFAULT 42
-#define VP8_ENC_QP_DEFAULT 10
+#define H264_ENC_QP_DEFAULT 26
+#define VP8_ENC_QP_DEFAULT 26
 
 #define ALIGN(ptr,align)       ((align) ? (((unsigned long)(ptr))/(align)*(align)) : ((unsigned long)(ptr)))
 #define MemAlign(mem,align) ((((unsigned int)mem)%(align))==0)
@@ -462,7 +462,7 @@ static VpuEncRetCode  VPU_EncSetCommonConfig(
   // bitPerFrame * frameRate / compression, so that resolution from max - min can get a approprite bitrate
   if (pRateCfg->nTargetBitrate < VPU_ENC_MIN_BITRTE && pRateCfg->nPictureRcEnabled) {
     int bitPerFrame = pPpCfg->origWidth * pPpCfg->origHeight * 8;
-    int compression = 20;
+    int compression = 50;
     pRateCfg->nTargetBitrate = bitPerFrame / compression  * frameRate / 1000 * 1000;
     pEncObj->encConfig.bitrate.nTargetBitrate = pRateCfg->nTargetBitrate;
   }
