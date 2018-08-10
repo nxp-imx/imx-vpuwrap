@@ -1119,7 +1119,7 @@ static VpuDecRetCode VPU_DecDecode(VpuDecObj* pObj, int* pOutBufRetCode)
       break;
   }
 
-  if(pObj->nBsBufLen == 0)
+  if(pObj->nBsBufLen == 0 && pObj->eosing == 0)
     *pOutBufRetCode |= VPU_DEC_NO_ENOUGH_INBUF;
 
   if(pObj->eosing && pObj->nBsBufLen == 0)
