@@ -86,7 +86,7 @@ static int g_seek_dump=DUMP_ALL_DATA;   /*0: only dump data after seeking; other
 #define H264_ENC_MAX_BITRATE (50000*1200)    /* Level 4.1 limit */
 #define VP8_ENC_MAX_BITRATE 60000000
 
-#define H264_ENC_QP_DEFAULT 26
+#define H264_ENC_QP_DEFAULT 33
 #define VP8_ENC_QP_DEFAULT 26
 
 #define ALIGN(ptr,align)       ((align) ? (((unsigned long)(ptr))/(align)*(align)) : ((unsigned long)(ptr)))
@@ -306,7 +306,7 @@ static VpuEncRetCode VPU_EncSetAvcDefaults(VpuEncObj* pEncObj)
   OMX_PARAM_DEBLOCKINGTYPE* deb = 0;
   deb = &pEncObj->encConfig.deblocking;
   deb->nPortIndex = 1;
-  deb->bDeblocking = OMX_FALSE;
+  deb->bDeblocking = OMX_TRUE;
 
   OMX_VIDEO_PARAM_QUANTIZATIONTYPE* quantization  = 0;
   quantization = &pEncObj->encConfig.videoQuantization;
