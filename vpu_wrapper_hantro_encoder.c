@@ -674,6 +674,7 @@ VpuEncRetCode VPU_EncOpen(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEn
 
   pObj->encConfig.deblocking.bDeblocking = OMX_FALSE;
   pObj->encConfig.rotation.nRotation = pInParam->nRotAngle;
+  pObj->encConfig.prependSPSPPSToIDRFrames = OMX_TRUE;
 
   VPU_ENC_LOG("VPU_EncOpen param w %d h %d bitrate %d gop %d frame rate %d qpmin %d qpmax %d\n",
     pInParam->nPicWidth, pInParam->nPicHeight, pInParam->nBitRate, pInParam->nGOPSize,
