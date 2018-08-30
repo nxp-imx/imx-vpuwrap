@@ -243,11 +243,26 @@ static OMX_COLOR_FORMATTYPE VPU_EncConvertColorFmtVpu2Omx(VpuColorFormat vpuColo
     case VPU_COLOR_420:
       omxColorFmt = chromaInterleave ? OMX_COLOR_FormatYUV420SemiPlanar : OMX_COLOR_FormatYUV420Planar;
       break;
-    case VPU_COLOR_422H:
+    case VPU_COLOR_422YUYV:
       omxColorFmt = OMX_COLOR_FormatYCbYCr;
       break;
-    case VPU_COLOR_422V:
-      omxColorFmt = OMX_COLOR_FormatYCbYCr;
+    case VPU_COLOR_422UYVY:
+      omxColorFmt = OMX_COLOR_FormatCbYCrY;
+      break;
+    case VPU_COLOR_ARGB8888:
+      omxColorFmt = OMX_COLOR_Format32bitBGRA8888;
+      break;
+    case VPU_COLOR_BGRA8888:
+      omxColorFmt = OMX_COLOR_Format32bitARGB8888;
+      break;
+    case VPU_COLOR_RGB565:
+      omxColorFmt = OMX_COLOR_Format16bitRGB565;
+      break;
+    case VPU_COLOR_RGB555:
+      omxColorFmt = OMX_COLOR_Format16bitARGB1555;
+      break;
+    case VPU_COLOR_BGR565:
+      omxColorFmt = OMX_COLOR_Format16bitBGR565;
       break;
     case VPU_COLOR_444:
       // not support yet
@@ -716,6 +731,10 @@ VpuEncRetCode VPU_EncOpen(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEn
       config.bSeiMessages = OMX_FALSE;
       config.nSliceHeight = 0;
       config.nPFrames = pObj->encConfig.avc.nPFrames;
+      if (pInParam->eColorFormat == VPU_COLOR_ARGB8888 || pInParam->eColorFormat == VPU_COLOR_BGRA8888 ||
+          pInParam->eColorFormat == VPU_COLOR_RGB565 || pInParam->eColorFormat == VPU_COLOR_RGB555 ||
+          pInParam->eColorFormat == VPU_COLOR_BGR565)
+        config.nVideoFullRange = 1; /* set 1 to imply that 845S H1 HW only support YUV full range when do RGB->YUV CSC(color space convert). */
 
       if (config.rate_config.nTargetBitrate > H264_ENC_MAX_BITRATE)
         config.rate_config.nTargetBitrate = H264_ENC_MAX_BITRATE;
