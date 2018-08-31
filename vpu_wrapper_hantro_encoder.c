@@ -62,7 +62,7 @@ static int g_seek_dump=DUMP_ALL_DATA;   /*0: only dump data after seeking; other
 
 
 #define VPU_MEM_ALIGN           0x10
-#define VPU_BITS_BUF_SIZE       (3*1024*1024)      //bitstream buffer size : big enough contain two big frames
+#define VPU_BITS_BUF_SIZE       (4*1024*1024)      //bitstream buffer size : big enough for 1080p h264/vp8 with max bitrate
 
 #define VPU_ENC_SEQ_DATA_SEPERATE
 #define VPU_ENC_MAX_RETRIES 10000
@@ -193,11 +193,6 @@ typedef struct
   int bStreamStarted;
   int bAvcc;
 
-  /* output frame buffer info */
-  STREAM_BUFFER outputStreamBuf[VPU_ENC_MAX_FRAME_INDEX];
-  int outputIndex;
-  int outputNum;
-
   /* perf calculation*/
   int totalFrameCnt;
   struct timeval tvBegin;
@@ -208,6 +203,11 @@ typedef struct
   ENCODER_PROTOTYPE *codec;
   OMX_VIDEO_PARAM_CONFIGTYPE config;
   VIDEO_ENCODER_CONFIG encConfig;
+
+  /* bit stream buffer */
+  unsigned char* pBsBufVirt;
+  unsigned char* pBsBufPhy;
+  int nBsBufLen;
 }VpuEncObj;
 
 typedef struct
@@ -629,6 +629,9 @@ VpuEncRetCode VPU_EncOpen(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEn
   pObj->bAvcc = ((pInParam->nIsAvcc && VPU_V_AVC == pInParam->eFormat) ? 1 : 0);
 
   pObj->totalFrameCnt = 0;
+  pObj->pBsBufPhy = pMemPhy->pPhyAddr;
+  pObj->pBsBufVirt = pMemPhy->pVirtAddr;
+  pObj->nBsBufLen = pMemPhy->nSize;
 
 #if 0
   if (pInParam->eFormat == VPU_V_AVC)
@@ -899,7 +902,7 @@ VpuEncRetCode VPU_EncClose(VpuEncHandle InHandle)
 
 VpuEncRetCode VPU_EncGetInitialInfo(VpuEncHandle InHandle, VpuEncInitInfo * pOutInitInfo)
 {
-  pOutInitInfo->nMinFrameBufferCount = 4; // Fixme later, hantro enc has no api to query out init info
+  pOutInitInfo->nMinFrameBufferCount = 0; // Fixme later, hantro enc has no api to query out init info
   pOutInitInfo->nAddressAlignment = 1;    // Fixme later, hantro enc has no api to query out init info
   pOutInitInfo->eType = VPU_TYPE_HANTRO;
   return VPU_ENC_RET_SUCCESS;
@@ -933,35 +936,7 @@ VpuEncRetCode VPU_EncGetWrapperVersionInfo(VpuWrapperVersionInfo * pOutVerInfo)
 
 VpuEncRetCode VPU_EncRegisterFrameBuffer(VpuEncHandle InHandle,VpuFrameBuffer *pInFrameBufArray, int nNum,int nSrcStride)
 {
-  VpuEncHandleInternal * pVpuObj;
-  VpuEncObj * pObj;
-  VpuEncRetCode ret;
-  STREAM_BUFFER *pStreamBuf;
-  int i;
-
-  if(InHandle == NULL) {
-    VPU_ENC_ERROR("%s: failure: handle is null \r\n", __FUNCTION__);
-    return VPU_ENC_RET_INVALID_HANDLE;
-  }
-
-  if(nNum > VPU_ENC_MAX_FRAME_INDEX) {
-    VPU_ENC_ERROR("%s: failure: register frame number is too big(%d) \r\n",__FUNCTION__, nNum);
-    return VPU_ENC_RET_INVALID_PARAM;
-  }
-
-  pVpuObj = (VpuEncHandleInternal *)InHandle;
-  pObj = &(pVpuObj->obj);
-  pStreamBuf = pObj->outputStreamBuf;
-
-  for (i = 0; i < nNum; i++) {
-    pStreamBuf->bus_data = pInFrameBufArray->pbufVirtY;
-    pStreamBuf->bus_address = (OSAL_BUS_WIDTH)pInFrameBufArray->pbufY;
-    pInFrameBufArray++;
-    pStreamBuf++;
-  }
-
-  pObj->outputNum = nNum;
-
+  // do nothing because h1 encoder don't need register frame buffer
   return VPU_ENC_RET_SUCCESS;
 }
 
@@ -1148,19 +1123,18 @@ VpuEncRetCode VPU_EncEncodeFrame(VpuEncHandle InHandle, VpuEncEncParam* pInOutPa
   memset(&stream, 0, sizeof(STREAM_BUFFER));
 
   /* set output buffer */
-  if (pObj->outputStreamBuf[pObj->outputIndex].bus_address) {
-    memcpy(&stream, &(pObj->outputStreamBuf[pObj->outputIndex]), sizeof(STREAM_BUFFER));
-    pObj->outputIndex = (pObj->outputIndex + 1) % pObj->outputNum;
-    copy = 1;
-  } else if (pInOutParam->nInPhyOutput){
+  copy = 1;
+  stream.bus_data = (OMX_U8*)pObj->pBsBufVirt;
+  stream.bus_address = (OSAL_BUS_WIDTH)pObj->pBsBufPhy;
+  stream.buf_max_size = (OMX_U32)pObj->nBsBufLen;
+
+  /* if the out buffer is DMA buffer, use it instead of pBsBufPhy, this can avoid copy buffer */
+  if (pInOutParam->nInPhyOutput) {
+    copy = 0;
     stream.bus_data = (OMX_U8*)pInOutParam->nInVirtOutput;
     stream.bus_address = (OSAL_BUS_WIDTH)pInOutParam->nInPhyOutput;
-  } else {
-    VPU_ENC_ERROR("invalid output buffer\n");
-    return VPU_ENC_RET_FAILURE;
+    stream.buf_max_size = pInOutParam->nInOutputBufLen;
   }
-
-  stream.buf_max_size = pInOutParam->nInOutputBufLen;
 
   pInOutParam->eOutRetCode |= VPU_ENC_INPUT_NOT_USED;
 
