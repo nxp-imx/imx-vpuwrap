@@ -1463,7 +1463,7 @@ VpuDecRetCode VPU_DecRegisterFrameBuffer(VpuDecHandle InHandle,VpuFrameBuffer *p
     pInFrameBufArray++;
 
     ret = pObj->codec->setframebuffer(pObj->codec, &buffer, nNum);
-    if (ret == CODEC_ERROR_BUFFER_SIZE)
+    if (ret == CODEC_ERROR_BUFFER_SIZE || ret == CODEC_ERROR_MEMFAIL)
     {
       return VPU_DEC_RET_INVALID_PARAM;
     }
