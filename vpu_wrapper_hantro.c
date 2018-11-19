@@ -694,10 +694,10 @@ static void WrapperFileDumpYUV(VpuDecObj* pObj, VpuFrameBuffer *pDisplayBuf)
     }
     return;
 }
-static void VpuPutInBuf(VpuDecObj* pObj, unsigned char *pIn, unsigned int len, unsigned char *pInPhyc)
+static void VpuPutInBuf(VpuDecObj* pObj, unsigned char *pIn, unsigned int len, bool useRingBuffer)
 {
   //do not use ring buffer in secure mode
-  if(pObj->bSecureMode && pInPhyc != NULL){
+  if(!useRingBuffer){
     pObj->pBsBufVirtStart = pIn;
     pObj->nBsBufLen = len;
     VPU_LOG("VpuPutInBuf size=%d",len);
@@ -736,12 +736,15 @@ static VpuDecRetCode VPU_DecProcessInBuf(VpuDecObj* pObj, VpuBufferNode* pInData
   unsigned int headerLen=0;
   unsigned int headerAllocated=0;
   int pNoErr = 1;
+  bool useRingBuffer = false;
 
   if(pInData->pVirAddr == (unsigned char *)0x01 && pInData->nSize == 0)
     pObj->eosing = true;
 
   if(pInData->pVirAddr == NULL || pInData->nSize == 0)
     return VPU_DEC_RET_SUCCESS;
+
+  useRingBuffer = !(pObj->bSecureMode && pInData->pPhyAddr != NULL);
 
   if(pObj->nPrivateSeqHeaderInserted == 0)
   {
@@ -767,7 +770,7 @@ static VpuDecRetCode VPU_DecProcessInBuf(VpuDecObj* pObj, VpuBufferNode* pInData
       pHeader[i++] = (unsigned char)(((nHeight >> 8) & 0xff));
       pHeader[i++] = (unsigned char)(((nHeight >> 16) & 0xff));
       pHeader[i++] = (unsigned char)(((nHeight >> 24) & 0xff));
-      VpuPutInBuf(pObj, pHeader, headerLen, pInData->pPhyAddr);
+      VpuPutInBuf(pObj, pHeader, headerLen, useRingBuffer);
     }
     else if(pObj->CodecFormat==VPU_V_WEBP)
     {
@@ -829,7 +832,7 @@ static VpuDecRetCode VPU_DecProcessInBuf(VpuDecObj* pObj, VpuBufferNode* pInData
         VC1CreateNALSeqHeader(pHeader, (int*)(&headerLen),pInData->sCodecData.pData,
             (int)pInData->sCodecData.nSize, (unsigned int*)pInData->pVirAddr,
             VC1_MAX_SEQ_HEADER_SIZE);
-        if(VC1_IS_NOT_NAL(((unsigned int*)pInData->pVirAddr)[0]))
+        if(VC1_IS_NOT_NAL(((unsigned int*)pInData->pVirAddr)[0]) && headerLen >= 4)
           headerLen -= 4;
       }
       else if(pObj->CodecFormat==VPU_V_VC1)
@@ -848,7 +851,7 @@ static VpuDecRetCode VPU_DecProcessInBuf(VpuDecObj* pObj, VpuBufferNode* pInData
         headerLen=pInData->sCodecData.nSize;
       }
       VPU_LOG("put CodecData len=%d",headerLen);
-      VpuPutInBuf(pObj, pHeader, headerLen, pInData->pPhyAddr);
+      VpuPutInBuf(pObj, pHeader, headerLen, useRingBuffer);
       pObj->nAccumulatedConsumedFrmBytes -= headerLen;
 
       if(headerAllocated){
@@ -863,7 +866,7 @@ static VpuDecRetCode VPU_DecProcessInBuf(VpuDecObj* pObj, VpuBufferNode* pInData
     unsigned int nFrmSize;
     VpuConvertAvccFrame(pInData->pVirAddr,pInData->nSize,pObj->nNalSizeLen,
         &pFrm,&nFrmSize,&pObj->nNalNum);
-    VpuPutInBuf(pObj, pFrm, nFrmSize,pInData->pPhyAddr);
+    VpuPutInBuf(pObj, pFrm, nFrmSize, useRingBuffer);
     if(pFrm!=pInData->pVirAddr){
       free(pFrm);
     }
@@ -872,12 +875,12 @@ static VpuDecRetCode VPU_DecProcessInBuf(VpuDecObj* pObj, VpuBufferNode* pInData
       unsigned char aVC1Head[VC1_MAX_FRM_HEADER_SIZE];
       pHeader=aVC1Head;
       VC1CreateNalFrameHeader(pHeader,(int*)(&headerLen),(unsigned int*)(pInData->pVirAddr));
-      VpuPutInBuf(pObj, pHeader, headerLen,pInData->pPhyAddr);
+      VpuPutInBuf(pObj, pHeader, headerLen, useRingBuffer);
     } else if(pObj->CodecFormat==VPU_V_MJPG) {
       pObj->nBsBufOffset = 0;
     }
 
-    VpuPutInBuf(pObj, pInData->pVirAddr, pInData->nSize,pInData->pPhyAddr);
+    VpuPutInBuf(pObj, pInData->pVirAddr, pInData->nSize, useRingBuffer);
   }
 
   return VPU_DEC_RET_SUCCESS;
