@@ -199,6 +199,7 @@ typedef struct
   int frame_size;
   bool bSecureMode;
   bool bConsumeInputLater;
+  int nSecureBufferAllocSize;
 }VpuDecObj;
 
 typedef struct 
@@ -369,6 +370,7 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
     if(pInParam->nSecureMode == 1){
       pObj->config.g2_conf.bEnableSecureMode = true;
       pObj->bSecureMode = true;
+      pObj->nSecureBufferAllocSize = pInParam->nSecureBufferAllocSize;
     }
   }
   else
@@ -387,6 +389,7 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
     if(pInParam->nSecureMode == 1){
       pObj->config.g1_conf.bEnableSecureMode = true;
       pObj->bSecureMode = true;
+      pObj->nSecureBufferAllocSize = pInParam->nSecureBufferAllocSize;
     }
   }
  
@@ -989,7 +992,7 @@ static VpuDecRetCode VPU_DecDecode(VpuDecObj* pObj, int* pOutBufRetCode)
     stream.bus_data = pObj->pBsBufVirtStart + pObj->nBsBufOffset;
     stream.bus_address = (OSAL_BUS_WIDTH)pObj->pBsBufPhyStart + pObj->nBsBufOffset;
     stream.streamlen = pObj->nBsBufLen;
-    stream.allocsize = VPU_BITS_BUF_SIZE;
+    stream.allocsize = pObj->bSecureMode ? pObj->nSecureBufferAllocSize : VPU_BITS_BUF_SIZE;
 
     // see if we can find complete frames in the buffer
     int ret = pObj->codec->scanframe(pObj->codec, &stream, &first, &last);
