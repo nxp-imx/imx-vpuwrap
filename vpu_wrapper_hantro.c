@@ -1100,6 +1100,8 @@ static VpuDecRetCode VPU_DecDecode(VpuDecObj* pObj, int* pOutBufRetCode)
         break;
       case CODEC_ERROR_STREAM:
         break;
+      case CODEC_ERROR_FRAME:
+        break;
       case CODEC_ERROR_STREAM_NOT_SUPPORTED:
         return VPU_DEC_RET_FAILURE;
       case CODEC_ERROR_FORMAT_NOT_SUPPORTED:
