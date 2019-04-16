@@ -51,13 +51,6 @@ if test "x$HAVE_HANTRO_ENC_LIB" = "xyes"; then
 fi
 AM_CONDITIONAL(USE_HANTRO_ENC_LIB, test "x$HAVE_HANTRO_ENC_LIB" = "xyes")
 
-AC_CHECK_HEADERS([malone/malone_interface.h], [HAVE_AMPHION_LIB=yes], [HAVE_AMPHION_LIB=no])
-if test "x$HAVE_AMPHION_LIB" = "xyes"; then
-    IMX_AMPHION_LIB="-lvpu-malone"
-    HAVE_VPU=yes
-fi
-AM_CONDITIONAL(USE_AMPHION_LIB, test "x$HAVE_AMPHION_LIB" = "xyes")
-
 if test "x$HAVE_VPU" = "xno"; then
     AC_MSG_ERROR([no vpu headers stop building vpu_wrapper])
 fi
