@@ -14,6 +14,10 @@ endif
 if USE_HANTRO_ENC_LIB
 libfslvpuwrap_la_SOURCES += vpu_wrapper_hantro_encoder.c
 endif
+if USE_HANTRO_VC8000E_ENC_LIB
+libfslvpuwrap_la_SOURCES += vpu_wrapper_hantro_VCencoder.c
+endif
+libfslvpuwrap_la_SOURCES += vpu_wrapper_hantro_encoder_all.c
 
 libfslvpuwrapincludedir = $(includedir)/imx-mm/vpu
 
@@ -29,6 +33,9 @@ endif
 if USE_HANTRO_ENC_LIB
 libfslvpuwrap_la_LIBADD += $(IMX_HANTRO_ENC_LIB)
 endif
+if USE_HANTRO_VC8000E_ENC_LIB
+libfslvpuwrap_la_LIBADD += $(IMX_HANTRO_VC8000E_ENC_LIB)
+endif
 
 libfslvpuwrap_la_CFLAGS =
 if USE_HANTRO_LIB
@@ -38,6 +45,10 @@ endif
 if USE_HANTRO_ENC_LIB
 libfslvpuwrap_la_CFLAGS += -DENCH1 -DOMX_ENCODER_VIDEO_DOMAIN -DENABLE_HANTRO_ENC
 libfslvpuwrap_la_CFLAGS += -I$(PKG_CONFIG_SYSROOT_DIR)/usr/include/hantro_enc
+endif
+if USE_HANTRO_VC8000E_ENC_LIB
+libfslvpuwrap_la_CFLAGS += -DENCVC8000E -DOMX_ENCODER_VIDEO_DOMAIN -DENABLE_HANTRO_ENC
+libfslvpuwrap_la_CFLAGS += -I$(PKG_CONFIG_SYSROOT_DIR)/usr/include/hantro_VC8000E_enc
 endif
 
 libfslvpuwrap_la_OBJCFLAGS =
