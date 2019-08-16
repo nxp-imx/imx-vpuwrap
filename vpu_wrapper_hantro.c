@@ -423,22 +423,10 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
           bDeblock, MPEG4FORMAT_SORENSON, &pObj->config.g1_conf);
       VPU_LOG("open Mpeg4 \r\n");
       break;
-    case VPU_V_DIVX4:		/**< DIVX 4 */
-    case VPU_V_DIVX56:		/**< DIVX 5/6 */
-      pObj->codec = HantroHwDecOmx_decoder_create_mpeg4(pObj->pdwl,
-          bDeblock, MPEG4FORMAT_CUSTOM_1, &pObj->config.g1_conf);
-      VPU_LOG("open DIVX 4 \r\n");
-      VPU_LOG("open DIVX 56 \r\n");
-      break;
     case VPU_V_XVID:		/**< XVID */
       pObj->codec = HantroHwDecOmx_decoder_create_mpeg4(pObj->pdwl,
           bDeblock, MPEG4FORMAT_MPEG4, &pObj->config.g1_conf);
       VPU_LOG("open XVID \r\n");
-      break;
-    case VPU_V_DIVX3:		/**< DIVX 3 */
-      pObj->codec = HantroHwDecOmx_decoder_create_mpeg4(pObj->pdwl,
-          bDeblock, MPEG4FORMAT_CUSTOM_1_3, &pObj->config.g1_conf);
-      VPU_LOG("open DIVX 3 \r\n");
       break;
     case VPU_V_RV:		
       VPU_LOG("open RV \r\n");
