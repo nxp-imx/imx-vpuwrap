@@ -57,19 +57,19 @@
 #define VPU_DEC_MAX_NUM_MEM_NUM	VPU_DEC_MAX_NUM_MEM_REQS
 #endif
 
-#define Align(ptr,align)	(((unsigned int)ptr+(align)-1)/(align)*(align))
+#define Align(ptr,align)	(((unsigned long)ptr+(align)-1)/(align)*(align))
 
 typedef struct
 {
 	//virtual mem info
 	int nVirtNum;
-	unsigned int virtMem[VPU_DEC_MAX_NUM_MEM_NUM];
+	unsigned long virtMem[VPU_DEC_MAX_NUM_MEM_NUM];
 
 	//phy mem info
 	int nPhyNum;
-	unsigned int phyMem_virtAddr[VPU_DEC_MAX_NUM_MEM_NUM];
-	unsigned int phyMem_phyAddr[VPU_DEC_MAX_NUM_MEM_NUM];
-	unsigned int phyMem_cpuAddr[VPU_DEC_MAX_NUM_MEM_NUM];
+	unsigned long phyMem_virtAddr[VPU_DEC_MAX_NUM_MEM_NUM];
+	unsigned long phyMem_phyAddr[VPU_DEC_MAX_NUM_MEM_NUM];
+	unsigned long phyMem_cpuAddr[VPU_DEC_MAX_NUM_MEM_NUM];
 	unsigned int phyMem_size[VPU_DEC_MAX_NUM_MEM_NUM];	
 }DecMemInfo;
 
@@ -290,6 +290,9 @@ int ConvertCodecFormat(int codec, VpuCodStd* pCodec)
 		case 14:
 			*pCodec=VPU_V_AVC_MVC;
 			break;
+		case 15:
+			*pCodec=VPU_V_HEVC;
+			break;
 		default:
 			return 0;			
 	}
@@ -420,7 +423,7 @@ int MallocMemBlock(VpuMemInfo* pMemBlock,DecMemInfo* pDecMem)
 			pMemBlock->MemSubBlock[i].pVirtAddr=(unsigned char*)Align(ptr,pMemBlock->MemSubBlock[i].nAlignment);
 
 			//record virtual base addr
-			pDecMem->virtMem[pDecMem->nVirtNum]=(unsigned int)ptr;
+			pDecMem->virtMem[pDecMem->nVirtNum]=(unsigned long)ptr;
 			pDecMem->nVirtNum++;
 		}
 		else// if(memInfo.MemSubBlock[i].MemType==VPU_MEM_PHY)
@@ -438,9 +441,9 @@ int MallocMemBlock(VpuMemInfo* pMemBlock,DecMemInfo* pDecMem)
 			pMemBlock->MemSubBlock[i].pPhyAddr=(unsigned char*)Align(vpuMem.nPhyAddr,pMemBlock->MemSubBlock[i].nAlignment);
 
 			//record physical base addr
-			pDecMem->phyMem_phyAddr[pDecMem->nPhyNum]=(unsigned int)vpuMem.nPhyAddr;
-			pDecMem->phyMem_virtAddr[pDecMem->nPhyNum]=(unsigned int)vpuMem.nVirtAddr;
-			pDecMem->phyMem_cpuAddr[pDecMem->nPhyNum]=(unsigned int)vpuMem.nCpuAddr;
+			pDecMem->phyMem_phyAddr[pDecMem->nPhyNum]=(unsigned long)vpuMem.nPhyAddr;
+			pDecMem->phyMem_virtAddr[pDecMem->nPhyNum]=(unsigned long)vpuMem.nVirtAddr;
+			pDecMem->phyMem_cpuAddr[pDecMem->nPhyNum]=(unsigned long)vpuMem.nCpuAddr;
 			pDecMem->phyMem_size[pDecMem->nPhyNum]=size;
 			pDecMem->nPhyNum++;			
 		}
@@ -924,6 +927,15 @@ int ProcessInitInfo(DecContxt * pDecContxt,VpuDecHandle handle,VpuDecInitInfo* p
 	}
 #endif
 
+	VpuBufferNode in_data = {0};
+    int buf_ret;
+	VpuDecRetCode dec_ret;
+    dec_ret=VPU_DecDecodeBuf(handle, &in_data, &buf_ret);
+	if (dec_ret == VPU_DEC_RET_FAILURE) {
+      DEC_STREAM_PRINTF("VPU_DecDecodeBuf fail \r\n");
+	  return 0;
+	}
+
 	//register frame buffs
 	DEC_TRACE;
 	ret=VPU_DecRegisterFrameBuffer(handle, frameBuf, BufNum);
@@ -960,6 +972,7 @@ int DecodeLoop(VpuDecHandle handle,DecContxt * pDecContxt, unsigned char* pBitst
 	VpuDecFrameLengthInfo decFrmLengthInfo;
 	unsigned int totalDecConsumedBytes;	//stuffer + frame
 	int nFrmNum;
+	int streamLen;
 
 #ifdef CHECK_DEAD_LOOP
 	int NotUsedLoopCnt=0;
@@ -1134,6 +1147,7 @@ RepeatPlay:
 					fileeos=1;
 				}
 				bufNull=0;
+				streamLen = readbytes;
 			}
 			else
 			{
@@ -1149,6 +1163,15 @@ RepeatPlay:
 		InData.pVirAddr=pBitstream;
 		InData.sCodecData.pData=NULL;
 		InData.sCodecData.nSize=0;
+
+		//all bytes are consumed -> eos
+		DEC_STREAM_PRINTF ("\n=== totalDecConsumedBytes: 0x%X, streamLen: 0x%X \n",totalDecConsumedBytes, streamLen);
+		if (totalDecConsumedBytes == streamLen)
+		{
+			InData.nSize=0;
+			InData.pVirAddr=(unsigned char *) 0x1;
+		}
+
 		if((pDecContxt->nCodec==13)||((pDecContxt->nCodec==3)))
 		{
 			//backdoor:  to notify vpu this is raw data. vpu wrapper shouldn't add other additional headers.
@@ -1232,7 +1255,7 @@ RepeatPlay:
 		//check frame size
 		if(capability)
 		{
-			if(bufRetCode&VPU_DEC_ONE_FRM_CONSUMED)
+			if(bufRetCode&VPU_DEC_ONE_FRM_CONSUMED || bufRetCode&VPU_DEC_NO_ENOUGH_INBUF)
 			{
 				ret=VPU_DecGetConsumedFrameInfo(handle, &decFrmLengthInfo);
 				if(VPU_DEC_RET_SUCCESS!=ret)
@@ -1459,6 +1482,9 @@ int decode_stream(DecContxt * pDecContxt)
 	decOpenParam.nChromaInterleave=pDecContxt->nChromaInterleave;
 	decOpenParam.nMapType=pDecContxt->nMapType;
 	decOpenParam.nTiled2LinearEnable=pDecContxt->nTile2LinearEnable;
+#ifdef USE_IMX8MM
+	decOpenParam.nEnableVideoCompressor = 0;
+#endif
 	//open vpu
 	ret=VPU_DecOpen(&handle, &decOpenParam, &memInfo);
 	if (ret!=VPU_DEC_RET_SUCCESS)

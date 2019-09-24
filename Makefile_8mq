@@ -1,0 +1,60 @@
+PROGRAM=test_dec_arm_elinux
+LIBRARY=./release/lib/lib_vpu_wrapper
+
+CC ?= gcc
+LN ?= $(CC)
+AS ?= as
+AR ?= =ar
+
+
+CFLAGS= -O2 -Wall
+INCLUDES= -I. -I$(SDKTARGETSYSROOT)/usr/include/hantro_dec -I/opt/fsl-imx-internal-xwayland/4.19-thud/sysroots/aarch64-poky-linux/usr/include -I/usr/include -I./sqlite
+
+AFLAGS=
+
+LFLAGS=-lfslvpuwrap -lcodec -lhantro
+
+#CFLAGS+=-DUSE_VPU_WRAPPER_TIMER
+#CFLAGS+=-DVPU_WRAPPER_DEBUG
+CFLAGS+=-DDEC_STREAM_DEBUG
+CFLAGS+=-DENC_STREAM_DEBUG
+CFLAGS+=-DAPP_DEBUG
+CFLAGS+=-DFB_RENDER_DEBUG
+CFLAGS+= -DSET_OUTPUT_CROP_RECT -DUSE_EXTERNAL_BUFFER -DVSI_API -DENABLE_CODEC_VP8
+
+
+LIB_OBJS=vpu_wrapper_hantro.o vpu_wrapper_timer.o
+LIB_OBJS +=utils.o
+APP_OBJS=test_dec_arm_elinux.o decode_stream.o
+APP_OBJS+=fb_render.o
+
+#ENC_APP_OBJS=test_enc_arm_elinux.o encode_stream.o vpu_wrapper_hantro_encoder.o
+#ENC_AUTO_OBJS=enc_auto_test.o encode_stream.o decode_stream.o fb_render.o sqlite_wrapper.o
+
+
+all: EXE
+	@echo "--- Build-all done for vpu wrapper ---"
+
+LIBRARY: $(LIB_OBJS)
+	mkdir -p ./release/lib
+	$(AR) -r $(LIBRARY).a $(LIB_OBJS)
+	$(LN) -o $(LIBRARY).so --shared -fpic $(LIB_OBJS)
+	#$(LN) -o $(LIBRARY).so -shared -nostartfiles $(LIB_OBJS)
+
+EXE: $(APP_OBJS) LIBRARY
+	$(LN) -o $(PROGRAM) $(LFLAGS) $(APP_OBJS) $(LIBRARY).a
+
+%.o: %.c
+	#$(CC) $(CFLAGS) $(INCLUDES)  -c  -o $@ $<
+	$(CC) -fPIC $(CFLAGS) $(INCLUDES)  -c  -o $@ $<
+	
+
+clean:
+	rm -rf $(LIB_OBJS)
+	rm -rf $(APP_OBJS)	
+	rm -rf $(LIBRARY).a
+	rm -rf $(LIBRARY).so
+	rm -rf $(PROGRAM)
+
+
+	

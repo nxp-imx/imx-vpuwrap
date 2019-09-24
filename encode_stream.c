@@ -32,21 +32,21 @@
 
 #define MAX_FRAME_NUM	(10)
 
-#define Align(ptr,align)	(((unsigned int)ptr+(align)-1)/(align)*(align))
+#define Align(ptr,align)	(((unsigned long)ptr+(align)-1)/(align)*(align))
 #define VPU_ENC_MAX_NUM_MEM_REQS	(30)
 
 typedef struct
 {
 	//virtual mem info
 	int nVirtNum;
-	unsigned int virtMem[VPU_ENC_MAX_NUM_MEM_REQS];
+	unsigned long virtMem[VPU_ENC_MAX_NUM_MEM_REQS];
 
 	//phy mem info
 	int nPhyNum;
-	unsigned int phyMem_virtAddr[VPU_ENC_MAX_NUM_MEM_REQS];
-	unsigned int phyMem_phyAddr[VPU_ENC_MAX_NUM_MEM_REQS];
-	unsigned int phyMem_cpuAddr[VPU_ENC_MAX_NUM_MEM_REQS];
-	unsigned int phyMem_size[VPU_ENC_MAX_NUM_MEM_REQS];	
+	unsigned long phyMem_virtAddr[VPU_ENC_MAX_NUM_MEM_REQS];
+	unsigned long phyMem_phyAddr[VPU_ENC_MAX_NUM_MEM_REQS];
+	unsigned long phyMem_cpuAddr[VPU_ENC_MAX_NUM_MEM_REQS];
+	unsigned long phyMem_size[VPU_ENC_MAX_NUM_MEM_REQS];
 }EncMemInfo;
 
 #if 1 // timer related part
@@ -182,7 +182,7 @@ int EncMallocMemBlock(VpuMemInfo* pMemBlock,EncMemInfo* pEncMem)
 			pMemBlock->MemSubBlock[i].pVirtAddr=(unsigned char*)Align(ptr,pMemBlock->MemSubBlock[i].nAlignment);
 
 			//record virtual base addr
-			pEncMem->virtMem[pEncMem->nVirtNum]=(unsigned int)ptr;
+			pEncMem->virtMem[pEncMem->nVirtNum]=(unsigned long)ptr;
 			pEncMem->nVirtNum++;
 		}
 		else// if(memInfo.MemSubBlock[i].MemType==VPU_MEM_PHY)
@@ -200,9 +200,9 @@ int EncMallocMemBlock(VpuMemInfo* pMemBlock,EncMemInfo* pEncMem)
 			pMemBlock->MemSubBlock[i].pPhyAddr=(unsigned char*)Align(vpuMem.nPhyAddr,pMemBlock->MemSubBlock[i].nAlignment);
 
 			//record physical base addr
-			pEncMem->phyMem_phyAddr[pEncMem->nPhyNum]=(unsigned int)vpuMem.nPhyAddr;
-			pEncMem->phyMem_virtAddr[pEncMem->nPhyNum]=(unsigned int)vpuMem.nVirtAddr;
-			pEncMem->phyMem_cpuAddr[pEncMem->nPhyNum]=(unsigned int)vpuMem.nCpuAddr;
+			pEncMem->phyMem_phyAddr[pEncMem->nPhyNum]=(unsigned long)vpuMem.nPhyAddr;
+			pEncMem->phyMem_virtAddr[pEncMem->nPhyNum]=(unsigned long)vpuMem.nVirtAddr;
+			pEncMem->phyMem_cpuAddr[pEncMem->nPhyNum]=(unsigned long)vpuMem.nCpuAddr;
 			pEncMem->phyMem_size[pEncMem->nPhyNum]=size;
 			pEncMem->nPhyNum++;			
 		}
@@ -615,11 +615,11 @@ RepeatEncode:
 		sEncEncParam.nPicHeight=pEncContxt->nPicHeight;	
 		sEncEncParam.nFrameRate=pEncContxt->nFrameRate;
 		sEncEncParam.nQuantParam=pEncContxt->nQuantParam;	
-		sEncEncParam.nInPhyInput=(unsigned int)pInputPhy;
-		sEncEncParam.nInVirtInput=(unsigned int)pInputVirt;
+		sEncEncParam.nInPhyInput=(unsigned long)pInputPhy;
+		sEncEncParam.nInVirtInput=(unsigned long)pInputVirt;
 		sEncEncParam.nInInputSize=nInputBufSize;
-		sEncEncParam.nInPhyOutput=(unsigned int)pOutputPhy;
-		sEncEncParam.nInVirtOutput=(unsigned int)pOutputVirt;
+		sEncEncParam.nInPhyOutput=(unsigned long)pOutputPhy;
+		sEncEncParam.nInVirtOutput=(unsigned long)pOutputVirt;
 		sEncEncParam.nInOutputBufLen=nOuputBufSize;
 
 		if(pEncContxt->nGOPSize==0){
@@ -654,10 +654,10 @@ RepeatEncode:
 			memset(&sFrameBuf,0,sizeof(VpuFrameBuffer));
 			sEncEncParam.pInFrame=&sFrameBuf;
 			sFrameBuf.pbufY=(unsigned char*)sEncEncParam.nInPhyInput;			
-			sFrameBuf.pbufY_tilebot=(unsigned char*)(sEncEncParam.nInPhyInput+((unsigned int)pYBotVir-sEncEncParam.nInVirtInput));
+			sFrameBuf.pbufY_tilebot=(unsigned char*)(sEncEncParam.nInPhyInput+((unsigned long)pYBotVir-sEncEncParam.nInVirtInput));
 			//sFrameBuf.pbufCb=(unsigned char*)Align((sFrameBuf.pbufY+nYSize),nTileAlign);
-			sFrameBuf.pbufCb=(unsigned char*)(sEncEncParam.nInPhyInput+((unsigned int)pCbTopVir-sEncEncParam.nInVirtInput));;
-			sFrameBuf.pbufCb_tilebot=(unsigned char*)(sEncEncParam.nInPhyInput+((unsigned int)pCbBotVir-sEncEncParam.nInVirtInput));;
+			sFrameBuf.pbufCb=(unsigned char*)(sEncEncParam.nInPhyInput+((unsigned long)pCbTopVir-sEncEncParam.nInVirtInput));;
+			sFrameBuf.pbufCb_tilebot=(unsigned char*)(sEncEncParam.nInPhyInput+((unsigned long)pCbBotVir-sEncEncParam.nInVirtInput));;
 			sFrameBuf.pbufCr=NULL;	//no meaning
 			sFrameBuf.nStrideY=sEncEncParam.nPicWidth;
 			switch(pEncContxt->nColor)

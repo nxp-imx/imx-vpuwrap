@@ -93,7 +93,7 @@ static void usage(char*program)
 		   "			[default: no save]\n"
 		   "	-n <frame_num>	:encode max <frame_num> frames\n"
 		   "			[default: all frames will be encoded]\n"
-		   "	-f <codec>	:set codec format with <codec>.\n"
+		   "	-f <codec>	:set codec format with <codec>. For 8mm, only support H264 \n"
 		   "			Mpeg4:	0 (default)\n"
 		   "			H263:	1 \n"
 		   "			H264:	2 \n"

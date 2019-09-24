@@ -56,6 +56,8 @@ pkgconfig_DATA = $(pcverfile)
 
 libfslvpuwraptestdir = $(datadir)/imx-mm/video-codec/examples/vpu
 libfslvpuwraptest_DATA = \
+    Makefile_8mm    \
+    Makefile_8mq    \
     Makefile.unit   \
     decode_stream.h \
     decode_stream.c \
