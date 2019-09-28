@@ -33,6 +33,8 @@ typedef struct
 	// input setting
 	FILE* fin;
 	FILE* fout;
+	FILE* fcodecdata;
+	int isavcc;
 	int nMaxNum;
 	int nDisplay;	
 	int nFbNo;

@@ -30,7 +30,7 @@
 
 #define NAME_SIZE 256
 
-#define DEFAULT_FILL_DATA_UNIT	(16*1024)
+#define DEFAULT_FILL_DATA_UNIT	(3*1024*1024)
 #define DEFAULT_DELAY_BUFSIZE		(-1)
 
 #define CASE_FIRST(x)   if (strncmp(argv[0], x, strlen(x)) == 0)
@@ -41,7 +41,9 @@ typedef struct
 {
 	char 	infile[NAME_SIZE];	// -i
 	char 	outfile[NAME_SIZE];	// -o
+	char    codecdatafile[NAME_SIZE];  // -a
 
+	int     isavcc;
 	int     saveYUV;		// -o
 	int     loop;			//-l
 	int     maxnum;		// -n
@@ -70,6 +72,7 @@ IOParams;
 static void usage(char*program)
 {
 	APP_DEBUG_PRINTF("\nUsage: %s [options] -i bitstream_file -f format \n", program);
+	APP_DEBUG_PRINTF("\nUsage: %s [options] -i avcc_file -a codec_data -f format \n", program);
 	APP_DEBUG_PRINTF("options:\n"
 		   "	-o <file_name>	:Save decoded output in YUV 4:2:0 format\n"
 		   "			[default: no save]\n"
@@ -257,7 +260,17 @@ static void GetUserInput(IOParams *pIO, int argc, char *argv[])
 					strcpy((char *)pIO->infile, argv[0]);
 					bitFileDone = 1;
 				}
-			}			
+			}
+			CASE("-a")
+			{
+				argc--;
+				argv++;
+				if (argv[0] != NULL)
+				{
+					strcpy((char *)pIO->codecdatafile, argv[0]);
+					pIO->isavcc = 1;
+				}
+			}
 			CASE("-map")
 			{
 				argc--;
@@ -303,6 +316,7 @@ int main(int argc, char **argv)
 	DecContxt decContxt;
 	FILE* fout=NULL;
 	FILE* fin=NULL;
+	FILE* fcodecdata=NULL;
 	int loop_cnt=0;
 	
 	// Defaults: 0
@@ -350,12 +364,24 @@ REPEAT:
 		}
 	}
 
-	APP_DEBUG_PRINTF("input bitstream : %s \r\n",ioParams.infile);
+	if(ioParams.isavcc)
+	{
+		fcodecdata = fopen(ioParams.codecdatafile, "rb");
+		if(fcodecdata==NULL)
+		{
+			APP_DEBUG_PRINTF("can not open codecdata file %s.\n", ioParams.codecdatafile);
+			return -1;
+		}
+	}
+
+	APP_DEBUG_PRINTF("input bitstream(%d) avccstream(%d) : %s \r\n",!ioParams.isavcc,ioParams.isavcc,ioParams.infile);
 	APP_DEBUG_PRINTF("max frame_number : %d, display: %d \r\n",ioParams.maxnum, ioParams.display);
 
 	//decode
 	decContxt.fin=fin;
 	decContxt.fout=fout;
+	decContxt.fcodecdata=fcodecdata;
+	decContxt.isavcc=ioParams.isavcc;
 	decContxt.nMaxNum=ioParams.maxnum;
 	decContxt.nDisplay=ioParams.display;
 	decContxt.nFbNo=ioParams.fbno;	

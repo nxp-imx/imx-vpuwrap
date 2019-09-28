@@ -478,6 +478,20 @@ int ReadBitstream(DecContxt * pDecContxt, unsigned char* pBitstream,int length)
 }
 
 
+int ReadCodecData(DecContxt * pDecContxt, unsigned char* pCodecData,int length)
+{
+	int readbytes;
+	//static int totalReadSize=0;
+
+	//DEC_STREAM_PRINTF("read %d bytes \r\n",length);
+	readbytes=fread(pCodecData,1,length,pDecContxt->fcodecdata);
+
+	//totalReadSize+=readbytes;
+	//printf("total read size: %d \r\n",totalReadSize);
+	return readbytes;
+}
+
+
 int OutputFrame(DecContxt * pDecContxt,VpuDecOutFrameInfo* pOutFrame,int width, int height,int fbHandle,int frameNum)
 {
 	int ySize;
@@ -951,12 +965,13 @@ int ProcessInitInfo(DecContxt * pDecContxt,VpuDecHandle handle,VpuDecInitInfo* p
 }
 
 
-int DecodeLoop(VpuDecHandle handle,DecContxt * pDecContxt, unsigned char* pBitstream,DecMemInfo* pDecMemInfo,int* pFbHandle)
+int DecodeLoop(VpuDecHandle handle,DecContxt * pDecContxt, unsigned char* pBitstream, unsigned char* pCodecData,DecMemInfo* pDecMemInfo,int* pFbHandle)
 {
 	int err;
 	int fileeos;
 	int dispeos;
 	int readbytes=0;
+	int readCodecData=0;
 	int bufNull;
 	int dispFrameNum;
 	int repeatNum=pDecContxt->nRepeatNum;
@@ -1136,15 +1151,24 @@ RepeatPlay:
 				unitDataSize=g_filemode_frame_length[g_filemode_curloc];
 				FILE_MODE_LOG("frame [%d]: length: %d \r\n",g_filemode_curloc,unitDataSize);
 				readbytes=ReadBitstream(pDecContxt, pBitstream,unitDataSize);
+				if(pDecContxt->isavcc)
+					readCodecData=ReadCodecData(pDecContxt, pCodecData,unitDataSize);
 				g_filemode_curloc=(g_filemode_curloc+1)%FILE_MODE_MAX_FRAME_NUM;
 #else
 				readbytes=ReadBitstream(pDecContxt, pBitstream, unitDataSize);
+				if(pDecContxt->isavcc)
+					readCodecData=ReadCodecData(pDecContxt, pCodecData,unitDataSize);
 #endif
 				if(unitDataSize!=readbytes)
 				{
 					//EOS
 					DEC_STREAM_PRINTF("%s: read file end: last size=0x%X \r\n",__FUNCTION__,readbytes);
 					fileeos=1;
+				}
+				if(pDecContxt->isavcc)
+				{
+					if(unitDataSize!=readCodecData)
+						DEC_STREAM_PRINTF("%s: read codec data end: last size=0x%X \r\n",__FUNCTION__,readCodecData);
 				}
 				bufNull=0;
 				streamLen = readbytes;
@@ -1163,6 +1187,11 @@ RepeatPlay:
 		InData.pVirAddr=pBitstream;
 		InData.sCodecData.pData=NULL;
 		InData.sCodecData.nSize=0;
+		if(pDecContxt->isavcc)
+		{
+			InData.sCodecData.pData=pCodecData;
+			InData.sCodecData.nSize=readCodecData;
+		}
 
 		//all bytes are consumed -> eos
 		DEC_STREAM_PRINTF ("\n=== totalDecConsumedBytes: 0x%X, streamLen: 0x%X \n",totalDecConsumedBytes, streamLen);
@@ -1388,6 +1417,7 @@ int decode_stream(DecContxt * pDecContxt)
 	int capability=0;
 
 	unsigned char* pBitstream=NULL;
+	unsigned char* pCodecData=NULL;
 #ifdef VPU_FILE_MODE_TEST		
 	int nUnitDataSize=FILE_MODE_MAX_FRAME_LEN;
 #else
@@ -1401,7 +1431,14 @@ int decode_stream(DecContxt * pDecContxt)
 		DEC_STREAM_PRINTF("%s: alloc bitstream buf failure: size=0x%X \r\n",__FUNCTION__,nUnitDataSize);
 		return 0;
 	}
-		
+
+	//alloc codec date buffer
+	pCodecData=malloc(nUnitDataSize);
+	if(NULL==pCodecData)
+	{
+		DEC_STREAM_PRINTF("%s: alloc codec data buf failure: size=0x%X \r\n",__FUNCTION__,nUnitDataSize);
+		return 0;
+	}
 	//clear 0
 	memset(&memInfo,0,sizeof(VpuMemInfo));
 	memset(&decMemInfo,0,sizeof(DecMemInfo));
@@ -1494,7 +1531,7 @@ int decode_stream(DecContxt * pDecContxt)
 	}	
 	
 	//decoding loop
-	noerr=DecodeLoop(handle, pDecContxt, pBitstream,&decMemInfo,&fbHandle);
+	noerr=DecodeLoop(handle, pDecContxt, pBitstream,pCodecData,&decMemInfo,&fbHandle);
 	
 	if(0==noerr)
 	{
@@ -1522,6 +1559,11 @@ finish:
 	if(pBitstream)
 	{
 		free(pBitstream);
+	}
+
+	if(pCodecData)
+	{
+		free(pCodecData);
 	}
 
 	//release fb render
