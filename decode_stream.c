@@ -5,6 +5,7 @@
  *  The following programs are the sole property of Freescale Semiconductor Inc.,
  *  and contain its proprietary and confidential information.
  *
+ *  Copyright 2019 NXP
  */
 
 /*   
