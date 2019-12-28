@@ -577,25 +577,25 @@ static VpuEncRetCode VPU_EncStreamSpecProcess(VpuEncObj *pObj, VpuEncEncParam* p
 }
 #endif
 
-VpuEncRetCode VPU_EncLoad_H1()
+VpuEncRetCode VPU_EncLoad()
 {
   VpuEncLogLevelParse(NULL);
 
   return VPU_ENC_RET_SUCCESS;
 }
 
-VpuEncRetCode VPU_EncUnLoad_H1()
+VpuEncRetCode VPU_EncUnLoad()
 {
   return VPU_ENC_RET_SUCCESS;
 }
 
-VpuEncRetCode VPU_EncReset_H1(VpuEncHandle InHandle)
+VpuEncRetCode VPU_EncReset(VpuEncHandle InHandle)
 {
   // hantro encoder doesn't have an interface to reset
   return VPU_ENC_RET_SUCCESS;
 }
 
-VpuEncRetCode VPU_EncOpen_H1(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEncOpenParam* pInParam)
+VpuEncRetCode VPU_EncOpen(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEncOpenParam* pInParam)
 {
   VpuMemSubBlockInfo * pMemPhy;
   VpuMemSubBlockInfo * pMemVirt;
@@ -785,7 +785,7 @@ VpuEncRetCode VPU_EncOpen_H1(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,Vp
   return VPU_ENC_RET_SUCCESS;
 }
 
-VpuEncRetCode VPU_EncOpenSimp_H1(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEncOpenParamSimp * pInParam)
+VpuEncRetCode VPU_EncOpenSimp(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEncOpenParamSimp * pInParam)
 {
   VpuEncRetCode ret;
   VpuEncOpenParam sEncOpenParamMore;
@@ -858,7 +858,7 @@ VpuEncRetCode VPU_EncOpenSimp_H1(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInf
   return ret;
 }
 
-VpuEncRetCode VPU_EncClose_H1(VpuEncHandle InHandle)
+VpuEncRetCode VPU_EncClose(VpuEncHandle InHandle)
 {
   VpuEncHandleInternal * pVpuObj;
   VpuEncObj* pObj;
@@ -900,7 +900,7 @@ VpuEncRetCode VPU_EncClose_H1(VpuEncHandle InHandle)
   return VPU_ENC_RET_SUCCESS;
 }
 
-VpuEncRetCode VPU_EncGetInitialInfo_H1(VpuEncHandle InHandle, VpuEncInitInfo * pOutInitInfo)
+VpuEncRetCode VPU_EncGetInitialInfo(VpuEncHandle InHandle, VpuEncInitInfo * pOutInitInfo)
 {
   pOutInitInfo->nMinFrameBufferCount = 0; // Fixme later, hantro enc has no api to query out init info
   pOutInitInfo->nAddressAlignment = 1;    // Fixme later, hantro enc has no api to query out init info
@@ -908,7 +908,7 @@ VpuEncRetCode VPU_EncGetInitialInfo_H1(VpuEncHandle InHandle, VpuEncInitInfo * p
   return VPU_ENC_RET_SUCCESS;
 }
 
-VpuEncRetCode VPU_EncGetVersionInfo_H1(VpuVersionInfo * pOutVerInfo)
+VpuEncRetCode VPU_EncGetVersionInfo(VpuVersionInfo * pOutVerInfo)
 {
   if(pOutVerInfo == NULL)
   {
@@ -925,7 +925,7 @@ VpuEncRetCode VPU_EncGetVersionInfo_H1(VpuVersionInfo * pOutVerInfo)
   return VPU_ENC_RET_SUCCESS;
 }
 
-VpuEncRetCode VPU_EncGetWrapperVersionInfo_H1(VpuWrapperVersionInfo * pOutVerInfo)
+VpuEncRetCode VPU_EncGetWrapperVersionInfo(VpuWrapperVersionInfo * pOutVerInfo)
 {
   pOutVerInfo->nMajor = (VPU_WRAPPER_VERSION_CODE >> (16)) & 0xff;
   pOutVerInfo->nMinor = (VPU_WRAPPER_VERSION_CODE >> (8)) & 0xff;
@@ -934,13 +934,13 @@ VpuEncRetCode VPU_EncGetWrapperVersionInfo_H1(VpuWrapperVersionInfo * pOutVerInf
   return VPU_ENC_RET_SUCCESS;
 }
 
-VpuEncRetCode VPU_EncRegisterFrameBuffer_H1(VpuEncHandle InHandle,VpuFrameBuffer *pInFrameBufArray, int nNum,int nSrcStride)
+VpuEncRetCode VPU_EncRegisterFrameBuffer(VpuEncHandle InHandle,VpuFrameBuffer *pInFrameBufArray, int nNum,int nSrcStride)
 {
   // do nothing because h1 encoder don't need register frame buffer
   return VPU_ENC_RET_SUCCESS;
 }
 
-VpuEncRetCode VPU_EncQueryMem_H1(VpuMemInfo* pOutMemInfo)
+VpuEncRetCode VPU_EncQueryMem(VpuMemInfo* pOutMemInfo)
 {
   VpuMemSubBlockInfo * pMem;
 
@@ -967,7 +967,7 @@ VpuEncRetCode VPU_EncQueryMem_H1(VpuMemInfo* pOutMemInfo)
   return VPU_ENC_RET_SUCCESS;
 }
 
-VpuEncRetCode VPU_EncGetMem_H1(VpuMemDesc* pInOutMem)
+VpuEncRetCode VPU_EncGetMem(VpuMemDesc* pInOutMem)
 {
   struct EWLLinearMem info;
   struct EWLInitParam ewlInit;
@@ -1004,7 +1004,7 @@ VpuEncRetCode VPU_EncGetMem_H1(VpuMemDesc* pInOutMem)
 }
 
 
-VpuEncRetCode VPU_EncFreeMem_H1(VpuMemDesc* pInMem)
+VpuEncRetCode VPU_EncFreeMem(VpuMemDesc* pInMem)
 {
   struct EWLLinearMem info;
   struct EWLInitParam ewlInit;
@@ -1031,7 +1031,7 @@ VpuEncRetCode VPU_EncFreeMem_H1(VpuMemDesc* pInMem)
   return VPU_ENC_RET_SUCCESS;
 }
 
-VpuEncRetCode VPU_EncConfig_H1(VpuEncHandle InHandle, VpuEncConfig InEncConf, void* pInParam)
+VpuEncRetCode VPU_EncConfig(VpuEncHandle InHandle, VpuEncConfig InEncConf, void* pInParam)
 {
   VpuEncHandleInternal * pVpuObj;
   VpuEncObj* pObj;
@@ -1102,7 +1102,7 @@ VpuEncRetCode VPU_EncConfig_H1(VpuEncHandle InHandle, VpuEncConfig InEncConf, vo
   return VPU_ENC_RET_SUCCESS;
 }
 
-VpuEncRetCode VPU_EncEncodeFrame_H1(VpuEncHandle InHandle, VpuEncEncParam* pInOutParam)
+VpuEncRetCode VPU_EncEncodeFrame(VpuEncHandle InHandle, VpuEncEncParam* pInOutParam)
 {
   VpuEncHandleInternal * pVpuObj;
   VpuEncObj * pObj;

@@ -991,19 +991,19 @@ static VCEncPictureType VPU_EncConvertColorFmt(VpuColorFormat vpuColorFmt, int c
   return inputColorFmt;
 }
 
-VpuEncRetCode VPU_EncLoad_VC8000E()
+VpuEncRetCode VPU_EncLoad()
 {
   VpuEncLogLevelParse(NULL);
 
   return VPU_ENC_RET_SUCCESS;
 }
 
-VpuEncRetCode VPU_EncUnLoad_VC8000E()
+VpuEncRetCode VPU_EncUnLoad()
 {
   return VPU_ENC_RET_SUCCESS;
 }
 
-VpuEncRetCode VPU_EncReset_VC8000E(VpuEncHandle InHandle)
+VpuEncRetCode VPU_EncReset(VpuEncHandle InHandle)
 {
   // hantro encoder doesn't have an interface to reset
   return VPU_ENC_RET_SUCCESS;
@@ -1208,7 +1208,7 @@ static VpuEncRetCode VPU_EncSetConfigDefaults(VpuEncObj* pObj, int frameRate, Vp
   return VPU_ENC_RET_SUCCESS;
 }
 
-VpuEncRetCode VPU_EncGetInitialInfo_VC8000E(VpuEncHandle InHandle, VpuEncInitInfo * pOutInitInfo)
+VpuEncRetCode VPU_EncGetInitialInfo(VpuEncHandle InHandle, VpuEncInitInfo * pOutInitInfo)
 {
   pOutInitInfo->nMinFrameBufferCount = 0; // Fixme later, hantro enc has no api to query out init info
   pOutInitInfo->nAddressAlignment = 1;    // Fixme later, hantro enc has no api to query out init info
@@ -1216,7 +1216,7 @@ VpuEncRetCode VPU_EncGetInitialInfo_VC8000E(VpuEncHandle InHandle, VpuEncInitInf
   return VPU_ENC_RET_SUCCESS;
 }
 
-VpuEncRetCode VPU_EncGetVersionInfo_VC8000E(VpuVersionInfo * pOutVerInfo)
+VpuEncRetCode VPU_EncGetVersionInfo(VpuVersionInfo * pOutVerInfo)
 {
   if(pOutVerInfo == NULL)
   {
@@ -1233,7 +1233,7 @@ VpuEncRetCode VPU_EncGetVersionInfo_VC8000E(VpuVersionInfo * pOutVerInfo)
   return VPU_ENC_RET_SUCCESS;
 }
 
-VpuEncRetCode VPU_EncGetWrapperVersionInfo_VC8000E(VpuWrapperVersionInfo * pOutVerInfo)
+VpuEncRetCode VPU_EncGetWrapperVersionInfo(VpuWrapperVersionInfo * pOutVerInfo)
 {
   pOutVerInfo->nMajor = (VPU_WRAPPER_VERSION_CODE >> (16)) & 0xff;
   pOutVerInfo->nMinor = (VPU_WRAPPER_VERSION_CODE >> (8)) & 0xff;
@@ -1242,13 +1242,13 @@ VpuEncRetCode VPU_EncGetWrapperVersionInfo_VC8000E(VpuWrapperVersionInfo * pOutV
   return VPU_ENC_RET_SUCCESS;
 }
 
-VpuEncRetCode VPU_EncRegisterFrameBuffer_VC8000E(VpuEncHandle InHandle,VpuFrameBuffer *pInFrameBufArray, int nNum,int nSrcStride)
+VpuEncRetCode VPU_EncRegisterFrameBuffer(VpuEncHandle InHandle,VpuFrameBuffer *pInFrameBufArray, int nNum,int nSrcStride)
 {
   // do nothing because VC8000E encoder don't need register frame buffer
   return VPU_ENC_RET_SUCCESS;
 }
 
-VpuEncRetCode VPU_EncQueryMem_VC8000E(VpuMemInfo* pOutMemInfo)
+VpuEncRetCode VPU_EncQueryMem(VpuMemInfo* pOutMemInfo)
 {
   VpuMemSubBlockInfo * pMem;
 
@@ -1275,7 +1275,7 @@ VpuEncRetCode VPU_EncQueryMem_VC8000E(VpuMemInfo* pOutMemInfo)
   return VPU_ENC_RET_SUCCESS;
 }
 
-VpuEncRetCode VPU_EncGetMem_VC8000E(VpuMemDesc* pInOutMem)
+VpuEncRetCode VPU_EncGetMem(VpuMemDesc* pInOutMem)
 {
   struct EWLLinearMem info;
   struct EWLInitParam ewlInit;
@@ -1311,7 +1311,7 @@ VpuEncRetCode VPU_EncGetMem_VC8000E(VpuMemDesc* pInOutMem)
   return VPU_ENC_RET_SUCCESS;
 }
 
-VpuEncRetCode VPU_EncFreeMem_VC8000E(VpuMemDesc* pInMem)
+VpuEncRetCode VPU_EncFreeMem(VpuMemDesc* pInMem)
 {
   struct EWLLinearMem info;
   struct EWLInitParam ewlInit;
@@ -1678,7 +1678,7 @@ static VpuEncRetCode VPU_EncDoEncode(VpuEncObj *pObj, FRAME* pFrame, STREAM_BUFF
   return stat;
 }
 
-VpuEncRetCode VPU_EncEncodeFrame_VC8000E(VpuEncHandle InHandle, VpuEncEncParam* pInOutParam)
+VpuEncRetCode VPU_EncEncodeFrame(VpuEncHandle InHandle, VpuEncEncParam* pInOutParam)
 {
   VpuEncHandleInternal * pVpuObj;
   VpuEncObj * pObj;
@@ -1820,7 +1820,7 @@ static void VCEnc_encoder_destroy(ENCODER_PROTOTYPE* arg)
   }
 }
 
-VpuEncRetCode VPU_EncClose_VC8000E(VpuEncHandle InHandle)
+VpuEncRetCode VPU_EncClose(VpuEncHandle InHandle)
 {
   VpuEncHandleInternal * pVpuObj;
   VpuEncObj* pObj;
@@ -1963,7 +1963,7 @@ static ENCODER_PROTOTYPE* VCEnc_encoder_create(const CONFIG* params, int size)
   return (ENCODER_PROTOTYPE*) this;
 }
 
-VpuEncRetCode VPU_EncOpen_VC8000E(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEncOpenParam* pInParam)
+VpuEncRetCode VPU_EncOpen(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEncOpenParam* pInParam)
 {
   VpuMemSubBlockInfo * pMemPhy;
   VpuMemSubBlockInfo * pMemVirt;
@@ -2085,7 +2085,7 @@ VpuEncRetCode VPU_EncOpen_VC8000E(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemIn
   return VPU_ENC_RET_SUCCESS;
 }
 
-VpuEncRetCode VPU_EncOpenSimp_VC8000E(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEncOpenParamSimp * pInParam)
+VpuEncRetCode VPU_EncOpenSimp(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEncOpenParamSimp * pInParam)
 {
   VpuEncRetCode ret;
   VpuEncOpenParam sEncOpenParamMore;
@@ -2161,7 +2161,7 @@ VpuEncRetCode VPU_EncOpenSimp_VC8000E(VpuEncHandle *pOutHandle, VpuMemInfo* pInM
   return ret;
 }
 
-VpuEncRetCode VPU_EncConfig_VC8000E(VpuEncHandle InHandle, VpuEncConfig InEncConf, void* pInParam)
+VpuEncRetCode VPU_EncConfig(VpuEncHandle InHandle, VpuEncConfig InEncConf, void* pInParam)
 {
   VpuEncHandleInternal * pVpuObj;
   VpuEncObj* pObj;

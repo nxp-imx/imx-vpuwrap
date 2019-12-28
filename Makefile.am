@@ -17,7 +17,6 @@ endif
 if USE_HANTRO_VC8000E_ENC_LIB
 libfslvpuwrap_la_SOURCES += vpu_wrapper_hantro_VCencoder.c
 endif
-libfslvpuwrap_la_SOURCES += vpu_wrapper_hantro_encoder_all.c
 
 libfslvpuwrapincludedir = $(includedir)/imx-mm/vpu
 
