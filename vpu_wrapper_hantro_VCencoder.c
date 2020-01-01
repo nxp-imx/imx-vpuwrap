@@ -657,7 +657,7 @@ static void VPU_EncInitRateCtrlParams(VCEncRateCtrl* rcCfg, CONFIG* params)
   if (params->rcCfg.qpMaxPB >= 0)
   {
     rcCfg->qpMaxPB = params->rcCfg.qpMaxPB;
-    if (rcCfg->qpHdr > rcCfg->qpMaxPB)
+    if (rcCfg->qpHdr != -1 && rcCfg->qpHdr > rcCfg->qpMaxPB)
       rcCfg->qpHdr = rcCfg->qpMaxPB;
   }
   if (params->rcCfg.qpMinI >= 0)
@@ -669,7 +669,7 @@ static void VPU_EncInitRateCtrlParams(VCEncRateCtrl* rcCfg, CONFIG* params)
   if (params->rcCfg.qpMaxI >= 0)
   {
     rcCfg->qpMaxI = params->rcCfg.qpMaxI;
-    if (rcCfg->qpHdr > rcCfg->qpMaxI)
+    if (rcCfg->qpHdr != -1 && rcCfg->qpHdr > rcCfg->qpMaxI)
       rcCfg->qpHdr = rcCfg->qpMaxI;
   }
   rcCfg->pictureSkip = params->rcCfg.pictureSkip;
@@ -1060,14 +1060,17 @@ static VpuEncRetCode VPU_EncSetRateCtrlDefaults(
     rcCfg->ctbRcRowQpStep = 16;
     pObj->max_cu_size = 64;
   }
+  rcCfg->hrd = 0;
+  rcCfg->pictureRc = 1;
+  rcCfg->pictureSkip = 0;
   rcCfg->qpHdr = (nRcIntraQp > 0 ? nRcIntraQp : ENC_QP_DEFAULT);
   rcCfg->qpMinPB = rcCfg->qpMinI = (qpMin > 0 ? qpMin : ENC_MIN_QP_DEFAULT);
   rcCfg->qpMaxPB = rcCfg->qpMaxI = (qpMax > 0 ? qpMax : ENC_MAX_QP_DEFAULT);
   rcCfg->bitPerSecond = bitrate;
   rcCfg->hrdCpbSize = 1000000;
-  rcCfg->bitVarRangeI = 2000;
-  rcCfg->bitVarRangeP = 2000;
-  rcCfg->bitVarRangeB = 2000;
+  rcCfg->bitVarRangeI = 10000;
+  rcCfg->bitVarRangeP = 10000;
+  rcCfg->bitVarRangeB = 10000;
   rcCfg->tolMovingBitRate = 2000;
   rcCfg->monitorFrames = VPU_ENC_DEFAULT;
   rcCfg->u32StaticSceneIbitPercent = 80;
@@ -2059,7 +2062,7 @@ VpuEncRetCode VPU_EncOpen(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEn
         // workaround to set check bitrate, calculate bitPerSecond = bitPerFrame * pInParam->nFrameRate / compression, 
         // so that resolution from max - min can get a approprite bitrate
         int bitPerFrame = pObj->config.cfg.width * pObj->config.cfg.height * 8;
-        int compression = 200;
+        int compression = 50;
         pObj->config.rcCfg.bitPerSecond = bitPerFrame / compression  * pInParam->nFrameRate / 1000 * 1000;
       }
 
