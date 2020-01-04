@@ -78,8 +78,8 @@ static int g_seek_dump=DUMP_ALL_DATA;   /*0: only dump data after seeking; other
 #define MAX_HEIGHT 1088
 #define MIN_HEIGHT 96
 
-#define VPU_ENC_DEFAULT_ALIGNMENT_H 8
-#define VPU_ENC_DEFAULT_ALIGNMENT_V 8
+#define VPU_ENC_DEFAULT_ALIGNMENT_H 4
+#define VPU_ENC_DEFAULT_ALIGNMENT_V 4
 
 #define H264_ENC_MAX_GOP_SIZE 300
 
@@ -407,8 +407,9 @@ static VpuEncRetCode  VPU_EncSetCommonConfig(
 {
   int validWidth, validHeight;
 
-  pPpCfg->origWidth = AlignWidth(pEncObj->encConfig.crop.nWidth, VPU_ENC_DEFAULT_ALIGNMENT_H);
-  pPpCfg->origHeight = AlignHeight(pEncObj->encConfig.crop.nHeight, VPU_ENC_DEFAULT_ALIGNMENT_V);
+  //set origWidth as width after right_padding (stride).
+  pPpCfg->origWidth = (pEncObj->encConfig.crop.nWidth + 15) & (~0x0f);
+  pPpCfg->origHeight = pEncObj->encConfig.crop.nHeight;
   pPpCfg->formatType = VPU_EncConvertColorFmtVpu2Omx(colorFmt, chromaInterleave);
   pPpCfg->angle = pEncObj->encConfig.rotation.nRotation;
   pPpCfg->frameStabilization = OMX_FALSE; // disable stabilization as default ?
@@ -421,12 +422,12 @@ static VpuEncRetCode  VPU_EncSetCommonConfig(
     pPpCfg->yOffset = pEncObj->encConfig.crop.nTop;
   }
 
-  validWidth = pPpCfg->origWidth;
-  validHeight = pPpCfg->origHeight;
+  validWidth = AlignWidth(pEncObj->encConfig.crop.nWidth, VPU_ENC_DEFAULT_ALIGNMENT_H);
+  validHeight = AlignHeight(pEncObj->encConfig.crop.nHeight, VPU_ENC_DEFAULT_ALIGNMENT_V);
 
   if (pEncObj->encConfig.rotation.nRotation == 90 || pEncObj->encConfig.rotation.nRotation == 270) {
-    validWidth = pPpCfg->origHeight;
-    validHeight = pPpCfg->origWidth;
+    validWidth = AlignHeight(pEncObj->encConfig.crop.nHeight, VPU_ENC_DEFAULT_ALIGNMENT_V);
+    validHeight = AlignWidth(pEncObj->encConfig.crop.nWidth, VPU_ENC_DEFAULT_ALIGNMENT_H);
   }
 
   pCommonCfg->nInputFramerate = FLOAT_Q16(frameRate);

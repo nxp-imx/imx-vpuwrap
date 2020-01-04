@@ -79,8 +79,8 @@ static int g_seek_dump=DUMP_ALL_DATA;   /*0: only dump data after seeking; other
 #define MIN_WIDTH 132
 #define MIN_HEIGHT 96
 
-#define VPU_ENC_DEFAULT_ALIGNMENT_H 8
-#define VPU_ENC_DEFAULT_ALIGNMENT_V 8
+#define VPU_ENC_DEFAULT_ALIGNMENT_H 4
+#define VPU_ENC_DEFAULT_ALIGNMENT_V 4
 
 #define ENC_QP_DEFAULT     26
 #define ENC_MIN_QP_DEFAULT 10
@@ -1018,10 +1018,15 @@ static VpuEncRetCode VPU_EncSetPreProcessorDefaults(
   int chromaInterleave)
 {
   VCEncPreProcessingCfg* preProcCfg = 0;
+  int stride_align;
   preProcCfg = &pObj->config.preProcCfg;
-  preProcCfg->origWidth = AlignWidth(width, VPU_ENC_DEFAULT_ALIGNMENT_H);
-  preProcCfg->origHeight = AlignHeight(height, VPU_ENC_DEFAULT_ALIGNMENT_V);
   preProcCfg->inputType = VPU_EncConvertColorFmt(colorFmt, chromaInterleave);
+  if (preProcCfg->inputType == VCENC_YUV420_PLANAR)
+    stride_align = 32;
+  else
+    stride_align = 16;
+  preProcCfg->origWidth = (width + stride_align - 1) & (~(stride_align - 1));
+  preProcCfg->origHeight = height;
 
   if (angle == 0)
     preProcCfg->rotation = 0;
@@ -1170,7 +1175,7 @@ static VpuEncRetCode VPU_EncSetCodingCtrlDefaults(VpuEncObj* pObj)
   return VPU_ENC_RET_SUCCESS;
 }
 
-static VpuEncRetCode VPU_EncSetConfigDefaults(VpuEncObj* pObj, int frameRate, VpuCodStd format)
+static VpuEncRetCode VPU_EncSetConfigDefaults(VpuEncObj* pObj, int frameRate, VpuCodStd format, int width, int height)
 {
   VCEncConfig* cfg = 0;
   cfg = &pObj->config.cfg;
@@ -1185,13 +1190,13 @@ static VpuEncRetCode VPU_EncSetConfigDefaults(VpuEncObj* pObj, int frameRate, Vp
 
   if (pObj->config.preProcCfg.rotation && pObj->config.preProcCfg.rotation != 3)
   {
-    cfg->width = pObj->config.preProcCfg.origHeight;
-    cfg->height = pObj->config.preProcCfg.origWidth;
+    cfg->width = AlignHeight(height, VPU_ENC_DEFAULT_ALIGNMENT_V);
+    cfg->height = AlignWidth(width, VPU_ENC_DEFAULT_ALIGNMENT_H);
   }
   else
   {
-    cfg->width = pObj->config.preProcCfg.origWidth;
-    cfg->height = pObj->config.preProcCfg.origHeight;
+    cfg->width = AlignWidth(width, VPU_ENC_DEFAULT_ALIGNMENT_H);
+    cfg->height = AlignHeight(height, VPU_ENC_DEFAULT_ALIGNMENT_V);
   }
   cfg->frameRateNum = frameRate;
   cfg->frameRateDenom = 1;
@@ -1340,10 +1345,10 @@ VpuEncRetCode VPU_EncFreeMem(VpuMemDesc* pInMem)
 }
 
 static void AlignedPicSizeGotbyFormat (VCEncPictureType type, u32 width, u32 height, u32 alignment,
-                                       u32 *luma_Size, u32 *chroma_Size, u32 *picture_Size)
+                                       u32 *luma_Size, u32 *chroma_Size)
 {
   u32 luma_stride=0, chroma_stride = 0;
-  u32 lumaSize = 0, chromaSize = 0, pictureSize = 0;
+  u32 lumaSize = 0, chromaSize = 0;
   VCEncGetAlignedStride(width, type, &luma_stride, &chroma_stride, alignment);
   switch (type)
   {
@@ -1438,13 +1443,10 @@ static void AlignedPicSizeGotbyFormat (VCEncPictureType type, u32 width, u32 hei
       break;
   }
 
-  pictureSize = lumaSize + chromaSize;
   if (luma_Size != NULL)
     *luma_Size = lumaSize;
   if (chroma_Size != NULL)
     *chroma_Size = chromaSize;
-  if(picture_Size != NULL)
-    *picture_Size = pictureSize;
 }
 
 static VpuEncRetCode VCEnc_encoder_stream_start(ENCODER_PROTOTYPE* arg, CONFIG* params, STREAM_BUFFER* stream)
@@ -1500,10 +1502,9 @@ static VpuEncRetCode VCEnc_encoder_stream_start(ENCODER_PROTOTYPE* arg, CONFIG* 
 static void VPU_EncSetEncInParamsEncode (VCEncIn *pEncIn, FRAME* frame, STREAM_BUFFER* stream, CONFIG* params, VCEncPictureCodingType nextCodingType)
 {
   u32 luma_Size = 0, chroma_Size = 0;
-  u32 picture_Size = 0;
 
-  AlignedPicSizeGotbyFormat (params->preProcCfg.inputType, params->cfg.width, params->cfg.height, params->preProcCfg.input_alignment,
-                                        &luma_Size, &chroma_Size, &picture_Size);
+  AlignedPicSizeGotbyFormat (params->preProcCfg.inputType, params->preProcCfg.origWidth, params->preProcCfg.origHeight,
+                                        params->preProcCfg.input_alignment, &luma_Size, &chroma_Size);
 
   pEncIn->busLuma = frame->fb_bus_address;
   pEncIn->busChromaU = pEncIn->busLuma + luma_Size;
@@ -2014,7 +2015,7 @@ VpuEncRetCode VPU_EncOpen(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEn
         pInParam->nRotAngle, pInParam->eColorFormat, pInParam->nChromaInterleave);
       VPU_EncSetRateCtrlDefaults(pObj, pInParam->nBitRate, pInParam->eFormat,
         pInParam->nRcIntraQp, pInParam->nUserQpMin, pInParam->nUserQpMax);
-      VPU_EncSetConfigDefaults(pObj, pInParam->nFrameRate, pInParam->eFormat);
+      VPU_EncSetConfigDefaults(pObj, pInParam->nFrameRate, pInParam->eFormat, pInParam->nPicWidth, pInParam->nPicHeight);
       VPU_EncSetCodingCtrlDefaults(pObj);
 
       if (pInParam->eColorFormat == VPU_COLOR_ARGB8888 || pInParam->eColorFormat == VPU_COLOR_BGRA8888 ||
