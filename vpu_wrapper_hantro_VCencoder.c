@@ -1554,8 +1554,10 @@ VpuEncRetCode VCEnc_encoder_encode(ENCODER_PROTOTYPE* arg, FRAME* frame, STREAM_
 
   if (ret == VCENC_OK)
   {
-    rcCfg.bitPerSecond = frame->bitrate;
-    ret = VCEncSetRateCtrl(this->inst, &rcCfg);
+    if (rcCfg.bitPerSecond != frame->bitrate) {
+      rcCfg.bitPerSecond = frame->bitrate;
+      ret = VCEncSetRateCtrl(this->inst, &rcCfg);
+    }
   }
   else
   {
