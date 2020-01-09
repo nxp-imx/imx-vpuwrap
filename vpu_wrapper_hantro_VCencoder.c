@@ -964,10 +964,10 @@ static VCEncPictureType VPU_EncConvertColorFmt(VpuColorFormat vpuColorFmt, int c
       inputColorFmt = VCENC_YUV422_INTERLEAVED_UYVY;
       break;
     case VPU_COLOR_ARGB8888:
-      inputColorFmt = VCENC_RGB888;
+      inputColorFmt = VCENC_BGR888;
       break;
     case VPU_COLOR_BGRA8888:
-      inputColorFmt = VCENC_BGR888;
+      inputColorFmt = VCENC_RGB888;
       break;
     case VPU_COLOR_RGB565:
       inputColorFmt = VCENC_RGB565;
