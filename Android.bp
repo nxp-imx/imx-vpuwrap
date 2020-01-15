@@ -1,0 +1,70 @@
+vpu_wrapper_hantro_defaults {
+    name: "vpu_wrapper_hantro_default",
+
+    srcs: [
+        "vpu_wrapper_hantro.c",
+        "utils.c",
+    ],
+
+    include_dirs: [
+        "vendor/nxp/imx-vpu-hantro/h1_encoder/software/inc",
+        "vendor/nxp/imx-vpu-hantro/decoder_sw/software/source/inc",
+        "vendor/nxp/imx-vpu-hantro/openmax_il/source/decoder",
+        "vendor/nxp/imx-vpu-hantro/openmax_il/source",
+        "vendor/nxp/imx-vpu-hantro/openmax_il/headers",
+        "vendor/nxp/imx-vpu-hantro/openmax_il",
+        "vendor/nxp/fsl-codec/ghdr",
+    ],
+
+    cflags: [
+        "-DSET_OUTPUT_CROP_RECT",
+        "-DUSE_EXTERNAL_BUFFER",
+        "-DUSE_OUTPUT_RELEASE",
+        "-DVSI_API",
+        "-DIS_G2_DECODER",
+        "-DENABLE_CODEC_HEVC",
+        "-DGET_FREE_BUFFER_NON_BLOCK",
+        "-DDOWN_SCALER",
+        "-DENABLE_CODEC_VP8",
+        "-DENCH1",
+        "-Wno-error=date-time",
+    ],
+
+    shared_libs: [
+        "liblog",
+        "libutils",
+        "libc",
+        "libm",
+        "libcodec",
+        "libhantro",
+    ],    
+}
+
+bootstrap_go_package {
+    name: "soong-vpu_wrapper",
+    pkgPath: "android/soong/vendor/nxp/imx_android_mm/codec2/vpu_wrapper",
+    deps: [
+        "blueprint",
+        "blueprint-pathtools",
+        "soong",
+        "soong-android",
+        "soong-cc",
+        "soong-genrule",
+    ],
+    srcs: [
+        "vpu_wrapper.go",
+    ],
+    pluginFor: ["soong_build"],
+}
+
+
+cc_library_shared {
+    name: "lib_vpu_wrapper",
+
+    defaults: [
+        "vpu_wrapper_hantro_default",
+        "imx_defaults",
+    ],
+
+}
+

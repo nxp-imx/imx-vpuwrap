@@ -1,6 +1,8 @@
-/*!
- *	CopyRight Notice:
+/**
  *	Copyright 2019-2020 NXP
+ *
+ *  The following programs are the sole property of NXP,
+ *  and contain its proprietary and confidential information.
  *
  *	History :
  *	Date	(y.m.d)		Author			Version			Description
@@ -29,8 +31,10 @@
 
 static int nVpuLogLevel=0;      //bit 0: api log; bit 1: raw dump; bit 2: yuv dump
 #ifdef ANDROID
-#include "Log.h"
-#define LOG_PRINTF LogOutput
+//#define LOG_NDEBUG 0
+#define LOG_TAG "VpuWrapper"
+#include <utils/Log.h>
+#define LOG_PRINTF ALOGD
 #define VPU_LOG_LEVELFILE "/data/vpu_log_level"
 #define VPU_DUMP_RAWFILE "/data/temp_wrapper.bit"
 #define VPU_DUMP_YUVFILE "/data/temp_wrapper.yuv"
@@ -1306,8 +1310,8 @@ VpuEncRetCode VPU_EncGetMem(VpuMemDesc* pInOutMem)
   pInOutMem->nPhyAddr = info.busAddress;
   pInOutMem->nVirtAddr = (unsigned long)info.virtualAddress;
 
-  VPU_ENC_LOG("EWLMallocLinear pewl %p, size %d, virt 0x%x phy 0x%x\n",
-    pewl, pInOutMem->nSize, info.virtualAddress, info.busAddress);
+  VPU_ENC_LOG("EWLMallocLinear pewl %p, size %d, virt %p phy %p\n",
+    pewl, pInOutMem->nSize, info.virtualAddress, (void*)info.busAddress);
 
   if (pewl)
     EWLRelease(pewl);
@@ -1981,7 +1985,7 @@ VpuEncRetCode VPU_EncOpen(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEn
   pMemVirt = &pInMemInfo->MemSubBlock[VIRT_INDEX];
   pMemPhy = &pInMemInfo->MemSubBlock[PHY_INDEX];
   if ((pMemVirt->pVirtAddr == NULL) || MemNotAlign(pMemVirt->pVirtAddr, VPU_MEM_ALIGN)
-      || (pMemVirt->nSize != sizeof(VpuEncHandleInternal)))
+      || (pMemVirt->nSize < sizeof(VpuEncHandleInternal)))
   {
     VPU_ENC_ERROR("%s: failure: invalid parameter ! \r\n", __FUNCTION__);
     return VPU_ENC_RET_INVALID_PARAM;
@@ -1989,7 +1993,7 @@ VpuEncRetCode VPU_EncOpen(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEn
 
   if ((pMemPhy->pVirtAddr == NULL) || MemNotAlign(pMemPhy->pVirtAddr, VPU_MEM_ALIGN)
       || (pMemPhy->pPhyAddr == NULL) || MemNotAlign(pMemPhy->pPhyAddr, VPU_MEM_ALIGN)
-      || (pMemPhy->nSize != (VPU_BITS_BUF_SIZE)))
+      || (pMemPhy->nSize < (VPU_BITS_BUF_SIZE)))
   {
     VPU_ENC_ERROR("%s: failure: invalid parameter !! \r\n", __FUNCTION__);
     return VPU_ENC_RET_INVALID_PARAM;
@@ -2064,7 +2068,7 @@ VpuEncRetCode VPU_EncOpen(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEn
         pObj->config.rcCfg.bitPerSecond = VPU_ENC_MAX_BITRATE;
       if (pObj->config.rcCfg.bitPerSecond < VPU_ENC_MIN_BITRATE)
       {
-        // workaround to set check bitrate, calculate bitPerSecond = bitPerFrame * pInParam->nFrameRate / compression, 
+        // workaround to set check bitrate, calculate bitPerSecond = bitPerFrame * pInParam->nFrameRate / compression,
         // so that resolution from max - min can get a approprite bitrate
         int bitPerFrame = pObj->config.cfg.width * pObj->config.cfg.height * 8;
         int compression = 50;
@@ -2210,7 +2214,7 @@ VpuEncRetCode VPU_EncConfig(VpuEncHandle InHandle, VpuEncConfig InEncConf, void*
         0: sequence header(SPS/PPS) + IDR +P +P +...+ (SPS/PPS)+IDR+....
         1: sequence header(SPS/PPS) + (SPS/PPS)+IDR +P +P +...+ (SPS/PPS)+IDR+....
       */
-      VPU_ENC_LOG("%s: enable SPS/PPS for IDR frames %d \r\n",__FUNCTION__);
+      VPU_ENC_LOG("%s: enable SPS/PPS for IDR frames \r\n",__FUNCTION__);
       //pObj->encConfig.prependSPSPPSToIDRFrames = OMX_TRUE;
       break;
     case VPU_ENC_CONF_RC_INTRA_QP: /*avc: 0..51, other 1..31*/

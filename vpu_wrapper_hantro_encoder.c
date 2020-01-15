@@ -1,10 +1,12 @@
-/*!
- *	CopyRight Notice:
- *	Copyright 2018 NXP
+/**
+ *  Copyright 2018-2020 NXP
  *
- *	History :
- *	Date	(y.m.d)		Author			Version			Description
- *	2018-06-10		  Bao Xiahong		0.1				Created
+ *  The following programs are the sole property of NXP,
+ *  and contain its proprietary and confidential information.
+ *
+ *  History :
+ *  Date    (y.m.d)     Author          Version         Description
+ *  2018-06-10        Bao Xiahong       0.1             Created
  */
 
 /** Vpu_wrapper_hantro_encoder.c
@@ -12,14 +14,25 @@
  *	application
  */
 
+#ifdef ANDROID_LOCAL_DEBUG
+//#define LOG_NDEBUG 0
+#define LOG_TAG "VpuWrapper"
+#include <utils/Log.h>
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <semaphore.h>
 
 #include "headers/OMX_Video.h"
 #include "headers/OMX_VideoExt.h"
+#ifdef ANDROID
+#include "ewl.h"
+#else
 #include "hantro_enc/ewl.h"
+#endif
 #include "encoder/codec.h"
 #include "encoder/encoder.h"
 #include "encoder/encoder_h264.h"
@@ -29,9 +42,8 @@
 #include "vpu_wrapper.h"
 
 static int nVpuLogLevel=0;      //bit 0: api log; bit 1: raw dump; bit 2: yuv dump
-#ifdef ANDROID
-#include "Log.h"
-#define LOG_PRINTF LogOutput
+#ifdef ANDROID_LOCAL_DEBUG
+#define LOG_PRINTF ALOGV
 #define VPU_LOG_LEVELFILE "/data/vpu_log_level"
 #define VPU_DUMP_RAWFILE "/data/temp_wrapper.bit"
 #define VPU_DUMP_YUVFILE "/data/temp_wrapper.yuv"
@@ -62,7 +74,11 @@ static int g_seek_dump=DUMP_ALL_DATA;   /*0: only dump data after seeking; other
 
 
 #define VPU_MEM_ALIGN           0x10
+#ifdef ANDROID
+#define VPU_BITS_BUF_SIZE       (3*1024*1024)      //bitstream buffer size : big enough contain two big frames
+#else
 #define VPU_BITS_BUF_SIZE       (4*1024*1024)      //bitstream buffer size : big enough for 1080p h264/vp8 with max bitrate
+#endif
 
 #define VPU_ENC_SEQ_DATA_SEPERATE
 #define VPU_ENC_MAX_RETRIES 10000
@@ -192,6 +208,11 @@ typedef struct
   VpuCodStd CodecFormat;
   int bStreamStarted;
   int bAvcc;
+
+  /* output frame buffer info */
+  STREAM_BUFFER outputStreamBuf[VPU_ENC_MAX_FRAME_INDEX];
+  int outputIndex;
+  int outputNum;
 
   /* perf calculation*/
   int totalFrameCnt;
@@ -548,7 +569,7 @@ static VpuEncRetCode VPU_EncDoEncode(VpuEncObj *pObj, FRAME* pFrame, STREAM_BUFF
 
   if (pStream->streamlen > pStream->buf_max_size) {
     VPU_ENC_ERROR("%s: output buffer is too small, need %d but actual is %d\n",
-        __FUNCTION__, pStream->streamlen, pStream->buf_max_size);
+        __FUNCTION__, (int)pStream->streamlen, (int)pStream->buf_max_size);
     return VPU_ENC_RET_INSUFFICIENT_FRAME_BUFFERS;
   }
 
@@ -615,7 +636,7 @@ VpuEncRetCode VPU_EncOpen(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEn
 
   if ((pMemPhy->pVirtAddr == NULL) || MemNotAlign(pMemPhy->pVirtAddr, VPU_MEM_ALIGN)
       || (pMemPhy->pPhyAddr == NULL) || MemNotAlign(pMemPhy->pPhyAddr, VPU_MEM_ALIGN)
-      || (pMemPhy->nSize != (VPU_BITS_BUF_SIZE)))
+      || (pMemPhy->nSize < (VPU_BITS_BUF_SIZE)))
   {
     VPU_ENC_ERROR("%s: failure: invalid parameter !! \r\n", __FUNCTION__);
     return VPU_ENC_RET_INVALID_PARAM;
@@ -903,7 +924,11 @@ VpuEncRetCode VPU_EncClose(VpuEncHandle InHandle)
 
 VpuEncRetCode VPU_EncGetInitialInfo(VpuEncHandle InHandle, VpuEncInitInfo * pOutInitInfo)
 {
+#ifdef ANDROID
+  pOutInitInfo->nMinFrameBufferCount = 4; // Fixme later, hantro enc has no api to query out init info
+#else
   pOutInitInfo->nMinFrameBufferCount = 0; // Fixme later, hantro enc has no api to query out init info
+#endif
   pOutInitInfo->nAddressAlignment = 1;    // Fixme later, hantro enc has no api to query out init info
   pOutInitInfo->eType = VPU_TYPE_HANTRO;
   return VPU_ENC_RET_SUCCESS;
@@ -937,7 +962,38 @@ VpuEncRetCode VPU_EncGetWrapperVersionInfo(VpuWrapperVersionInfo * pOutVerInfo)
 
 VpuEncRetCode VPU_EncRegisterFrameBuffer(VpuEncHandle InHandle,VpuFrameBuffer *pInFrameBufArray, int nNum,int nSrcStride)
 {
+#ifdef ANDROID
+  VpuEncHandleInternal * pVpuObj;
+  VpuEncObj * pObj;
+  VpuEncRetCode ret;
+  STREAM_BUFFER *pStreamBuf;
+  int i;
+
+  if(InHandle == NULL) {
+    VPU_ENC_ERROR("%s: failure: handle is null \r\n", __FUNCTION__);
+    return VPU_ENC_RET_INVALID_HANDLE;
+  }
+
+  if(nNum > VPU_ENC_MAX_FRAME_INDEX) {
+    VPU_ENC_ERROR("%s: failure: register frame number is too big(%d) \r\n",__FUNCTION__, nNum);
+    return VPU_ENC_RET_INVALID_PARAM;
+  }
+
+  pVpuObj = (VpuEncHandleInternal *)InHandle;
+  pObj = &(pVpuObj->obj);
+  pStreamBuf = pObj->outputStreamBuf;
+
+  for (i = 0; i < nNum; i++) {
+    pStreamBuf->bus_data = pInFrameBufArray->pbufVirtY;
+    pStreamBuf->bus_address = (OSAL_BUS_WIDTH)pInFrameBufArray->pbufY;
+    pInFrameBufArray++;
+    pStreamBuf++;
+  }
+
+  pObj->outputNum = nNum;
+#else
   // do nothing because h1 encoder don't need register frame buffer
+#endif
   return VPU_ENC_RET_SUCCESS;
 }
 
@@ -995,8 +1051,9 @@ VpuEncRetCode VPU_EncGetMem(VpuMemDesc* pInOutMem)
   pInOutMem->nPhyAddr = info.busAddress;
   pInOutMem->nVirtAddr = (unsigned long)info.virtualAddress;
   pInOutMem->nCpuAddr = info.ion_fd;
-  VPU_ENC_LOG("EWLMallocLinear pewl %p, size %d, virt 0x%x phy 0x%x\n",
-    pewl, pInOutMem->nSize, info.virtualAddress, info.busAddress);
+  pInOutMem->nSize = info.size;
+  VPU_ENC_LOG("EWLMallocLinear pewl %p, size %d, virt 0x%p phy 0x%llx\n",
+    pewl, info.size, info.virtualAddress, (long long)info.busAddress);
 
   if (pewl)
     EWLRelease(pewl);
@@ -1075,7 +1132,7 @@ VpuEncRetCode VPU_EncConfig(VpuEncHandle InHandle, VpuEncConfig InEncConf, void*
         0: sequence header(SPS/PPS) + IDR +P +P +...+ (SPS/PPS)+IDR+....
         1: sequence header(SPS/PPS) + (SPS/PPS)+IDR +P +P +...+ (SPS/PPS)+IDR+....
       */
-      VPU_ENC_LOG("%s: enable SPS/PPS for IDR frames %d \r\n",__FUNCTION__);
+      VPU_ENC_LOG("%s: enable SPS/PPS for IDR frames \r\n",__FUNCTION__);
       pObj->encConfig.prependSPSPPSToIDRFrames = OMX_TRUE;
       break;
     case VPU_ENC_CONF_RC_INTRA_QP: /*avc: 0..51, other 1..31*/
@@ -1124,6 +1181,21 @@ VpuEncRetCode VPU_EncEncodeFrame(VpuEncHandle InHandle, VpuEncEncParam* pInOutPa
   memset(&stream, 0, sizeof(STREAM_BUFFER));
 
   /* set output buffer */
+#ifdef ANDROID
+  if (pObj->outputStreamBuf[pObj->outputIndex].bus_address) {
+    memcpy(&stream, &(pObj->outputStreamBuf[pObj->outputIndex]), sizeof(STREAM_BUFFER));
+    pObj->outputIndex = (pObj->outputIndex + 1) % pObj->outputNum;
+    copy = 1;
+  } else if (pInOutParam->nInPhyOutput){
+    stream.bus_data = (OMX_U8*)pInOutParam->nInVirtOutput;
+    stream.bus_address = (OSAL_BUS_WIDTH)pInOutParam->nInPhyOutput;
+  } else {
+    VPU_ENC_ERROR("invalid output buffer\n");
+    return VPU_ENC_RET_FAILURE;
+  }
+
+  stream.buf_max_size = pInOutParam->nInOutputBufLen;
+#else
   copy = 1;
   stream.bus_data = (OMX_U8*)pObj->pBsBufVirt;
   stream.bus_address = (OSAL_BUS_WIDTH)pObj->pBsBufPhy;
@@ -1136,6 +1208,7 @@ VpuEncRetCode VPU_EncEncodeFrame(VpuEncHandle InHandle, VpuEncEncParam* pInOutPa
     stream.bus_address = (OSAL_BUS_WIDTH)pInOutParam->nInPhyOutput;
     stream.buf_max_size = pInOutParam->nInOutputBufLen;
   }
+#endif
 
   pInOutParam->eOutRetCode |= VPU_ENC_INPUT_NOT_USED;
 
@@ -1147,6 +1220,10 @@ VpuEncRetCode VPU_EncEncodeFrame(VpuEncHandle InHandle, VpuEncEncParam* pInOutPa
         memcpy((void*)pInOutParam->nInVirtOutput, stream.bus_data, stream.streamlen);
 
       pInOutParam->nOutOutputSize = stream.streamlen; // codec data
+
+      if (pObj->bAvcc) {
+        VpuConvertToAvccHeader((unsigned char*)pInOutParam->nInVirtOutput, pInOutParam->nOutOutputSize, &pInOutParam->nOutOutputSize);
+      }
 
       pInOutParam->eOutRetCode |= VPU_ENC_OUTPUT_SEQHEADER;
 
@@ -1204,6 +1281,10 @@ VpuEncRetCode VPU_EncEncodeFrame(VpuEncHandle InHandle, VpuEncEncParam* pInOutPa
   }
 
   pInOutParam->nOutOutputSize = stream.streamlen;
+
+  if (pObj->bAvcc) {
+    VpuConvertToAvccData((unsigned char*)pInOutParam->nInVirtOutput, pInOutParam->nOutOutputSize);
+  }
 
   pInOutParam->eOutRetCode |= (VPU_ENC_OUTPUT_DIS | VPU_ENC_INPUT_USED);
   pObj->totalFrameCnt++;

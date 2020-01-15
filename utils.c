@@ -1,8 +1,8 @@
 /*
  *  Copyright (c) 2016, Freescale Semiconductor Inc.,
- *  All Rights Reserved.
+ *	Copyright 2018-2020 NXP
  *
- *  The following programs are the sole property of Freescale Semiconductor Inc.,
+ *  The following programs are the sole property of NXP,
  *  and contain its proprietary and confidential information.
  *
  */
@@ -101,7 +101,7 @@ int VpuConvertAvccHeader(unsigned char* pCodecData, unsigned int nSize, unsigned
 
   VPU_LOG("spsSize: %d , num of PPS: %d \r\n",spsSize, numPPS);
   tempBufSize=nSize+2*numPPS; //need to allocate more bytes since startcode occupy 4 bytes, while pps size is 2 bytes.
-  pTemp=vpu_malloc(tempBufSize); 
+  pTemp=vpu_malloc(tempBufSize);
   if(pTemp==NULL){
     VPU_ERROR("error: malloc %d bytes fail !\r\n", tempBufSize);
     //do nothing, return
@@ -166,7 +166,7 @@ int VpuConvertHvccHeader(unsigned char* pCodecData, unsigned int nSize, unsigned
   if(nSize<23){
     goto corrupt_header;
   }
-  pTemp=vpu_malloc(nSize); 
+  pTemp=vpu_malloc(nSize);
   if(pTemp==NULL){
     VPU_ERROR("error: malloc %d bytes fail !\r\n", nSize);
     //do nothing, return
@@ -535,4 +535,166 @@ int VC1CreateRCVFrameHeader(unsigned char* pHeader, int* pHeaderLen,unsigned int
   return 1;
 }
 
+int VpuFindAVCStartCode(unsigned char* pData, int nSize,unsigned char** ppStart)
+{
+#define AVC_START_CODE 0x00000001
+    unsigned int startcode=0xFFFFFFFF;
+    unsigned char* p=pData;
+    unsigned char* pEnd=pData+nSize;
+    while(p<pEnd){
+        startcode=(startcode<<8)|p[0];
+        if(AVC_START_CODE==startcode){
+            break;
+        }
+        p++;
+    }
+    if(p>=pEnd){
+        VPU_LOG("not find valid start code \r\n");
+        *ppStart=NULL;
+        return 0;
+    }
+    *ppStart=p-3;
+    return 1;
+}
 
+int VpuConvertToAvccData(unsigned char* pData, int nSize)
+{
+  /*we will replace the 'start code'(00000001) with 'nal size'(4bytes), and the buffer length no changed*/
+  unsigned char* pPre=pData;
+  int length=nSize;
+  int nalSize=0;
+  int outSize=0;
+  int i=0;
+  unsigned char* pNext=NULL;
+  VPU_LOG("convert to avcc data: %d bytes \r\n",nSize);
+  if(0==VpuFindAVCStartCode(pData,length,&pPre)){
+      goto finish;
+  }
+  pPre+=4; //skip 4 bytes of startcode
+  length-=(pPre-pData);
+  while(1){
+    VpuFindAVCStartCode(pPre,length,&pNext);
+    if(pNext){
+        nalSize=pNext-pPre;
+    }
+    else{
+        nalSize=length; //last nal
+    }
+    pPre[-4]=(nalSize>>24)&0xFF;
+    pPre[-3]=(nalSize>>16)&0xFF;
+    pPre[-2]=(nalSize>>8)&0xFF;
+    pPre[-1]=(nalSize)&0xFF;
+    VPU_LOG("[%d]: fill one nal size: %d \r\n",i,nalSize);
+    i++;
+    outSize+=nalSize+4;
+    if(pNext==NULL){
+        goto finish;
+    }
+    pNext+=4;
+    length-=(pNext-pPre);
+    pPre=pNext;
+  }
+finish:
+  if(outSize!=nSize){
+      VPU_ERROR("error: size not matched in convert progress of avcc !\r\n");
+  }
+  if(i==0){
+      VPU_ERROR("error: no find any nal start code in convert progress of avcc !\r\n");
+  }
+  return 1;
+}
+
+int VpuConvertToAvccHeader(unsigned char* pData, int nSize, int*pFilledSize)
+{
+  unsigned char* pPre=pData;
+  int spsSize=0, ppsSize=0;
+  unsigned char *sps=NULL, *pps=NULL;
+  unsigned char* pNext=NULL;
+  unsigned char naltype;
+  int length=nSize;
+  char* pTemp=NULL,*pFilled=NULL;
+  int filledSize=0;
+  /*search boundary of sps and pps */
+  if(0==VpuFindAVCStartCode(pData,length,&pPre)){
+      goto search_finish;
+  }
+  pPre+=4; //skip 4 bytes of startcode
+  length-=(pPre-pData);
+  if(length<=0){
+      goto search_finish;
+  }
+  while(1){
+    int size;
+    VpuFindAVCStartCode(pPre,length,&pNext);
+    if(pNext){
+        size=pNext-pPre;
+    }
+    else{
+        size=length; //last nal
+    }
+    naltype=pPre[0] & 0x1f;
+    VPU_LOG("find one nal, type: 0x%X, size: %d \r\n",naltype,size);
+    if (naltype==7) { /* SPS */
+        sps=pPre;
+        spsSize=size;
+    }
+    else if (naltype==8) { /* PPS */
+        pps= pPre;
+        ppsSize=size;
+    }
+    if(pNext==NULL){
+        goto search_finish;
+    }
+    pNext+=4;
+    length-=(pNext-pPre);
+    if(length<=0){
+        goto search_finish;
+    }
+    pPre=pNext;
+  }
+search_finish:
+  if((sps==NULL)||(pps==NULL)){
+      VPU_ERROR("failed to create avcc header: no sps/pps in codec data !\r\n");
+      return 0;
+  }
+
+  /*fill valid avcc header*/
+  pTemp=vpu_malloc(nSize+20); // need to allocate more bytes(more than 6+2+1+2 bytes) for additonal tag info
+  if(pTemp==NULL){
+      VPU_ERROR("malloc %d bytes failure \r\n",nSize);
+      return 0;
+  }
+  pFilled=pTemp;
+  pFilled[0]=1;       /* version */
+  pFilled[1]=sps[1];  /* profile */
+  pFilled[2]=sps[2];  /* profile compat */
+  pFilled[3]=sps[3];  /* level */
+  pFilled[4]=0xFF;    /* 6 bits reserved (111111) + 2 bits nal size length - 1 (11) */
+  pFilled[5]=0xE1;    /* 3 bits reserved (111) + 5 bits number of sps (00001) */
+  pFilled+=6;
+
+  pFilled[0]=(spsSize>>8)&0xFF; /*sps size*/
+  pFilled[1]=spsSize&0xFF;
+  pFilled+=2;
+  vpu_memcpy(pFilled,sps,spsSize); /*sps data*/
+  pFilled+=spsSize;
+
+  pFilled[0]=1;       /* number of pps */
+  pFilled++;
+  pFilled[0]=(ppsSize>>8)&0xFF;   /*pps size*/
+  pFilled[1]=ppsSize&0xFF;
+  pFilled+=2;
+  vpu_memcpy(pFilled,pps,ppsSize); /*pps data*/
+
+  filledSize=6+2+spsSize+1+2+ppsSize;
+  vpu_memcpy(pData,pTemp,filledSize);
+
+  if(pTemp){
+      vpu_free(pTemp);
+  }
+  VPU_LOG("created on avcc header: %d bytes, sps size: %d, pps size: %d \r\n",filledSize,spsSize, ppsSize);
+  *pFilledSize=filledSize;
+  return 1;
+}
+
+/* end of file*/

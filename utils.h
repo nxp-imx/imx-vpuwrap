@@ -1,8 +1,8 @@
 /*
  *  Copyright (c) 2016, Freescale Semiconductor Inc.,
- *  All Rights Reserved.
+ *  Copyright 2018-2020 NXP
  *
- *  The following programs are the sole property of Freescale Semiconductor Inc.,
+ *  The following programs are the sole property of NXP,
  *  and contain its proprietary and confidential information.
  *
  */
@@ -31,6 +31,10 @@ int VC1CreateRCVSeqHeader(unsigned char* pHeader, int* pHeaderLen,
 	unsigned char* pCodecPri,unsigned int nFrameSize,int nWidth,int nHeight,int* pNoError);
 int VC1CreateNalFrameHeader(unsigned char* pHeader, int* pHeaderLen,unsigned int*pInData );
 int VC1CreateRCVFrameHeader(unsigned char* pHeader, int* pHeaderLen,unsigned int nInSize );
+
+int VpuFindAVCStartCode(unsigned char* pData, int nSize, unsigned char** ppStart);
+int VpuConvertToAvccData(unsigned char* pData, int nSize);
+int VpuConvertToAvccHeader(unsigned char* pData, int nSize, int* pFilledSize);
 
 #ifdef __cplusplus
 }
