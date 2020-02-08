@@ -1,6 +1,6 @@
 /*!
  *	CopyRight Notice:
- *	Copyright 2019 NXP
+ *	Copyright 2019-2020 NXP
  *
  *	History :
  *	Date	(y.m.d)		Author			Version			Description
@@ -104,9 +104,6 @@ static int g_seek_dump=DUMP_ALL_DATA;   /*0: only dump data after seeking; other
 #define VPU_ENC_ERROR(...) if(nVpuLogLevel&0x1) {LOG_PRINTF(__VA_ARGS__);}
 #define VPU_ENC_ASSERT(exp) if((!(exp))&&(nVpuLogLevel&0x1)) {LOG_PRINTF("%s: %d : assert condition !!!\r\n",__FUNCTION__,__LINE__);}
 
-#define IS_H264(a)  (a == VCENC_VIDEO_CODEC_H264)
-#define CLIP3(x, y, z)  ((z) < (x) ? (x) : ((z) > (y) ? (y) : (z)))
-#define MIN(a,b) ((a)<(b) ? (a) : (b))
 #define MEMORY_SENTINEL 0xACDCACDC;
 
 typedef struct FrameString
@@ -240,7 +237,6 @@ struct ENCODER_PROTOTYPE
     VpuEncRetCode (*encode)(ENCODER_PROTOTYPE*, FRAME*, STREAM_BUFFER*, CONFIG*);
 };
 
-typedef const void *VCEncInst;
 typedef struct
 {
   VCEncInst inst;
@@ -1534,6 +1530,9 @@ VpuEncRetCode VCEnc_encoder_encode(ENCODER_PROTOTYPE* arg, FRAME* frame, STREAM_
   VCEncRateCtrl rcCfg;
   VCEncCodingCtrl codingCfg;
 
+  memset(&codingCfg, 0, sizeof(VCEncCodingCtrl));
+  memset(&rcCfg, 0, sizeof(VCEncRateCtrl));
+
   VPU_EncSetEncInParamsEncode(&this->encIn, frame, stream, params, this->nextCodingType);
 
   // set the first frame
@@ -1889,8 +1888,8 @@ static ENCODER_PROTOTYPE* VCEnc_encoder_create(const CONFIG* params, int size)
   this->nIFrameCounter = 0;
   this->nextCodingType = VCENC_INTRA_FRAME;
 
-  VPU_EncInitEncInParamsCreate(&this->encIn, params);
-  VPU_EncInitConfigParams(&this->encIn, &cfg, params);
+  VPU_EncInitEncInParamsCreate(&this->encIn, (CONFIG*)params);
+  VPU_EncInitConfigParams(&this->encIn, &cfg, (CONFIG*)params);
 
   VCEncRet ret = VCEncInit(&cfg, &this->inst);
 
@@ -1898,11 +1897,12 @@ static ENCODER_PROTOTYPE* VCEnc_encoder_create(const CONFIG* params, int size)
   if (ret == VCENC_OK)
   {
     VCEncCodingCtrl codingCfg;
+    memset(&codingCfg, 0, sizeof(VCEncCodingCtrl));
     ret = VCEncGetCodingCtrl(this->inst, &codingCfg);
 
     if (ret == VCENC_OK)
     {
-      VPU_EncInitCodingCtrlParams(&codingCfg, params);
+      VPU_EncInitCodingCtrlParams(&codingCfg, (CONFIG*)params);
       ret = VCEncSetCodingCtrl(this->inst, &codingCfg);
     }
     else
@@ -1921,10 +1921,11 @@ static ENCODER_PROTOTYPE* VCEnc_encoder_create(const CONFIG* params, int size)
   if (ret == VCENC_OK)
   {
     VCEncRateCtrl rcCfg;
+    memset(&rcCfg, 0, sizeof(VCEncRateCtrl));
     ret = VCEncGetRateCtrl(this->inst, &rcCfg);
     if (ret == VCENC_OK)
     {
-      VPU_EncInitRateCtrlParams(&rcCfg, params);
+      VPU_EncInitRateCtrlParams(&rcCfg, (CONFIG*)params);
       ret = VCEncSetRateCtrl(this->inst, &rcCfg);
     }
     else
@@ -1943,10 +1944,11 @@ static ENCODER_PROTOTYPE* VCEnc_encoder_create(const CONFIG* params, int size)
   if (ret == VCENC_OK)
   {
     VCEncPreProcessingCfg preProcCfg;
+    memset(&preProcCfg, 0, sizeof(VCEncPreProcessingCfg));
     ret = VCEncGetPreProcessing(this->inst, &preProcCfg);
     if (ret == VCENC_OK)
     {
-      VPU_EncInitPreProcessorParams(&preProcCfg, params);
+      VPU_EncInitPreProcessorParams(&preProcCfg, (CONFIG*)params);
       ret = VCEncSetPreProcessing(this->inst, &preProcCfg);
     }
     else
