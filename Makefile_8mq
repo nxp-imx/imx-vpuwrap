@@ -8,7 +8,7 @@ AR ?= =ar
 
 
 CFLAGS= -O2 -Wall
-INCLUDES= -I. -I$(SDKTARGETSYSROOT)/usr/include/hantro_dec -I/opt/fsl-imx-internal-xwayland/4.19-thud/sysroots/aarch64-poky-linux/usr/include -I/usr/include -I./sqlite
+INCLUDES= -I. -I$(SDKTARGETSYSROOT)/usr/include/hantro_dec -I/opt/fsl-imx-xwayland/5.4-zeus/sysroots/aarch64-poky-linux/usr/include -I/usr/include
 
 AFLAGS=
 
@@ -27,10 +27,6 @@ LIB_OBJS=vpu_wrapper_hantro.o vpu_wrapper_timer.o
 LIB_OBJS +=utils.o
 APP_OBJS=test_dec_arm_elinux.o decode_stream.o
 APP_OBJS+=fb_render.o
-
-#ENC_APP_OBJS=test_enc_arm_elinux.o encode_stream.o vpu_wrapper_hantro_encoder.o
-#ENC_AUTO_OBJS=enc_auto_test.o encode_stream.o decode_stream.o fb_render.o sqlite_wrapper.o
-
 
 all: EXE
 	@echo "--- Build-all done for vpu wrapper ---"

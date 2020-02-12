@@ -68,24 +68,20 @@ libfslvpuwraptestdir = $(datadir)/imx-mm/video-codec/examples/vpu
 libfslvpuwraptest_DATA = \
     Makefile_8mm    \
     Makefile_8mq    \
-    Makefile.unit   \
+    Makefile_8mp    \
+    Makefile_iMX6    \
     decode_stream.h \
     decode_stream.c \
     encode_stream.h \
     encode_stream.c \
     fb_render.h     \
     fb_render.c     \
-    sqlite_wrapper.h    \
-    sqlite_wrapper.c    \
     vpu_wrapper_timer.h \
     vpu_wrapper_timer.c \
     test_dec_arm_elinux.c   \
-    test_enc_arm_elinux.c   \
-    enc_auto_test.c
+    test_enc_arm_elinux.c
 
 libfslvpuwraptestlibdir = $(datadir)/imx-mm/video-codec/examples/vpu/sqlite
-libfslvpuwraptestlib_DATA = \
-    sqlite/sqlite3.h    \
-    sqlite/libsqlite3.a
+libfslvpuwraptestlib_DATA =
 
 EXTRA_DIST = autogen.sh $(libfslvpuwrapdoc_DATA) $(libfslvpuwraptest_DATA) $(libfslvpuwraptestlib_DATA)

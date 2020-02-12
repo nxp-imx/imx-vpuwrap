@@ -1,3 +1,4 @@
+
 PROGRAM=test_dec_arm_elinux
 ENC_PROGRAM=test_enc_arm_elinux
 LIBRARY=./release/lib/lib_vpu_wrapper
@@ -9,11 +10,11 @@ AR ?= =ar
 
 
 CFLAGS= -O2 -Wall
-INCLUDES= -I. -I$(SDKTARGETSYSROOT)/usr/include/hantro_dec -I$(SDKTARGETSYSROOT)/usr/include/hantro_enc -I/opt/fsl-imx-xwayland/5.4-zeus/sysroots/aarch64-poky-linux/usr/include -I/usr/include
+INCLUDES= -I. -I$(SDKTARGETSYSROOT)/usr/include -I/opt/fsl-imx-xwayland/5.4-zeus/sysroots/aarch64-poky-linux/usr/include -I/usr/include
 
 AFLAGS=
 
-LFLAGS=-lfslvpuwrap -lcodec -lhantro -lcodec_enc -lhantro_h1
+LFLAGS=-lvpu -lipu -lpthread -lm -ldl
 
 
 #CFLAGS+=-DUSE_VPU_WRAPPER_TIMER
@@ -22,17 +23,13 @@ CFLAGS+=-DDEC_STREAM_DEBUG
 CFLAGS+=-DENC_STREAM_DEBUG
 CFLAGS+=-DAPP_DEBUG
 CFLAGS+=-DFB_RENDER_DEBUG
-CFLAGS+= -DSET_OUTPUT_CROP_RECT -DUSE_EXTERNAL_BUFFER -DVSI_API -DENABLE_CODEC_VP8
-CFLAGS+= -DENCH1 -DOMX_ENCODER_VIDEO_DOMAIN -DENABLE_HANTRO_ENC
-CFLAGS+= -DUSE_IMX8MM
 
-
-LIB_OBJS=vpu_wrapper_hantro.o vpu_wrapper_timer.o
+LIB_OBJS=vpu_wrapper.o vpu_wrapper_timer.o
 LIB_OBJS +=utils.o
 APP_OBJS=test_dec_arm_elinux.o decode_stream.o
 APP_OBJS+=fb_render.o
 
-ENC_APP_OBJS=test_enc_arm_elinux.o encode_stream.o vpu_wrapper_hantro_encoder.o
+ENC_APP_OBJS=test_enc_arm_elinux.o encode_stream.o
 
 all: EXE ENC_EXE
 	@echo "--- Build-all done for vpu wrapper ---"
@@ -49,18 +46,19 @@ EXE: $(APP_OBJS) LIBRARY
 ENC_EXE: $(ENC_APP_OBJS) LIBRARY
 	$(LN) -o $(ENC_PROGRAM) $(LFLAGS) $(ENC_APP_OBJS) $(LIBRARY).a
 
+
 %.o: %.c
 	#$(CC) $(CFLAGS) $(INCLUDES)  -c  -o $@ $<
 	$(CC) -fPIC $(CFLAGS) $(INCLUDES)  -c  -o $@ $<
-	
+
 
 clean:
 	rm -rf $(LIB_OBJS)
-	rm -rf $(APP_OBJS)	
+	rm -rf $(APP_OBJS)
 	rm -rf $(ENC_APP_OBJS)
 	rm -rf $(LIBRARY).a
 	rm -rf $(LIBRARY).so
 	rm -rf $(PROGRAM)
-	rm -rf $(ENC_PROGRAM)	
+	rm -rf $(ENC_PROGRAM)
 
-	
+

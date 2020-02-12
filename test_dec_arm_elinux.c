@@ -1,16 +1,16 @@
 /*
  *  Copyright (c) 2010-2014, Freescale Semiconductor Inc.,
- *  All Rights Reserved.
+ *  Copyright 2019-2020 NXP
  *
- *  The following programs are the sole property of Freescale Semiconductor Inc.,
+ *  The following programs are the sole property of NXP,
  *  and contain its proprietary and confidential information.
  *
- *  Copyright 2019 NXP
  */
 
 /*
  *	test_dec_arm_elinux.c
  *	vpu unit test application
+ *
  *	History :
  *	Date	(y.m.d)		Author			Version			Description
  *	2010-09-14		eagle zhou		0.1				Created

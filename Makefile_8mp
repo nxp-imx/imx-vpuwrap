@@ -13,7 +13,7 @@ INCLUDES= -I. -I$(SDKTARGETSYSROOT)/usr/include/hantro_dec -I$(SDKTARGETSYSROOT)
 
 AFLAGS=
 
-LFLAGS=-lfslvpuwrap -lcodec -lhantro -lcodec_enc -lhantro_h1
+LFLAGS=-lm -lfslvpuwrap -lcodec -lhantro -lhantro_vc8000e
 
 
 #CFLAGS+=-DUSE_VPU_WRAPPER_TIMER
@@ -23,8 +23,8 @@ CFLAGS+=-DENC_STREAM_DEBUG
 CFLAGS+=-DAPP_DEBUG
 CFLAGS+=-DFB_RENDER_DEBUG
 CFLAGS+= -DSET_OUTPUT_CROP_RECT -DUSE_EXTERNAL_BUFFER -DVSI_API -DENABLE_CODEC_VP8
-CFLAGS+= -DENCH1 -DOMX_ENCODER_VIDEO_DOMAIN -DENABLE_HANTRO_ENC
-CFLAGS+= -DUSE_IMX8MM
+CFLAGS+= -DENCVC8000E -DOMX_ENCODER_VIDEO_DOMAIN -DENABLE_HANTRO_ENC
+CFLAGS+= -DUSE_IMX8MP
 
 
 LIB_OBJS=vpu_wrapper_hantro.o vpu_wrapper_timer.o
@@ -32,7 +32,7 @@ LIB_OBJS +=utils.o
 APP_OBJS=test_dec_arm_elinux.o decode_stream.o
 APP_OBJS+=fb_render.o
 
-ENC_APP_OBJS=test_enc_arm_elinux.o encode_stream.o vpu_wrapper_hantro_encoder.o
+ENC_APP_OBJS=test_enc_arm_elinux.o encode_stream.o vpu_wrapper_hantro_VCencoder.o
 
 all: EXE ENC_EXE
 	@echo "--- Build-all done for vpu wrapper ---"
@@ -52,15 +52,15 @@ ENC_EXE: $(ENC_APP_OBJS) LIBRARY
 %.o: %.c
 	#$(CC) $(CFLAGS) $(INCLUDES)  -c  -o $@ $<
 	$(CC) -fPIC $(CFLAGS) $(INCLUDES)  -c  -o $@ $<
-	
+
 
 clean:
 	rm -rf $(LIB_OBJS)
-	rm -rf $(APP_OBJS)	
+	rm -rf $(APP_OBJS)
 	rm -rf $(ENC_APP_OBJS)
 	rm -rf $(LIBRARY).a
 	rm -rf $(LIBRARY).so
 	rm -rf $(PROGRAM)
-	rm -rf $(ENC_PROGRAM)	
+	rm -rf $(ENC_PROGRAM)
 
-	
+

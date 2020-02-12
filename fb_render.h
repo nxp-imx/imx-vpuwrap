@@ -1,8 +1,8 @@
 /*
  *  Copyright (c) 2010-2012, Freescale Semiconductor Inc.,
- *  All Rights Reserved.
+ *  Copyright 2020 NXP
  *
- *  The following programs are the sole property of Freescale Semiconductor Inc.,
+ *  The following programs are the sole property of NXP,
  *  and contain its proprietary and confidential information.
  *
  */
@@ -10,6 +10,8 @@
 /*
  *  fb_render.h
  *	header file for fb_render.c 
+ *
+ *	History :
  *	Date	(y.m.d)		Author			Version			Description
  *	2010-09-14		eagle zhou		0.1				Created
  */

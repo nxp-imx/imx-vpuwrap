@@ -1,11 +1,10 @@
 /*
  *  Copyright (c) 2010-2014, Freescale Semiconductor Inc.,
- *  All Rights Reserved.
+ *  Copyright 2019-2020 NXP
  *
- *  The following programs are the sole property of Freescale Semiconductor Inc.,
+ *  The following programs are the sole property of NXP,
  *  and contain its proprietary and confidential information.
  *
- *  Copyright 2019 NXP
  */
 
 /*   
@@ -1441,6 +1440,7 @@ int decode_stream(DecContxt * pDecContxt)
 		return 0;
 	}
 	//clear 0
+	memset(&decOpenParam, 0, sizeof(VpuDecOpenParam));
 	memset(&memInfo,0,sizeof(VpuMemInfo));
 	memset(&decMemInfo,0,sizeof(DecMemInfo));
 

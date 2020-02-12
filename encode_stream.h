@@ -1,8 +1,8 @@
 /*
  *  Copyright (c) 2010-2014, Freescale Semiconductor Inc.,
- *  All Rights Reserved.
+ *  Copyright 2019-2020 NXP
  *
- *  The following programs are the sole property of Freescale Semiconductor Inc.,
+ *  The following programs are the sole property of NXP,
  *  and contain its proprietary and confidential information.
  *
  */
@@ -10,6 +10,7 @@
 /*
  *	encode_stream.h
  *	header file contain all related struct info in encode_stream.c
+ *
  *	History :
  *	Date	(y.m.d)		Author			Version			Description
  *	2010-12-31		eagle zhou		0.1				Created

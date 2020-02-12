@@ -1,13 +1,14 @@
 /*
  *  Copyright (c) 2010-2013, Freescale Semiconductor Inc.,
- *  All Rights Reserved.
+ *  Copyright 2020 NXP
  *
- *  The following programs are the sole property of Freescale Semiconductor Inc.,
+ *  The following programs are the sole property of NXP,
  *  and contain its proprietary and confidential information.
  *
  */
 
-/** fb_render.c
+/*
+ *  fb_render.c
  *	this file is responsible for rendering video frame through ipu's fb
  */
 
