@@ -1,0 +1,16 @@
+NXP Software Content Register
+
+--------------------------------------------
+
+Outgoing License:          LA_OPT_NXP_Software_License - Production Use, Section 2.3 applies
+License File:              COPYING
+Package Category:          Multimedia
+Type of content:           Source code
+Description and comments:  i.MX VPU wrapper library
+Release Location:          i.MX Yocto Project mirror
+Origin:                    NXP (proprietary)
+                           Freescale Semiconductor, Inc. (proprietary)
+File vpu_wrapper.go:       Apache License, Version 2.0
+                           Used in Android build
+
+--------------------------------------------
