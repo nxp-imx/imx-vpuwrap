@@ -42,7 +42,7 @@ vpu_wrapper_hantro_defaults {
 
 bootstrap_go_package {
     name: "soong-vpu_wrapper",
-    pkgPath: "android/soong/vendor/nxp/imx_android_mm/codec2/vpu_wrapper",
+    pkgPath: "android/soong/vendor/nxp/vpu_wrapper",
     deps: [
         "blueprint",
         "blueprint-pathtools",

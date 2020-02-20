@@ -299,15 +299,11 @@ VpuDecRetCode VPU_DecQueryMem(VpuMemInfo* pOutMemInfo)
   pMem->MemType=VPU_MEM_VIRT;
   pMem->nAlignment=VPU_MEM_ALIGN;
   pMem->nSize=sizeof(VpuDecHandleInternal);
-  pMem->pVirtAddr=NULL;
-  pMem->pPhyAddr=NULL;
 
   pMem=&pOutMemInfo->MemSubBlock[PHY_INDEX];
   pMem->MemType=VPU_MEM_PHY;
   pMem->nAlignment=VPU_MEM_ALIGN;
   pMem->nSize=VPU_BITS_BUF_SIZE;
-  pMem->pVirtAddr=NULL;
-  pMem->pPhyAddr=NULL;
 
   pOutMemInfo->nSubBlockNum=2;
 
