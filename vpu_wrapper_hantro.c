@@ -1360,6 +1360,9 @@ VpuDecRetCode VPU_DecGetInitialInfo(VpuDecHandle InHandle, VpuDecInitInfo * pOut
   pOutInitInfo->nPicWidth = info.width;
   pOutInitInfo->nPicHeight = info.height;
   pOutInitInfo->nMinFrameBufferCount = info.frame_buffers;
+  /* video_full_range_flag is independent of colour_description_present_flag，
+  so put it here to make sure fullRange flag is set. */
+  pOutInitInfo->ColourDesc.fullRange = info.video_full_range_flag;
   if (info.bit_depth == 0)
     pOutInitInfo->nBitDepth = 8;
   else
@@ -1405,7 +1408,6 @@ VpuDecRetCode VPU_DecGetInitialInfo(VpuDecHandle InHandle, VpuDecInitInfo * pOut
     pOutInitInfo->ColourDesc.colourPrimaries = info.colour_primaries;
     pOutInitInfo->ColourDesc.transferCharacteristics = info.transfer_characteristics;
     pOutInitInfo->ColourDesc.matrixCoeffs = info.matrix_coeffs;
-    pOutInitInfo->ColourDesc.fullRange = info.video_full_range_flag;
     pOutInitInfo->hasColorDesc = true;
   }
 
