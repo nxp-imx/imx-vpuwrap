@@ -206,7 +206,9 @@ typedef enum FRAME_TYPE
 typedef struct FRAME
 {
     unsigned char* fb_bus_data;
-    unsigned long fb_bus_address;
+    unsigned long fb_bus_address_Luma;
+    unsigned long fb_bus_address_ChromaU;
+    unsigned long fb_bus_address_ChromaV;
     u32 fb_frameSize;
     u32 fb_bufferSize;
     FRAME_TYPE frame_type;
@@ -1501,10 +1503,17 @@ static void VPU_EncSetEncInParamsEncode (VCEncIn *pEncIn, FRAME* frame, STREAM_B
 
   AlignedPicSizeGotbyFormat (params->preProcCfg.inputType, params->preProcCfg.origWidth, params->preProcCfg.origHeight,
                                         params->preProcCfg.input_alignment, &luma_Size, &chroma_Size);
-
-  pEncIn->busLuma = frame->fb_bus_address;
+  // for ANDROID, frame->fb_bus_address_ChromaU and frame->fb_bus_address_ChromaV are null.
+  // consider input buffer's Y,U,V physical address to be continous.
+  #ifdef ANDROID
+  pEncIn->busLuma = frame->fb_bus_address_Luma;
   pEncIn->busChromaU = pEncIn->busLuma + luma_Size;
   pEncIn->busChromaV = pEncIn->busChromaU + chroma_Size / 2;
+  #else
+  pEncIn->busLuma = frame->fb_bus_address_Luma;
+  pEncIn->busChromaU = frame->fb_bus_address_ChromaU;
+  pEncIn->busChromaV = frame->fb_bus_address_ChromaV;
+  #endif
   pEncIn->busLumaOrig = pEncIn->busChromaUOrig = pEncIn->busChromaVOrig = (ptr_t)NULL;
 
   pEncIn->timeIncrement = params->cfg.frameRateDenom;
@@ -1754,9 +1763,11 @@ VpuEncRetCode VPU_EncEncodeFrame(VpuEncHandle InHandle, VpuEncEncParam* pInOutPa
   memset(&frame, 0, sizeof(FRAME));
 
   if(pInOutParam->pInFrame != NULL) {
-    frame.fb_bus_address = (unsigned long)pInOutParam->pInFrame->pbufY;
+    frame.fb_bus_address_Luma = (unsigned long)pInOutParam->pInFrame->pbufY;
+    frame.fb_bus_address_ChromaU = (unsigned long)pInOutParam->pInFrame->pbufCb;
+    frame.fb_bus_address_ChromaV = (unsigned long)pInOutParam->pInFrame->pbufCr;
   } else {
-    frame.fb_bus_address = pInOutParam->nInPhyInput;
+    frame.fb_bus_address_Luma = pInOutParam->nInPhyInput;
   }
 
   frame.bitrate = pObj->config.rcCfg.bitPerSecond;
