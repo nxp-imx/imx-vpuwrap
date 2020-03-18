@@ -35,6 +35,7 @@ extern "C" {
 
 /**************************** decoder part **********************************/
 
+#define VPU_WRAPPER_HAS_PIC_ID 1   /* Only hantro decoder implement PIC map */
 #define VPU_DEC_MAX_NUM_MEM_REQS 2
 
 //typedef RetCode VpuRetCode;
@@ -396,7 +397,8 @@ typedef struct {
 	unsigned int nQ16ShiftWidthDivHeightRatio;	/*support dynamic ratio, refer to definition in struct 'VpuDecInitInfo'*/
 	int rfc_luma_offset;
 	int rfc_chroma_offset;
-	int nReserved[7];		/*reserved for recording other info*/
+	int nPicId[2];          /*Picture ID, Identifier of the picture in decoding order, passed in VpuBufferNode::nPicId, see: OUTPUT_BUFFER_PRIVATE::nPicId[2]*/
+	int nReserved[5];		/*reserved for recording other info*/
 }VpuFrameExtInfo;
 
 typedef struct {
@@ -459,8 +461,9 @@ typedef struct
 	unsigned char* pVirAddr;	/*buffer virtual base addr*/
 	unsigned int nSize;		/*valid data length */
 	VpuCodecData sCodecData;	/*private data specified by codec*/
+	int nPicId;      /* Picture ID, which will be returned by decoder in VpuFrameExtInfo::nPicId[2]*/
 
-	int nReserved[2];				/*reserved for future extension*/
+	int nReserved[1];				/*reserved for future extension*/
 	void* pPrivate;				/*reserved for future special extension*/
 }VpuBufferNode;
 

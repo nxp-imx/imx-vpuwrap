@@ -179,6 +179,7 @@ typedef struct
   unsigned char* pBsBufPhyEnd;
   int nBsBufLen;
   int nBsBufOffset;
+  int nCurrentPicId;
 
   /* state */
   VpuDecState state;
@@ -750,6 +751,8 @@ static VpuDecRetCode VPU_DecProcessInBuf(VpuDecObj* pObj, VpuBufferNode* pInData
   if(pInData->pVirAddr == NULL || pInData->nSize == 0)
     return VPU_DEC_RET_SUCCESS;
 
+  pObj->nCurrentPicId = pInData->nPicId;
+
   useRingBuffer = !(pObj->bSecureMode && pInData->pPhyAddr != NULL);
 
   if(pObj->nPrivateSeqHeaderInserted == 0)
@@ -941,6 +944,8 @@ static VpuDecRetCode VPU_DecGetFrame(VpuDecObj* pObj, int* pOutBufRetCode)
       //pObj->frameInfo.pExtInfo->nFrmWidth=pSrcInfo->width;
       //pObj->frameInfo.pExtInfo->nFrmHeight=pSrcInfo->height;
       //pObj->frameInfo.pExtInfo->FrmCropRect=pSrcInfo->frameCrop;
+      pObj->frameInfo.pExtInfo->nPicId[0] = frm.outBufPrivate.nPicId[0];
+      pObj->frameInfo.pExtInfo->nPicId[1] = frm.outBufPrivate.nPicId[1];
       pObj->frameInfo.pExtInfo->FrmCropRect.nRight=frm.outBufPrivate.nFrameWidth;
       pObj->frameInfo.pExtInfo->FrmCropRect.nBottom=frm.outBufPrivate.nFrameHeight;
       //pObj->frameInfo.pExtInfo->nQ16ShiftWidthDivHeightRatio=pSrcInfo->Q16ShiftWidthDivHeightRatio;
@@ -1026,6 +1031,7 @@ static VpuDecRetCode VPU_DecDecode(VpuDecObj* pObj, int* pOutBufRetCode)
     stream.sliceInfoNum =  pObj->slice_info_num;
     stream.pSliceInfo = (OMX_U8 *)pObj->slice_info;
     //stream.picId = pObj->propagateData.picIndex;
+    stream.picId = pObj->nCurrentPicId;
 
     unsigned long bytes = 0;
     FRAME frm;
