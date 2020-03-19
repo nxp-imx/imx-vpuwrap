@@ -934,7 +934,7 @@ static void VPU_EncInitEncInParamsCreate(VCEncIn *pEncIn, CONFIG* params)
   pEncIn->last_idr_picture_cnt = pEncIn->picture_cnt = 0;
 
   // initialize this->encIn.gopConfig
-  pEncIn->gopConfig.idr_interval = 0;
+  pEncIn->gopConfig.idr_interval = params->nPFrames;
   pEncIn->gopConfig.gdrDuration = 0;
   pEncIn->gopConfig.firstPic = 0;
   pEncIn->gopConfig.lastPic = 100;
@@ -1518,6 +1518,14 @@ static void VPU_EncSetEncInParamsEncode (VCEncIn *pEncIn, FRAME* frame, STREAM_B
 
   pEncIn->timeIncrement = params->cfg.frameRateDenom;
   pEncIn->codingType = nextCodingType;
+  pEncIn->resendSPS = 0;
+  pEncIn->resendPPS = 0;
+  pEncIn->resendVPS = 0;
+  if (pEncIn->codingType == VCENC_INTRA_FRAME) {
+    pEncIn->resendSPS = 1;
+    pEncIn->resendPPS = 1;
+    pEncIn->resendVPS = 1;
+  }
 
   pEncIn->pOutBuf[0] = (u32 *) stream->bus_data;
   pEncIn->outBufSize[0] = stream->buf_max_size;
