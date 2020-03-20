@@ -112,6 +112,8 @@ typedef enum {
 	VPU_DEC_CONF_INIT_CNT_THRESHOLD,  /*at seqinit stage: vpu will report error if data count reach the threshold*/
 
 	VPU_DEC_CONF_ENABLE_TILED,  /*configure output frame to tiled after parsed sequence header and before register frame buffer */
+
+    VPU_DEC_CONF_RESET_CODECDATA, /*configure to reset codec data so that new codec data can be handled */
 } VpuDecConfig;
 
 typedef enum
@@ -670,7 +672,7 @@ typedef struct {
 
 	unsigned long nInPhyInput;	//input buffer address
 	unsigned long nInVirtInput;
-	int nInInputSize;	
+	int nInInputSize;
 	unsigned long nInPhyOutput;	//output frame address
 	unsigned long nInVirtOutput;
 	unsigned int nInOutputBufLen;
