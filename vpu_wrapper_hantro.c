@@ -652,6 +652,9 @@ VpuDecRetCode VPU_DecConfig(VpuDecHandle InHandle, VpuDecConfig InDecConf, void*
       }
       pObj->codec->setinfo(pObj->codec, &pObj->config);
       break;
+    case VPU_DEC_CONF_RESET_CODECDATA:
+      pObj->nPrivateSeqHeaderInserted = *(int*)pInParam;
+      break;
     default:
       VPU_ERROR("%s: failure: invalid setting \r\n",__FUNCTION__);
       return VPU_DEC_RET_INVALID_PARAM;
