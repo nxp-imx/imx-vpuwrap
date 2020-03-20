@@ -213,6 +213,7 @@ typedef struct
   bool bSecureMode;
   bool bConsumeInputLater;
   int nSecureBufferAllocSize;
+  bool bReorderDisable;
 }VpuDecObj;
 
 typedef struct
@@ -403,6 +404,11 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
       pObj->nSecureBufferAllocSize = pInParam->nSecureBufferAllocSize;
     }
   }
+  if (pInParam->nReorderEnable == 0) {
+    pObj->bReorderDisable = true;
+  } else {
+    pObj->bReorderDisable = false;
+  }
 
   pObj->config_tile = false;
 
@@ -413,6 +419,9 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
         pObj->config_tile = true;
       pObj->codec = HantroHwDecOmx_decoder_create_h264(pObj->pdwl,
           bIsMvcStream, &pObj->config.g1_conf);
+      if (pObj->bReorderDisable && pObj->codec->setnoreorder(pObj->codec, OMX_TRUE) != CODEC_OK) {
+        VPU_LOG ("reorder setting fail\n");
+      }
       VPU_LOG("open H.264 \r\n");
       break;
     case VPU_V_MPEG2: 	 /**< AKA: H.262 */
@@ -486,6 +495,9 @@ VpuDecRetCode VPU_DecOpen(VpuDecHandle *pOutHandle, VpuDecOpenParam * pInParam,V
       }
       pObj->codec = HantroHwDecOmx_decoder_create_hevc(pObj->pdwl,
           &pObj->config.g2_conf);
+      if (pObj->bReorderDisable && pObj->codec->setnoreorder(pObj->codec, OMX_TRUE) != CODEC_OK) {
+        VPU_LOG ("reorder setting fail\n");
+      }
       VPU_LOG("open HEVC \r\n");
       break;
     case VPU_V_VP9:
@@ -1141,8 +1153,13 @@ static VpuDecRetCode VPU_DecDecode(VpuDecObj* pObj, int* pOutBufRetCode)
       break;
   }
 
-  if(pObj->nBsBufLen == 0 && pObj->eosing == 0)
+  if(pObj->nBsBufLen == 0 && pObj->eosing == 0) {
     *pOutBufRetCode |= VPU_DEC_NO_ENOUGH_INBUF;
+    if (pObj->bReorderDisable && (*pOutBufRetCode & VPU_DEC_ONE_FRM_CONSUMED))
+    {
+      *pOutBufRetCode &= ~VPU_DEC_NO_ENOUGH_INBUF;
+    }
+  }
 
   if(pObj->eosing && pObj->nBsBufLen == 0)
   {
