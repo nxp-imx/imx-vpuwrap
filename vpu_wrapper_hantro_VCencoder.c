@@ -1307,6 +1307,8 @@ VpuEncRetCode VPU_EncGetMem(VpuMemDesc* pInOutMem)
 
   pInOutMem->nPhyAddr = info.busAddress;
   pInOutMem->nVirtAddr = (unsigned long)info.virtualAddress;
+  pInOutMem->nSize = info.size;
+  pInOutMem->nCpuAddr = info.ion_fd;
 
   VPU_ENC_LOG("EWLMallocLinear pewl %p, size %d, virt %p phy %p\n",
     pewl, pInOutMem->nSize, info.virtualAddress, (void*)info.busAddress);
@@ -1325,7 +1327,9 @@ VpuEncRetCode VPU_EncFreeMem(VpuMemDesc* pInMem)
 
   info.size = pInMem->nSize;
   info.virtualAddress = (u32*)pInMem->nVirtAddr;
+  info.allocVirtualAddr = (u32*)pInMem->nVirtAddr;
   info.busAddress = pInMem->nPhyAddr;
+  info.ion_fd = pInMem->nCpuAddr;
 
   ewlInit.clientType = EWL_CLIENT_TYPE_H264_ENC;
   pewl = (void*)EWLInit(&ewlInit);
