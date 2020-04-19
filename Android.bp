@@ -57,13 +57,40 @@ bootstrap_go_package {
     pluginFor: ["soong_build"],
 }
 
+cc_defaults {
+    name: "imx_vpu_defaults",
+
+    cflags: [
+        "-Wl,-Bsymbolic",
+        "-Wno-unused-parameter",
+        "-Wno-implicit-fallthrough",
+        "-Werror",
+    ],
+
+    sanitize: {
+          misc_undefined: [
+            "signed-integer-overflow",
+            "unsigned-integer-overflow",
+            "bounds",],
+          diag: {
+              misc_undefined: [
+                "signed-integer-overflow",
+                "unsigned-integer-overflow",
+                "bounds",],
+          },
+          cfi: true,
+    },
+
+    soc_specific: true,
+    vendor: true
+}
 
 cc_library_shared {
     name: "lib_vpu_wrapper",
 
     defaults: [
         "vpu_wrapper_hantro_default",
-        "imx_defaults",
+        "imx_vpu_defaults",
     ],
 
 }
