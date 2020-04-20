@@ -28,6 +28,10 @@ vpu_wrapper_hantro_defaults {
         "-DENABLE_CODEC_VP8",
         "-DENCH1",
         "-Wno-error=date-time",
+        "-Wl,-Bsymbolic",
+        "-Wno-unused-parameter",
+        "-Wno-implicit-fallthrough",
+        "-Werror",
     ],
 
     shared_libs: [
@@ -38,6 +42,23 @@ vpu_wrapper_hantro_defaults {
         "libcodec",
         "libhantro",
     ],    
+
+    sanitize: {
+          misc_undefined: [
+            "signed-integer-overflow",
+            "unsigned-integer-overflow",
+            "bounds",],
+          diag: {
+              misc_undefined: [
+                "signed-integer-overflow",
+                "unsigned-integer-overflow",
+                "bounds",],
+          },
+          cfi: true,
+    },
+
+    soc_specific: true,
+    vendor: true
 }
 
 bootstrap_go_package {
@@ -63,7 +84,6 @@ cc_library_shared {
 
     defaults: [
         "vpu_wrapper_hantro_default",
-        "imx_defaults",
     ],
 
 }
