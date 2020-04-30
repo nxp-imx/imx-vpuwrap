@@ -364,6 +364,55 @@ static void dumpYUV(unsigned char* pBuf, unsigned int len)
    }
 }
 
+/* table for max frame size for each video level */
+typedef struct {
+    int level;
+    int size;    // mbPerFrame, (Width / 16) * (Height / 16)
+}EncLevelSizeMap;
+
+/* H264 level size map table, sync with h1 h264 encoder */
+static const EncLevelSizeMap H264LevelSizeMapTable[] = {
+    {VCENC_H264_LEVEL_1,  99},
+    {VCENC_H264_LEVEL_1_b, 99},
+    {VCENC_H264_LEVEL_1_1, 396},
+    {VCENC_H264_LEVEL_1_2, 396},
+    {VCENC_H264_LEVEL_1_3, 396},
+    {VCENC_H264_LEVEL_2,  396},
+    {VCENC_H264_LEVEL_2_1, 792},
+    {VCENC_H264_LEVEL_2_2, 1620},
+    {VCENC_H264_LEVEL_3,  1620},
+    {VCENC_H264_LEVEL_3_1, 3600},
+    {VCENC_H264_LEVEL_3_2, 5120},
+    {VCENC_H264_LEVEL_4,  8192},
+    {VCENC_H264_LEVEL_4_1, 8192},
+    {VCENC_H264_LEVEL_4_2, 8704},
+    {VCENC_H264_LEVEL_5,  22080},
+    {VCENC_H264_LEVEL_5_1, 65025},
+};
+
+static int calculateH264Level(int width, int height)
+{
+  // adjust H264 level based on video resolution because encoder will check this.
+  int i, mbPerFrame, tableLen;
+  mbPerFrame = ((width + 15) / 16) * ((height + 15) / 16);
+  tableLen = sizeof(H264LevelSizeMapTable)/sizeof(H264LevelSizeMapTable[0]);
+  int level = VCENC_H264_LEVEL_1;
+
+  for (i = 0; i < tableLen; i++) {
+    if (level == H264LevelSizeMapTable[i].level) {
+      if (mbPerFrame <= H264LevelSizeMapTable[i].size)
+        break;
+      else if (i + 1 < tableLen)
+        level = H264LevelSizeMapTable[i + 1].level;
+      else
+        return VCENC_H264_LEVEL_5_1; // mbPerFrame too big, return the highest level
+    }
+  }
+
+  return level;
+}
+
+
 static void VPU_EncInitConfigParams(VCEncIn *pEncIn, VCEncConfig* cfg, CONFIG* params)
 {
   int idx;
@@ -1093,11 +1142,18 @@ static VpuEncRetCode VPU_EncSetRateCtrlDefaults(
 static VpuEncRetCode VPU_EncSetCodingCtrlDefaults(VpuEncObj* pObj)
 {
   VCEncCodingCtrl* codingCfg = 0;
+  VCEncConfig* cfg = &pObj->config.cfg;
+
   codingCfg = &pObj->config.codingCfg;
   codingCfg->tc_Offset = -2;
   codingCfg->beta_Offset = 5;
   codingCfg->enableSao = 1;
   codingCfg->enableCabac = 1;
+
+  if (cfg->codecFormat == VCENC_VIDEO_CODEC_H264 && cfg->profile == VCENC_H264_BASE_PROFILE)
+  {
+    codingCfg->enableCabac = 0;
+  }
 
   /* 0 means none full range, 1 means full range when do RGB->YUV CSC */
   codingCfg->videoFullRange = 0;
@@ -1186,8 +1242,8 @@ static VpuEncRetCode VPU_EncSetConfigDefaults(VpuEncObj* pObj, int frameRate, Vp
     cfg->codecFormat = VCENC_VIDEO_CODEC_H264;
   if (format == VPU_V_HEVC)
     cfg->codecFormat = VCENC_VIDEO_CODEC_HEVC;
-  cfg->profile = (IS_H264(cfg->codecFormat) ? VCENC_H264_HIGH_PROFILE : VCENC_HEVC_MAIN_PROFILE);
-  cfg->level = (IS_H264(cfg->codecFormat) ? VCENC_H264_LEVEL_5_1 : VCENC_HEVC_LEVEL_6);
+  cfg->profile = (IS_H264(cfg->codecFormat) ? VCENC_H264_BASE_PROFILE : VCENC_HEVC_MAIN_PROFILE);
+  cfg->level = (IS_H264(cfg->codecFormat) ? calculateH264Level(cfg->width, cfg->height) : VCENC_HEVC_LEVEL_6);
   cfg->tier = VCENC_HEVC_MAIN_TIER;
 
   if (pObj->config.preProcCfg.rotation && pObj->config.preProcCfg.rotation != 3)
