@@ -424,13 +424,15 @@ static VpuEncRetCode  VPU_EncSetCommonConfig(
     int qpMin,
     int qpMax,
     VpuColorFormat colorFmt,
-    int chromaInterleave)
+    int chromaInterleave,
+    int Width,
+    int Height)
 {
   int validWidth, validHeight;
 
   //set origWidth as width after right_padding (stride).
-  pPpCfg->origWidth = (pEncObj->encConfig.crop.nWidth + 15) & (~0x0f);
-  pPpCfg->origHeight = pEncObj->encConfig.crop.nHeight;
+  pPpCfg->origWidth = (Width + 15) & (~0x0f);
+  pPpCfg->origHeight = Height;
   pPpCfg->formatType = VPU_EncConvertColorFmtVpu2Omx(colorFmt, chromaInterleave);
   pPpCfg->angle = pEncObj->encConfig.rotation.nRotation;
   pPpCfg->frameStabilization = OMX_FALSE; // disable stabilization as default ?
@@ -730,7 +732,8 @@ VpuEncRetCode VPU_EncOpen(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEn
       VPU_EncSetAvcDefaults(pObj);
       VPU_EncSetCommonConfig(pObj, &config.common_config, &config.rate_config, &config.pp_config,
             pInParam->nFrameRate, pInParam->nUserQpMin, pInParam->nUserQpMax,
-            pInParam->eColorFormat, pInParam->nChromaInterleave);
+            pInParam->eColorFormat, pInParam->nChromaInterleave,
+            pInParam->nOrigWidth, pInParam->nOrigHeight);
 
       pObj->encConfig.avc.nPFrames = (pInParam->nGOPSize > H264_ENC_MAX_GOP_SIZE ? H264_ENC_MAX_GOP_SIZE : pInParam->nGOPSize);
 
@@ -777,7 +780,8 @@ VpuEncRetCode VPU_EncOpen(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEn
       VPU_EncSetVp8Defaults(pObj);
       VPU_EncSetCommonConfig(pObj, &config.common_config, &config.rate_config, &config.pp_config,
             pInParam->nFrameRate, pInParam->nUserQpMin, pInParam->nUserQpMax,
-            pInParam->eColorFormat, pInParam->nChromaInterleave);
+            pInParam->eColorFormat, pInParam->nChromaInterleave,
+            pInParam->nOrigWidth, pInParam->nOrigHeight);
 
       config.vp8_config.eProfile = pObj->encConfig.vp8.eProfile;
       config.vp8_config.eLevel = pObj->encConfig.vp8.eLevel;
@@ -817,6 +821,16 @@ VpuEncRetCode VPU_EncOpenSimp(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,V
   sEncOpenParamMore.eFormat = pInParam->eFormat;
   sEncOpenParamMore.nPicWidth = pInParam->nPicWidth;
   sEncOpenParamMore.nPicHeight = pInParam->nPicHeight;
+
+  /* temporarily, Android will not set this parameter, add protect here */
+  if (pInParam->nOrigWidth == 0 || pInParam->nOrigHeight == 0) {
+    sEncOpenParamMore.nOrigWidth = pInParam->nPicWidth;
+    sEncOpenParamMore.nOrigHeight = pInParam->nPicHeight;
+  } else {
+    sEncOpenParamMore.nOrigWidth = pInParam->nOrigWidth;
+    sEncOpenParamMore.nOrigHeight = pInParam->nOrigHeight;
+  }
+
   sEncOpenParamMore.nRotAngle = pInParam->nRotAngle;
   sEncOpenParamMore.nFrameRate = pInParam->nFrameRate;
   sEncOpenParamMore.nBitRate = pInParam->nBitRate * 1000; //kbps->bps

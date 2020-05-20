@@ -2094,7 +2094,7 @@ VpuEncRetCode VPU_EncOpen(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEn
   switch (pInParam->eFormat) {
     case VPU_V_AVC:
     case VPU_V_HEVC:
-      VPU_EncSetPreProcessorDefaults(pObj, pInParam->nPicWidth, pInParam->nPicHeight,
+      VPU_EncSetPreProcessorDefaults(pObj, pInParam->nOrigWidth, pInParam->nOrigHeight,
         pInParam->nRotAngle, pInParam->eColorFormat, pInParam->nChromaInterleave);
       VPU_EncSetRateCtrlDefaults(pObj, pInParam->nBitRate, pInParam->eFormat,
         pInParam->nRcIntraQp, pInParam->nUserQpMin, pInParam->nUserQpMax);
@@ -2182,6 +2182,16 @@ VpuEncRetCode VPU_EncOpenSimp(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,V
   sEncOpenParamMore.eFormat = pInParam->eFormat;
   sEncOpenParamMore.nPicWidth = pInParam->nPicWidth;
   sEncOpenParamMore.nPicHeight = pInParam->nPicHeight;
+
+  /* temporarily, Android will not set this parameter, add protect here */
+  if (pInParam->nOrigWidth == 0 || pInParam->nOrigHeight == 0) {
+    sEncOpenParamMore.nOrigWidth = pInParam->nPicWidth;
+    sEncOpenParamMore.nOrigHeight = pInParam->nPicHeight;
+  } else {
+    sEncOpenParamMore.nOrigWidth = pInParam->nOrigWidth;
+    sEncOpenParamMore.nOrigHeight = pInParam->nOrigHeight;
+  }
+
   sEncOpenParamMore.nRotAngle = pInParam->nRotAngle;
   sEncOpenParamMore.nFrameRate = pInParam->nFrameRate;
   sEncOpenParamMore.nBitRate = pInParam->nBitRate * 1000; //kbps->bps

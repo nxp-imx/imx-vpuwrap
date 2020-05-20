@@ -555,6 +555,8 @@ typedef struct {
 	VpuCodStd eFormat;
 	int nPicWidth;
 	int nPicHeight;
+	int nOrigWidth;
+	int nOrigHeight;
 	int nRotAngle;
 	int nFrameRate;
 	int nBitRate;				/*unit: kbps*/
@@ -618,6 +620,8 @@ typedef struct {
 	VpuCodStd eFormat;
 	int nPicWidth;
 	int nPicHeight;
+	int nOrigWidth;
+	int nOrigHeight;
 	int nRotAngle;
 	int nFrameRate;
 	int nBitRate;				/*unit: kbps*/
