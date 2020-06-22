@@ -289,6 +289,9 @@ typedef struct {
 	unsigned char* pbufVirtCb_tilebot;	//for field tile: chroma bottom pointer
 	//unsigned char* pbufVirtCr_tilebot;	//not required since always enable interleave for tile
 
+    /* ion fd */
+    int nIonFd;
+
 	int nReserved[5];				/*reserved for future extension*/
 	void* pPrivate;				/*reserved for future special extension*/
 } VpuFrameBuffer;

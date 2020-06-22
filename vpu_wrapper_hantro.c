@@ -1494,14 +1494,15 @@ VpuDecRetCode VPU_DecRegisterFrameBuffer(VpuDecHandle InHandle,VpuFrameBuffer *p
     BUFFER buffer;
     CODEC_STATE ret = CODEC_ERROR_UNSPECIFIED;
 
-    VPU_LOG("%s: register frame index: %d virt: %p phy: %p \r\n",
-        __FUNCTION__, i, pInFrameBufArray->pbufVirtY, pInFrameBufArray->pbufY);
+    VPU_LOG("%s: register frame index: %d virt: %p phy: %p ion fd %d\r\n",
+        __FUNCTION__, i, pInFrameBufArray->pbufVirtY, pInFrameBufArray->pbufY, pInFrameBufArray->nIonFd);
 
     pVpuObj->obj.frameBuf[i]=*pInFrameBufArray;
 
     buffer.bus_data = pInFrameBufArray->pbufVirtY;
     buffer.bus_address = (OSAL_BUS_WIDTH)pInFrameBufArray->pbufY;
     buffer.allocsize = pObj->nFrameSize;
+    buffer.ion_fd = pInFrameBufArray->nIonFd;
 
     pInFrameBufArray++;
 
