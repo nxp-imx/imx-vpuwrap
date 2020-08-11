@@ -555,6 +555,15 @@ typedef enum
 }VpuEncBufRetCode;
 
 typedef struct {
+    int nColourDescPresentFlag;
+    int nPrimaries;
+    int nTransfer;
+    int nMatrixCoeffs;
+    int nVideoSignalPresentFlag;
+    int nFullRange;
+} VpuIsoColorAspects;
+
+typedef struct {
 	VpuCodStd eFormat;
 	int nPicWidth;
 	int nPicHeight;
@@ -576,6 +585,8 @@ typedef struct {
 	int nLinear2TiledEnable; 	/*valid when (nMapType!=0): 0--tile input; 1--yuv input*/
 	VpuColorFormat eColorFormat;	/*only MJPG support non-420*/
 	int nIsAvcc;				/*it is used for H.264 data format, 0: byte stream ; 1: avcc format*/
+
+    VpuIsoColorAspects sColorAspects;
 
 	int nReserved[3];				/*reserved for future extension*/
 	void* pAppCxt;				/*reserved for future extension*/
@@ -667,6 +678,8 @@ typedef struct {
 	int nMEUseZeroPmv;       // 0: PMV_ENABLE, 1: PMV_DISABLE
 	int nIntraCostWeight;    // Additional weight of Intra Cost for mode decision to reduce Intra MB density
 	int nIsAvcc;				/*it is used for H.264 data format, 0: byte stream ; 1: avcc format*/
+
+    VpuIsoColorAspects sColorAspects;
 
 	int nReserved[8];				/*reserved for future extension*/
 	void* pAppCxt;			/*reserved for future extension*/

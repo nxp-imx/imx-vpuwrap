@@ -509,6 +509,30 @@ static VpuEncRetCode  VPU_EncSetCommonConfig(
   return VPU_ENC_RET_SUCCESS;
 }
 
+// T-REC-H.264-201201-I!!PDF-E.pdf
+// E.1.1 VUI parameters syntax
+static VpuEncRetCode  VPU_EncSetColorAspectsInfo(
+        void * pConfig,
+        VpuIsoColorAspects * pIsoColorAspects,
+        VpuCodStd format)
+{
+  if (!pConfig || !pIsoColorAspects)
+    return VPU_ENC_RET_INVALID_PARAM;
+
+  if (format == VPU_V_AVC) {
+      H264_CONFIG * pH264Config= (H264_CONFIG*)pConfig;
+      pH264Config->videoSignalTypePresent = pIsoColorAspects->nVideoSignalPresentFlag;
+      pH264Config->fullRange = pIsoColorAspects->nFullRange;
+      pH264Config->primaries = pIsoColorAspects->nPrimaries;
+      pH264Config->matrixCoeffs = pIsoColorAspects->nMatrixCoeffs;
+      pH264Config->transfer = pIsoColorAspects->nTransfer;
+      pH264Config->colorDescription = pIsoColorAspects->nColourDescPresentFlag;
+      pH264Config->videoFormat = 5;    // Unspecified video format
+  }
+
+  return VPU_ENC_RET_SUCCESS;
+}
+
 
 static VpuEncRetCode VPU_EncStartEncode(VpuEncObj *pObj, STREAM_BUFFER* pOutputStream)
 {
@@ -734,6 +758,7 @@ VpuEncRetCode VPU_EncOpen(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEn
             pInParam->nFrameRate, pInParam->nUserQpMin, pInParam->nUserQpMax,
             pInParam->eColorFormat, pInParam->nChromaInterleave,
             pInParam->nOrigWidth, pInParam->nOrigHeight);
+      VPU_EncSetColorAspectsInfo(&config, &pInParam->sColorAspects, VPU_V_AVC);
 
       pObj->encConfig.avc.nPFrames = (pInParam->nGOPSize > H264_ENC_MAX_GOP_SIZE ? H264_ENC_MAX_GOP_SIZE : pInParam->nGOPSize);
 
@@ -867,6 +892,8 @@ VpuEncRetCode VPU_EncOpenSimp(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,V
   sEncOpenParamMore.nRcIntervalMode = 0;        /* 0:normal, 1:frame_level, 2:slice_level, 3: user defined Mb_level */
   sEncOpenParamMore.nMbInterval = 0;
   sEncOpenParamMore.nAvcIntra16x16OnlyModeEnable = 0;
+
+  memcpy(&sEncOpenParamMore.sColorAspects, &pInParam->sColorAspects, sizeof(VpuIsoColorAspects));
 
   //set some default value structure 'VpuEncOpenParamMore'
   switch(pInParam->eFormat)

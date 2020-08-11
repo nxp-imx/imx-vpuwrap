@@ -614,12 +614,6 @@ static void VPU_EncInitCodingCtrlParams(VCEncCodingCtrl* codingCfg, CONFIG* para
   codingCfg->num_tile_rows       = params->codingCfg.num_tile_rows;
   codingCfg->loop_filter_across_tiles_enabled_flag = params->codingCfg.loop_filter_across_tiles_enabled_flag;
 
-  /* for HDR10 */
-  codingCfg->Hdr10Color.hdr10_color_enable = params->codingCfg.Hdr10Color.hdr10_color_enable;
-  codingCfg->Hdr10Color.hdr10_matrix = params->codingCfg.Hdr10Color.hdr10_matrix;
-  codingCfg->Hdr10Color.hdr10_primary = params->codingCfg.Hdr10Color.hdr10_primary;
-  codingCfg->Hdr10Color.hdr10_transfer = params->codingCfg.Hdr10Color.hdr10_transfer;
-
   codingCfg->intraArea.top    = params->codingCfg.intraArea.top;
   codingCfg->intraArea.left   = params->codingCfg.intraArea.left;
   codingCfg->intraArea.bottom = params->codingCfg.intraArea.bottom;
@@ -1157,12 +1151,6 @@ static VpuEncRetCode VPU_EncSetCodingCtrlDefaults(VpuEncObj* pObj)
 
   /* 0 means none full range, 1 means full range when do RGB->YUV CSC */
   codingCfg->videoFullRange = 0;
-  /* for HDR10 */
-  codingCfg->Hdr10Color.hdr10_color_enable = 0;
-  codingCfg->Hdr10Color.hdr10_matrix = 9;
-  codingCfg->Hdr10Color.hdr10_primary = 9;
-  codingCfg->Hdr10Color.hdr10_transfer = 0;
-
   codingCfg->noiseLow = 10;
   codingCfg->firstFrameSigma = 11;
   codingCfg->smartH264Qp = 30;
@@ -1243,7 +1231,7 @@ static VpuEncRetCode VPU_EncSetConfigDefaults(VpuEncObj* pObj, int frameRate, Vp
   if (format == VPU_V_HEVC)
     cfg->codecFormat = VCENC_VIDEO_CODEC_HEVC;
   cfg->profile = (IS_H264(cfg->codecFormat) ? VCENC_H264_BASE_PROFILE : VCENC_HEVC_MAIN_PROFILE);
-  cfg->level = (IS_H264(cfg->codecFormat) ? calculateH264Level(cfg->width, cfg->height) : VCENC_HEVC_LEVEL_6);
+  cfg->level = (IS_H264(cfg->codecFormat) ? calculateH264Level(cfg->width, cfg->height) : VCENC_HEVC_LEVEL_5_1);
   cfg->tier = VCENC_HEVC_MAIN_TIER;
 
   if (pObj->config.preProcCfg.rotation && pObj->config.preProcCfg.rotation != 3)
@@ -1952,7 +1940,7 @@ static void * VCEnc_Malloc(unsigned long size)
 }
 
 // create codec instance and initialize it
-static ENCODER_PROTOTYPE* VCEnc_encoder_create(const CONFIG* params, int size)
+static ENCODER_PROTOTYPE* VCEnc_encoder_create(const CONFIG* params, VpuIsoColorAspects * pColorAspects)
 {
   VCEncConfig cfg;
   memset(&cfg, 0, sizeof(VCEncConfig));
@@ -2047,6 +2035,19 @@ static ENCODER_PROTOTYPE* VCEnc_encoder_create(const CONFIG* params, int size)
       VPU_ENC_ERROR("H264EncSetPreProcessing failed! (%d)", ret);
       return NULL;
   }
+
+  // Setup VUI color aspects
+  ret = VCEncSetVuiColorDescription(this->inst,
+            pColorAspects->nVideoSignalPresentFlag, 5 /*Unspecified video format*/,
+            pColorAspects->nColourDescPresentFlag, pColorAspects->nPrimaries,
+            pColorAspects->nTransfer, pColorAspects->nMatrixCoeffs);
+
+  if (ret != VCENC_OK)
+  {
+    VPU_ENC_ERROR("VCEncSetVuiColorDescription failed! (%d)", ret);
+    return NULL;
+  }
+
   return (ENCODER_PROTOTYPE*) this;
 }
 
@@ -2101,31 +2102,27 @@ VpuEncRetCode VPU_EncOpen(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEn
       VPU_EncSetConfigDefaults(pObj, pInParam->nFrameRate, pInParam->eFormat, pInParam->nPicWidth, pInParam->nPicHeight);
       VPU_EncSetCodingCtrlDefaults(pObj);
 
-      if (pInParam->eColorFormat == VPU_COLOR_ARGB8888 || pInParam->eColorFormat == VPU_COLOR_BGRA8888 ||
-          pInParam->eColorFormat == VPU_COLOR_RGB565 || pInParam->eColorFormat == VPU_COLOR_RGB555 ||
-          pInParam->eColorFormat == VPU_COLOR_BGR565) {
-            if (pInParam->nFullRange == 1) {        /* full range */
-              pObj->config.codingCfg.videoFullRange = 1;
-              if (pInParam->nColorConversionType == 4) {
-                pObj->config.preProcCfg.colorConversion.type = 0;  /* full range BT.601 */
-              } else if (pInParam->nColorConversionType == 3) {
-                pObj->config.preProcCfg.colorConversion.type = 1;  /* full range BT.709 */
-              }
-              else {
-                pObj->config.preProcCfg.colorConversion.type = 0;
-              }
-            }
-            else {          /* none full range */
-              pObj->config.codingCfg.videoFullRange = 0;
-              if (pInParam->nColorConversionType == 4) {
-                pObj->config.preProcCfg.colorConversion.type = 4;  /* none full range BT.601 */
-              } else if (pInParam->nColorConversionType == 3) {
-                pObj->config.preProcCfg.colorConversion.type = 6;  /* none full range BT.709 */
-              }
-              else {
-                pObj->config.preProcCfg.colorConversion.type = 4;
-              }
-            }
+      if (pInParam->nFullRange == 1) {        /* full range */
+        pObj->config.codingCfg.videoFullRange = 1;
+        if (pInParam->nColorConversionType == 4) {
+          pObj->config.preProcCfg.colorConversion.type = 0;  /* full range BT.601 */
+        } else if (pInParam->nColorConversionType == 3) {
+          pObj->config.preProcCfg.colorConversion.type = 1;  /* full range BT.709 */
+        }
+        else {
+          pObj->config.preProcCfg.colorConversion.type = 0;
+        }
+      }
+      else {          /* none full range */
+        pObj->config.codingCfg.videoFullRange = 0;
+        if (pInParam->nColorConversionType == 4) {
+          pObj->config.preProcCfg.colorConversion.type = 4;  /* none full range BT.601 */
+        } else if (pInParam->nColorConversionType == 3) {
+          pObj->config.preProcCfg.colorConversion.type = 6;  /* none full range BT.709 */
+        }
+        else {
+          pObj->config.preProcCfg.colorConversion.type = 4;
+        }
       }
 
       if (pInParam->nStreamSliceCount <= 1) {
@@ -2150,7 +2147,7 @@ VpuEncRetCode VPU_EncOpen(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEn
         pObj->config.rcCfg.bitPerSecond = bitPerFrame / compression  * pInParam->nFrameRate / 1000 * 1000;
       }
 
-      pObj->codec = VCEnc_encoder_create(&pObj->config, pObj->nBsBufLen);
+      pObj->codec = VCEnc_encoder_create(&pObj->config, &pInParam->sColorAspects);
       if (IS_H264(pObj->config.cfg.codecFormat)) {
         VPU_ENC_LOG("open H264 \r\n");
       }
@@ -2231,6 +2228,8 @@ VpuEncRetCode VPU_EncOpenSimp(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,V
   sEncOpenParamMore.nRcIntervalMode = 0;        /* 0:normal, 1:frame_level, 2:slice_level, 3: user defined Mb_level */
   sEncOpenParamMore.nMbInterval = 0;
   sEncOpenParamMore.nAvcIntra16x16OnlyModeEnable = 0;
+
+  memcpy(&sEncOpenParamMore.sColorAspects, &pInParam->sColorAspects, sizeof(VpuIsoColorAspects));
 
   //set some default value structure 'VpuEncOpenParamMore'
   switch(pInParam->eFormat)
