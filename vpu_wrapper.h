@@ -573,7 +573,6 @@ typedef struct {
 	int nFrameRate;
 	int nBitRate;				/*unit: kbps*/
 	int nGOPSize;
-	int nFullRange;
 	int nColorConversionType;
 	int nStreamSliceCount;
 	int nIntraRefresh;		/*intra macro block numbers*/
@@ -640,7 +639,6 @@ typedef struct {
 	int nFrameRate;
 	int nBitRate;				/*unit: kbps*/
 	int nGOPSize;
-	int nFullRange;
 	int nColorConversionType;
 	int nStreamSliceCount;
 	int nChromaInterleave;	/*should be set to 1 when (nMapType!=0)*/

@@ -2102,27 +2102,31 @@ VpuEncRetCode VPU_EncOpen(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEn
       VPU_EncSetConfigDefaults(pObj, pInParam->nFrameRate, pInParam->eFormat, pInParam->nPicWidth, pInParam->nPicHeight);
       VPU_EncSetCodingCtrlDefaults(pObj);
 
-      if (pInParam->nFullRange == 1) {        /* full range */
-        pObj->config.codingCfg.videoFullRange = 1;
-        if (pInParam->nColorConversionType == 4) {
-          pObj->config.preProcCfg.colorConversion.type = 0;  /* full range BT.601 */
-        } else if (pInParam->nColorConversionType == 3) {
-          pObj->config.preProcCfg.colorConversion.type = 1;  /* full range BT.709 */
-        }
-        else {
-          pObj->config.preProcCfg.colorConversion.type = 0;
-        }
-      }
-      else {          /* none full range */
-        pObj->config.codingCfg.videoFullRange = 0;
-        if (pInParam->nColorConversionType == 4) {
-          pObj->config.preProcCfg.colorConversion.type = 4;  /* none full range BT.601 */
-        } else if (pInParam->nColorConversionType == 3) {
-          pObj->config.preProcCfg.colorConversion.type = 6;  /* none full range BT.709 */
-        }
-        else {
-          pObj->config.preProcCfg.colorConversion.type = 4;
-        }
+      pObj->config.codingCfg.videoFullRange = pInParam->sColorAspects.nFullRange;
+
+      if (pInParam->eColorFormat == VPU_COLOR_ARGB8888 || pInParam->eColorFormat == VPU_COLOR_BGRA8888 ||
+          pInParam->eColorFormat == VPU_COLOR_RGB565 || pInParam->eColorFormat == VPU_COLOR_RGB555 ||
+          pInParam->eColorFormat == VPU_COLOR_BGR565) {
+            if (pObj->config.codingCfg.videoFullRange) {        /* full range */
+              if (pInParam->nColorConversionType == 4) {
+                pObj->config.preProcCfg.colorConversion.type = 0;  /* full range BT.601 */
+              } else if (pInParam->nColorConversionType == 3) {
+                pObj->config.preProcCfg.colorConversion.type = 1;  /* full range BT.709 */
+              }
+              else {
+                pObj->config.preProcCfg.colorConversion.type = 0;
+              }
+            }
+            else {          /* none full range */
+              if (pInParam->nColorConversionType == 4) {
+                pObj->config.preProcCfg.colorConversion.type = 4;  /* none full range BT.601 */
+              } else if (pInParam->nColorConversionType == 3) {
+                pObj->config.preProcCfg.colorConversion.type = 6;  /* none full range BT.709 */
+              }
+              else {
+                pObj->config.preProcCfg.colorConversion.type = 4;
+              }
+            }
       }
 
       if (pInParam->nStreamSliceCount <= 1) {
@@ -2193,7 +2197,6 @@ VpuEncRetCode VPU_EncOpenSimp(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,V
   sEncOpenParamMore.nFrameRate = pInParam->nFrameRate;
   sEncOpenParamMore.nBitRate = pInParam->nBitRate * 1000; //kbps->bps
   sEncOpenParamMore.nGOPSize = pInParam->nGOPSize;
-  sEncOpenParamMore.nFullRange = pInParam->nFullRange;
   sEncOpenParamMore.nColorConversionType = pInParam->nColorConversionType;
   sEncOpenParamMore.nStreamSliceCount = pInParam->nStreamSliceCount;
 
