@@ -87,7 +87,7 @@ static int g_seek_dump=DUMP_ALL_DATA;   /*0: only dump data after seeking; other
 #define VPU_ENC_DEFAULT_ALIGNMENT_V 4
 
 #define ENC_QP_DEFAULT     26
-#define ENC_MIN_QP_DEFAULT 10
+#define ENC_MIN_QP_DEFAULT 0
 #define ENC_MAX_QP_DEFAULT 51
 
 #define MAX_GOPCONFIG_SIZE 8
@@ -1111,11 +1111,13 @@ static VpuEncRetCode VPU_EncSetRateCtrlDefaults(
     pObj->max_cu_size = 64;
   }
   rcCfg->hrd = 0;
-  rcCfg->pictureRc = 1;
+  /* vbr and rate control are conflict */
+  rcCfg->vbr = (bitrate == 0 ? 1 : 0);
+  rcCfg->pictureRc = (rcCfg->vbr == 0 ? 1: 0);
   rcCfg->pictureSkip = 0;
-  rcCfg->qpHdr = (nRcIntraQp > 0 ? nRcIntraQp : ENC_QP_DEFAULT);
   rcCfg->qpMinPB = rcCfg->qpMinI = (qpMin > 0 ? qpMin : ENC_MIN_QP_DEFAULT);
   rcCfg->qpMaxPB = rcCfg->qpMaxI = (qpMax > 0 ? qpMax : ENC_MAX_QP_DEFAULT);
+  rcCfg->qpHdr = ((nRcIntraQp >= rcCfg->qpMinPB && nRcIntraQp <= rcCfg->qpMaxPB) ? nRcIntraQp : ENC_QP_DEFAULT);
   rcCfg->bitPerSecond = bitrate;
   rcCfg->hrdCpbSize = 1000000;
   rcCfg->bitVarRangeI = 10000;

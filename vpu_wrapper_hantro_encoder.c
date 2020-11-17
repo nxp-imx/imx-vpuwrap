@@ -104,6 +104,8 @@ static int g_seek_dump=DUMP_ALL_DATA;   /*0: only dump data after seeking; other
 
 #define H264_ENC_QP_DEFAULT 33
 #define VP8_ENC_QP_DEFAULT 26
+#define ENC_MIN_QP_DEFAULT 0
+#define ENC_MAX_QP_DEFAULT 51
 
 #define ALIGN(ptr,align)       ((align) ? (((unsigned long)(ptr))/(align)*(align)) : ((unsigned long)(ptr)))
 #define MemAlign(mem,align) ((((unsigned int)mem)%(align))==0)
@@ -412,6 +414,8 @@ static VpuEncRetCode VPU_EncSetBitrateDefaults(VpuEncObj* pEncObj, unsigned int 
 #ifdef CONFORMANCE
   config->eControlRate = OMX_Video_ControlRateConstant;
 #endif
+  if (bitrate == 0)
+    config->eControlRate = OMX_Video_ControlRateDisable;
   return VPU_ENC_RET_SUCCESS;
 }
 
@@ -457,8 +461,8 @@ static VpuEncRetCode  VPU_EncSetCommonConfig(
   pCommonCfg->nOutputWidth = validWidth;
   pCommonCfg->nOutputHeight = validHeight;
 
-  pRateCfg->nQpMin = qpMin; //0
-  pRateCfg->nQpMax = qpMax; //51
+  pRateCfg->nQpMin = (qpMin > 0 ? qpMin : ENC_MIN_QP_DEFAULT); //0
+  pRateCfg->nQpMax = (qpMax > 0 ? qpMax : ENC_MAX_QP_DEFAULT); //51
   pRateCfg->eRateControl = pEncObj->encConfig.bitrate.eControlRate;
   pRateCfg->nTargetBitrate = pEncObj->encConfig.bitrate.nTargetBitrate;
 
@@ -792,7 +796,8 @@ VpuEncRetCode VPU_EncOpen(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEn
       if (config.rate_config.nTargetBitrate > H264_ENC_MAX_BITRATE)
         config.rate_config.nTargetBitrate = H264_ENC_MAX_BITRATE;
 
-      config.rate_config.nQpDefault = (pInParam->nRcIntraQp > 0 ? pInParam->nRcIntraQp : H264_ENC_QP_DEFAULT);
+      config.rate_config.nQpDefault = ((pInParam->nRcIntraQp >=config.rate_config.nQpMin && pInParam->nRcIntraQp <= config.rate_config.nQpMax) ? 
+            pInParam->nRcIntraQp : H264_ENC_QP_DEFAULT);
 
       pObj->codec = HantroHwEncOmx_encoder_create_h264(&config);
       VPU_ENC_LOG("open H.264 \r\n");
@@ -816,7 +821,8 @@ VpuEncRetCode VPU_EncOpen(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEn
       if (config.rate_config.nTargetBitrate > VP8_ENC_MAX_BITRATE)
         config.rate_config.nTargetBitrate = VP8_ENC_MAX_BITRATE;
 
-      config.rate_config.nQpDefault = (pInParam->nRcIntraQp > 0 ? pInParam->nRcIntraQp : VP8_ENC_QP_DEFAULT);
+      config.rate_config.nQpDefault = ((pInParam->nRcIntraQp >=config.rate_config.nQpMin && pInParam->nRcIntraQp <= config.rate_config.nQpMax) ? 
+            pInParam->nRcIntraQp : VP8_ENC_QP_DEFAULT);
 
       pObj->codec = HantroHwEncOmx_encoder_create_vp8(&config);
       VPU_ENC_LOG("open VP8 \r\n");
