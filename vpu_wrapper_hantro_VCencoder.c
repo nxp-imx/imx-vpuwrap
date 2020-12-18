@@ -1607,7 +1607,7 @@ VpuEncRetCode VCEnc_encoder_encode(ENCODER_PROTOTYPE* arg, FRAME* frame, STREAM_
   {
     this->encIn.timeIncrement = 0;
   }
-  if ((this->nTotalFrames %  params->nPFrames) == 0)
+  if (frame->frame_type == INTRA_FRAME)
   {
     this->encIn.codingType = VCENC_INTRA_FRAME;
   }
