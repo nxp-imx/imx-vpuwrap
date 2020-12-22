@@ -651,9 +651,11 @@ VpuDecRetCode VPU_DecConfig(VpuDecHandle InHandle, VpuDecConfig InDecConf, void*
     case VPU_DEC_CONF_ENABLE_TILED:
       if (pObj->CodecFormat == VPU_V_HEVC || pObj->CodecFormat == VPU_V_VP9) {
         pObj->config.g2_conf.bEnableTiled = false;
+        pObj->config_tile = false;
         if ((*((int*)pInParam)) == 1)
         {
           pObj->config.g2_conf.bEnableTiled = true;
+          pObj->config_tile = true;
         }
       } else {
         pObj->config.g1_conf.bEnableTiled = false;
@@ -661,6 +663,13 @@ VpuDecRetCode VPU_DecConfig(VpuDecHandle InHandle, VpuDecConfig InDecConf, void*
         {
           pObj->config.g1_conf.bEnableTiled = true;
         }
+        if (pObj->CodecFormat == VPU_V_AVC) {
+          pObj->config_tile = false;
+          if ((*((int*)pInParam)) == 1)
+          {
+            pObj->config_tile = true;
+          }
+	}
       }
       pObj->codec->setinfo(pObj->codec, &pObj->config);
       break;
