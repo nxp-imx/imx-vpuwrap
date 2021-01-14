@@ -1268,6 +1268,8 @@ static VpuDecRetCode RvParseHeader(VpuDecObj* pObj, VpuBufferNode* pInData)
   pInData->pVirAddr += 20 + pObj->slice_info_num * 8;
   pInData->nSize -= 20 + pObj->slice_info_num * 8;
   pObj->nAccumulatedConsumedStufferBytes += 20 + pObj->slice_info_num * 8;
+  if (pObj->slice_info_num < 0 || pInData->nSize < 0)
+    return VPU_DEC_RET_INVALID_FRAME_BUFFER;
   return VPU_DEC_RET_SUCCESS;
 }
 
@@ -1316,8 +1318,13 @@ VpuDecRetCode VPU_DecDecodeBuf(VpuDecHandle InHandle, VpuBufferNode* pInData,
     if(pObj->bSecureMode)
         pObj->nBsBufOffset = 0;
 
-    if(pObj->CodecFormat==VPU_V_RV)
-      RvParseHeader(pObj, pInData);
+    if(pObj->CodecFormat == VPU_V_RV) {
+      ret = RvParseHeader(pObj, pInData);
+      if (ret == VPU_DEC_RET_INVALID_FRAME_BUFFER) {
+        *pOutBufRetCode = VPU_DEC_INPUT_USED | VPU_DEC_SKIP;
+        return VPU_DEC_RET_SUCCESS;
+      }
+    }
     VPU_DecProcessInBuf(pObj, pInData);
     *pOutBufRetCode |= VPU_DEC_INPUT_USED;
 
