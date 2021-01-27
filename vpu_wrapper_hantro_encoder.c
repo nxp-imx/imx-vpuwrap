@@ -104,8 +104,8 @@ static int g_seek_dump=DUMP_ALL_DATA;   /*0: only dump data after seeking; other
 
 #define H264_ENC_QP_DEFAULT 33
 #define VP8_ENC_QP_DEFAULT 26
-#define ENC_MIN_QP_DEFAULT 0
-#define ENC_MAX_QP_DEFAULT 51
+#define AVC_ENC_MAX_QP_DEFAULT 51
+#define VP8_ENC_MAX_QP_DEFAULT 127
 
 #define ALIGN(ptr,align)       ((align) ? (((unsigned long)(ptr))/(align)*(align)) : ((unsigned long)(ptr)))
 #define MemAlign(mem,align) ((((unsigned int)mem)%(align))==0)
@@ -461,8 +461,8 @@ static VpuEncRetCode  VPU_EncSetCommonConfig(
   pCommonCfg->nOutputWidth = validWidth;
   pCommonCfg->nOutputHeight = validHeight;
 
-  pRateCfg->nQpMin = (qpMin > 0 ? qpMin : ENC_MIN_QP_DEFAULT); //0
-  pRateCfg->nQpMax = (qpMax > 0 ? qpMax : ENC_MAX_QP_DEFAULT); //51
+  pRateCfg->nQpMin = qpMin;
+  pRateCfg->nQpMax = qpMax;
   pRateCfg->eRateControl = pEncObj->encConfig.bitrate.eControlRate;
   pRateCfg->nTargetBitrate = pEncObj->encConfig.bitrate.nTargetBitrate;
 
@@ -889,7 +889,7 @@ VpuEncRetCode VPU_EncOpenSimp(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,V
     sEncOpenParamMore.nRcIntraQp = pInParam->nIntraQP;
   }
 
-  sEncOpenParamMore.nUserQpMax = 0;
+  sEncOpenParamMore.nUserQpMax = (pInParam->eFormat == VPU_V_AVC) ? AVC_ENC_MAX_QP_DEFAULT : VP8_ENC_MAX_QP_DEFAULT;
   sEncOpenParamMore.nUserQpMin = 0;
   sEncOpenParamMore.nUserQpMinEnable = 0;
   sEncOpenParamMore.nUserQpMaxEnable = 0;
