@@ -1547,7 +1547,7 @@ static VpuEncRetCode VCEnc_encoder_stream_start(ENCODER_PROTOTYPE* arg, CONFIG* 
   return stat;
 }
 
-static void VPU_EncSetEncInParamsEncode (VCEncIn *pEncIn, FRAME* frame, STREAM_BUFFER* stream, CONFIG* params, VCEncPictureCodingType nextCodingType)
+static void VPU_EncSetEncInParamsEncode (VCEncIn *pEncIn, FRAME* frame, STREAM_BUFFER* stream, CONFIG* params)
 {
   u32 luma_Size = 0, chroma_Size = 0;
 
@@ -1567,11 +1567,11 @@ static void VPU_EncSetEncInParamsEncode (VCEncIn *pEncIn, FRAME* frame, STREAM_B
   pEncIn->busLumaOrig = pEncIn->busChromaUOrig = pEncIn->busChromaVOrig = (ptr_t)NULL;
 
   pEncIn->timeIncrement = params->cfg.frameRateDenom;
-  pEncIn->codingType = nextCodingType;
   pEncIn->resendSPS = 0;
   pEncIn->resendPPS = 0;
   pEncIn->resendVPS = 0;
-  if (pEncIn->codingType == VCENC_INTRA_FRAME) {
+  if (pEncIn->codingType == VCENC_INTRA_FRAME && pEncIn->picture_cnt != 0) {
+    pEncIn->poc = 0;
     pEncIn->resendSPS = 1;
     pEncIn->resendPPS = 1;
     pEncIn->resendVPS = 1;
@@ -1600,8 +1600,6 @@ VpuEncRetCode VCEnc_encoder_encode(ENCODER_PROTOTYPE* arg, FRAME* frame, STREAM_
   memset(&codingCfg, 0, sizeof(VCEncCodingCtrl));
   memset(&rcCfg, 0, sizeof(VCEncRateCtrl));
 
-  VPU_EncSetEncInParamsEncode(&this->encIn, frame, stream, params, this->nextCodingType);
-
   // set the first frame
   if (this->nTotalFrames == 0)
   {
@@ -1610,7 +1608,14 @@ VpuEncRetCode VCEnc_encoder_encode(ENCODER_PROTOTYPE* arg, FRAME* frame, STREAM_
   if (frame->frame_type == INTRA_FRAME)
   {
     this->encIn.codingType = VCENC_INTRA_FRAME;
+    this->encIn.last_idr_picture_cnt = this->nTotalFrames;
   }
+  else
+  {
+    this->encIn.codingType = VCENC_PREDICTED_FRAME;
+  }
+  this->encIn.picture_cnt = this->nTotalFrames;
+  VPU_EncSetEncInParamsEncode(&this->encIn, frame, stream, params);
 
   VPU_ENC_LOG("Frame type %s, Frame counter (%d)\n", (this->encIn.codingType == VCENC_INTRA_FRAME) ?
         "I": ((this->encIn.codingType == VCENC_PREDICTED_FRAME) ? "P" : "B"),
