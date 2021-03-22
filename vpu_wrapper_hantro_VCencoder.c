@@ -1231,7 +1231,7 @@ static VpuEncRetCode VPU_EncSetConfigDefaults(VpuEncObj* pObj, int frameRate, Vp
   if (format == VPU_V_HEVC)
     cfg->codecFormat = VCENC_VIDEO_CODEC_HEVC;
   cfg->profile = (IS_H264(cfg->codecFormat) ? VCENC_H264_BASE_PROFILE : VCENC_HEVC_MAIN_PROFILE);
-  cfg->level = (IS_H264(cfg->codecFormat) ? calculateH264Level(cfg->width, cfg->height) : VCENC_HEVC_LEVEL_5_1);
+  cfg->level = (IS_H264(cfg->codecFormat) ? calculateH264Level(width, height) : VCENC_HEVC_LEVEL_5_1);
   cfg->tier = VCENC_HEVC_MAIN_TIER;
 
   if (pObj->config.preProcCfg.rotation && pObj->config.preProcCfg.rotation != 3)
