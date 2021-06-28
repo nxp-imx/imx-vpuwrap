@@ -1,4 +1,4 @@
-LA_OPT_NXP_Software_License v24 June 2021
+LA_OPT_NXP_Software_License v25 June 2021
 
 IMPORTANT.  Read the following NXP Software License Agreement ("Agreement")
 completely. By selecting the "I Accept" button at the end of this page, or by
@@ -96,7 +96,7 @@ in combination with a NXP Product.
 You may not distribute or sublicense the Licensed Software to others under the
 license granted in this Section 2.2.
 
-You may demonstrate the Licensed Software to your direct costumers as part of
+You may demonstrate the Licensed Software to your direct customers as part of
 an Authorized System so long as such demonstration is directly controlled by
 you and without prior approval by NXP; however, to all other third parties only
 if NXP has provided its advance, written approval (e.g. email approval) of your
@@ -492,7 +492,7 @@ following:
 
 (1)          Use of Software is limited to Authorized System only
 
-(2)          In no event may Licensee Sublicense OR distribute the Software
+(2)          In no event may Licensee Sublicense the Software
 
 (3)          AU-ZONE TECHNOLOGIES SHALL NOT BE LIABLE FOR USE OF LICENSED
 SOFTWARE IN CRITICAL APPLICATIONS BY LICENSEE
