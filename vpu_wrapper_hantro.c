@@ -1772,12 +1772,16 @@ VpuDecRetCode VPU_DecGetMem(VpuMemDesc* pInOutMem)
   struct DWLInitParam dwlInit;
   const void *pdwl = NULL;
 
-  dwlInit.client_type = DWL_CLIENT_TYPE_HEVC_DEC;
+  dwlInit.client_type = DWL_CLIENT_TYPE_H264_DEC;
   pdwl = (void*)DWLInit(&dwlInit);
   if (!pdwl)
   {
-    VPU_ERROR("%s: DWLInit failed !! \r\n",__FUNCTION__);
-    return VPU_DEC_RET_FAILURE;
+    dwlInit.client_type = DWL_CLIENT_TYPE_HEVC_DEC;
+    pdwl = (void*)DWLInit(&dwlInit);
+    if (!pdwl) {
+      VPU_ERROR("%s: DWLInit failed !! \r\n", __FUNCTION__);
+      return VPU_DEC_RET_FAILURE;
+    }
   }
 
   if(pInOutMem->nType == VPU_MEM_DESC_NORMAL)
@@ -1818,13 +1822,18 @@ VpuDecRetCode VPU_DecFreeMem(VpuMemDesc* pInMem)
   else if(pInMem->nType == VPU_MEM_DESC_SECURE)
     info.mem_type = DWL_MEM_TYPE_SLICE;
 
-  dwlInit.client_type = DWL_CLIENT_TYPE_HEVC_DEC;
+  dwlInit.client_type = DWL_CLIENT_TYPE_H264_DEC;
   pdwl = (void*)DWLInit(&dwlInit);
   if (!pdwl)
   {
-    VPU_ERROR("%s: DWLInit failed !! \r\n",__FUNCTION__);
-    return VPU_DEC_RET_FAILURE;
+    dwlInit.client_type = DWL_CLIENT_TYPE_HEVC_DEC;
+    pdwl = (void*)DWLInit(&dwlInit);
+    if (!pdwl) {
+      VPU_ERROR("%s: DWLInit failed !! \r\n", __FUNCTION__);
+      return VPU_DEC_RET_FAILURE;
+    }
   }
+
   VPU_LOG("VPU_DecFreeMem fd=%d",info.ion_fd);
   DWLFreeLinear(pdwl, &info);
 
