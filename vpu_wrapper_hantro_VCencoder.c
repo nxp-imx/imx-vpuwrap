@@ -1233,7 +1233,6 @@ static VpuEncRetCode VPU_EncSetConfigDefaults(VpuEncObj* pObj, int frameRate, Vp
   if (format == VPU_V_HEVC)
     cfg->codecFormat = VCENC_VIDEO_CODEC_HEVC;
   cfg->profile = (IS_H264(cfg->codecFormat) ? VCENC_H264_BASE_PROFILE : VCENC_HEVC_MAIN_PROFILE);
-  cfg->level = (IS_H264(cfg->codecFormat) ? calculateH264Level(cfg->width, cfg->height) : VCENC_HEVC_LEVEL_5_1);
   cfg->tier = VCENC_HEVC_MAIN_TIER;
 
   if (pObj->config.preProcCfg.rotation && pObj->config.preProcCfg.rotation != 3)
@@ -1246,6 +1245,7 @@ static VpuEncRetCode VPU_EncSetConfigDefaults(VpuEncObj* pObj, int frameRate, Vp
     cfg->width = AlignWidth(width, VPU_ENC_DEFAULT_ALIGNMENT_H);
     cfg->height = AlignHeight(height, VPU_ENC_DEFAULT_ALIGNMENT_V);
   }
+  cfg->level = (IS_H264(cfg->codecFormat) ? calculateH264Level(cfg->width, cfg->height) : VCENC_HEVC_LEVEL_5_1);
   cfg->frameRateNum = frameRate;
   cfg->frameRateDenom = 1;
   cfg->maxTLayers = 1;         /*will be recalculated after InitGopConfigs*/
