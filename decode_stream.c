@@ -428,7 +428,7 @@ int MallocMemBlock(VpuMemInfo* pMemBlock,DecMemInfo* pDecMem)
 		}
 		else// if(memInfo.MemSubBlock[i].MemType==VPU_MEM_PHY)
 		{
-			VpuMemDesc vpuMem;
+			VpuMemDesc vpuMem = {0};
 			VpuDecRetCode ret;
 			vpuMem.nSize=size;
 			ret=VPU_DecGetMem(&vpuMem);
@@ -940,15 +940,6 @@ int ProcessInitInfo(DecContxt * pDecContxt,VpuDecHandle handle,VpuDecInitInfo* p
 		}		
 	}
 #endif
-
-	VpuBufferNode in_data = {0};
-    int buf_ret;
-	VpuDecRetCode dec_ret;
-    dec_ret=VPU_DecDecodeBuf(handle, &in_data, &buf_ret);
-	if (dec_ret == VPU_DEC_RET_FAILURE) {
-      DEC_STREAM_PRINTF("VPU_DecDecodeBuf fail \r\n");
-	  return 0;
-	}
 
 	//register frame buffs
 	DEC_TRACE;
