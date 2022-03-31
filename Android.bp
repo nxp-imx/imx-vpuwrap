@@ -28,7 +28,6 @@ vpu_wrapper_hantro_defaults {
         "-DENABLE_CODEC_VP8",
         "-DENCH1",
         "-Wno-error=date-time",
-        "-Wl,-Bsymbolic",
         "-Wno-unused-parameter",
         "-Wno-implicit-fallthrough",
         "-Werror",
