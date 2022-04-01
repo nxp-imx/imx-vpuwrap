@@ -33,6 +33,10 @@ vpu_wrapper_hantro_defaults {
         "-Werror",
     ],
 
+    ldflags: [
+        "-Wl,-Bsymbolic",
+    ],
+
     shared_libs: [
         "liblog",
         "libutils",
