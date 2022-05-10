@@ -314,6 +314,12 @@ static int AlignHeight(int height, int align)
     return (height) / align * align;
 }
 
+static int CLAMP(int val, int lo, int hi)
+{
+  int tmp = (val > lo) ? val : lo;
+  return (tmp < hi) ? tmp : hi;
+}
+
 static int VpuEncLogLevelParse(int * pLogLevel)
 {
   int level=0;
@@ -1117,7 +1123,9 @@ static VpuEncRetCode VPU_EncSetRateCtrlDefaults(
   rcCfg->pictureSkip = 0;
   rcCfg->qpMinPB = rcCfg->qpMinI = (qpMin > 0 ? qpMin : ENC_MIN_QP_DEFAULT);
   rcCfg->qpMaxPB = rcCfg->qpMaxI = (qpMax > 0 ? qpMax : ENC_MAX_QP_DEFAULT);
-  rcCfg->qpHdr = ((nRcIntraQp >= rcCfg->qpMinPB && nRcIntraQp <= rcCfg->qpMaxPB) ? nRcIntraQp : ENC_QP_DEFAULT);
+  rcCfg->qpHdr = ((nRcIntraQp >= ENC_MIN_QP_DEFAULT && nRcIntraQp <= ENC_MAX_QP_DEFAULT) ? nRcIntraQp : ENC_QP_DEFAULT);
+  rcCfg->qpHdr = CLAMP (rcCfg->qpHdr, rcCfg->qpMinPB, rcCfg->qpMaxPB);
+
   rcCfg->bitPerSecond = bitrate;
   rcCfg->hrdCpbSize = 1000000;
   rcCfg->bitVarRangeI = 10000;
@@ -2229,8 +2237,8 @@ VpuEncRetCode VPU_EncOpenSimp(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,V
     sEncOpenParamMore.nRcIntraQp = pInParam->nIntraQP;
   }
 
-  sEncOpenParamMore.nUserQpMax = 0;
-  sEncOpenParamMore.nUserQpMin = 0;
+  sEncOpenParamMore.nUserQpMax = pInParam->nUserQpMax;
+  sEncOpenParamMore.nUserQpMin = pInParam->nUserQpMin;
   sEncOpenParamMore.nUserQpMinEnable = 0;
   sEncOpenParamMore.nUserQpMaxEnable = 0;
 

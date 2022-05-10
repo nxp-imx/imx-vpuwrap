@@ -164,6 +164,12 @@ static int AlignHeight(int height, int align)
     return (height) / align * align;
 }
 
+static int CLAMP(int val, int lo, int hi)
+{
+  int tmp = (val > lo) ? val : lo;
+  return (tmp < hi) ? tmp : hi;
+}
+
 static int VpuEncLogLevelParse(int * pLogLevel)
 {
   int level=0;
@@ -425,8 +431,6 @@ static VpuEncRetCode  VPU_EncSetCommonConfig(
     RATE_CONTROL_CONFIG* pRateCfg,
     PRE_PROCESSOR_CONFIG* pPpCfg,
     int frameRate,
-    int qpMin,
-    int qpMax,
     VpuColorFormat colorFmt,
     int chromaInterleave,
     int Width,
@@ -461,8 +465,6 @@ static VpuEncRetCode  VPU_EncSetCommonConfig(
   pCommonCfg->nOutputWidth = validWidth;
   pCommonCfg->nOutputHeight = validHeight;
 
-  pRateCfg->nQpMin = qpMin;
-  pRateCfg->nQpMax = qpMax;
   pRateCfg->eRateControl = pEncObj->encConfig.bitrate.eControlRate;
   pRateCfg->nTargetBitrate = pEncObj->encConfig.bitrate.nTargetBitrate;
 
@@ -759,8 +761,7 @@ VpuEncRetCode VPU_EncOpen(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEn
 
       VPU_EncSetAvcDefaults(pObj);
       VPU_EncSetCommonConfig(pObj, &config.common_config, &config.rate_config, &config.pp_config,
-            pInParam->nFrameRate, pInParam->nUserQpMin, pInParam->nUserQpMax,
-            pInParam->eColorFormat, pInParam->nChromaInterleave,
+            pInParam->nFrameRate, pInParam->eColorFormat, pInParam->nChromaInterleave,
             pInParam->nOrigWidth, pInParam->nOrigHeight);
       VPU_EncSetColorAspectsInfo(&config, &pInParam->sColorAspects, VPU_V_AVC);
 
@@ -796,8 +797,11 @@ VpuEncRetCode VPU_EncOpen(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEn
       if (config.rate_config.nTargetBitrate > H264_ENC_MAX_BITRATE)
         config.rate_config.nTargetBitrate = H264_ENC_MAX_BITRATE;
 
-      config.rate_config.nQpDefault = ((pInParam->nRcIntraQp >=config.rate_config.nQpMin && pInParam->nRcIntraQp <= config.rate_config.nQpMax) ? 
+      config.rate_config.nQpMin = (pInParam->nUserQpMin > 0 ? pInParam->nUserQpMin : 0);
+      config.rate_config.nQpMax = (pInParam->nUserQpMax > 0 ? pInParam->nUserQpMax : AVC_ENC_MAX_QP_DEFAULT);
+      config.rate_config.nQpDefault = ((pInParam->nRcIntraQp >= 0 && pInParam->nRcIntraQp <= AVC_ENC_MAX_QP_DEFAULT) ? 
             pInParam->nRcIntraQp : H264_ENC_QP_DEFAULT);
+      config.rate_config.nQpDefault = CLAMP (config.rate_config.nQpDefault, config.rate_config.nQpMin, config.rate_config.nQpMax);
 
       pObj->codec = HantroHwEncOmx_encoder_create_h264(&config);
       VPU_ENC_LOG("open H.264 \r\n");
@@ -809,8 +813,7 @@ VpuEncRetCode VPU_EncOpen(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEn
 
       VPU_EncSetVp8Defaults(pObj);
       VPU_EncSetCommonConfig(pObj, &config.common_config, &config.rate_config, &config.pp_config,
-            pInParam->nFrameRate, pInParam->nUserQpMin, pInParam->nUserQpMax,
-            pInParam->eColorFormat, pInParam->nChromaInterleave,
+            pInParam->nFrameRate, pInParam->eColorFormat, pInParam->nChromaInterleave,
             pInParam->nOrigWidth, pInParam->nOrigHeight);
 
       config.vp8_config.eProfile = pObj->encConfig.vp8.eProfile;
@@ -821,8 +824,11 @@ VpuEncRetCode VPU_EncOpen(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEn
       if (config.rate_config.nTargetBitrate > VP8_ENC_MAX_BITRATE)
         config.rate_config.nTargetBitrate = VP8_ENC_MAX_BITRATE;
 
-      config.rate_config.nQpDefault = ((pInParam->nRcIntraQp >=config.rate_config.nQpMin && pInParam->nRcIntraQp <= config.rate_config.nQpMax) ? 
+      config.rate_config.nQpMin = (pInParam->nUserQpMin > 0 ? pInParam->nUserQpMin : 0);
+      config.rate_config.nQpMax = (pInParam->nUserQpMax > 0 ? pInParam->nUserQpMax : VP8_ENC_MAX_QP_DEFAULT);
+      config.rate_config.nQpDefault = ((pInParam->nRcIntraQp >= 0 && pInParam->nRcIntraQp <= VP8_ENC_MAX_QP_DEFAULT) ? 
             pInParam->nRcIntraQp : VP8_ENC_QP_DEFAULT);
+      config.rate_config.nQpDefault = CLAMP (config.rate_config.nQpDefault, config.rate_config.nQpMin, config.rate_config.nQpMax);
 
       pObj->codec = HantroHwEncOmx_encoder_create_vp8(&config);
       VPU_ENC_LOG("open VP8 \r\n");
@@ -889,8 +895,8 @@ VpuEncRetCode VPU_EncOpenSimp(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,V
     sEncOpenParamMore.nRcIntraQp = pInParam->nIntraQP;
   }
 
-  sEncOpenParamMore.nUserQpMax = (pInParam->eFormat == VPU_V_AVC) ? AVC_ENC_MAX_QP_DEFAULT : VP8_ENC_MAX_QP_DEFAULT;
-  sEncOpenParamMore.nUserQpMin = 0;
+  sEncOpenParamMore.nUserQpMax = pInParam->nUserQpMax;
+  sEncOpenParamMore.nUserQpMin = pInParam->nUserQpMin;
   sEncOpenParamMore.nUserQpMinEnable = 0;
   sEncOpenParamMore.nUserQpMaxEnable = 0;
 
