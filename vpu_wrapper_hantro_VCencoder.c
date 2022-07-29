@@ -418,6 +418,20 @@ static int calculateH264Level(int width, int height)
   return level;
 }
 
+static void AdjustBitrate(VpuEncObj* pObj)
+{
+  if (pObj->config.rcCfg.bitPerSecond > VPU_ENC_MAX_BITRATE)
+    pObj->config.rcCfg.bitPerSecond = VPU_ENC_MAX_BITRATE;
+  if (pObj->config.rcCfg.bitPerSecond < VPU_ENC_MIN_BITRATE)
+  {
+    // workaround to set check bitrate, calculate bitPerSecond = bitPerFrame * pInParam->nFrameRate / compression,
+    // so that resolution from max - min can get a approprite bitrate
+    int bitPerFrame = pObj->config.cfg.width * pObj->config.cfg.height * 8;
+    int compression = 50;
+    pObj->config.rcCfg.bitPerSecond = bitPerFrame / compression  * pObj->config.cfg.frameRateNum
+        * pObj->config.cfg.frameRateDenom / 1000 * 1000;
+  }
+}
 
 static void VPU_EncInitConfigParams(VCEncIn *pEncIn, VCEncConfig* cfg, CONFIG* params)
 {
@@ -2155,16 +2169,7 @@ VpuEncRetCode VPU_EncOpen(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEn
       pObj->config.gopSize = 1;    /* make sure no B frame */
       pObj->config.nPFrames = (pInParam->nGOPSize > ENC_MAX_GOP_SIZE ? ENC_MAX_GOP_SIZE : pInParam->nGOPSize);
 
-      if (pObj->config.rcCfg.bitPerSecond > VPU_ENC_MAX_BITRATE)
-        pObj->config.rcCfg.bitPerSecond = VPU_ENC_MAX_BITRATE;
-      if (pObj->config.rcCfg.bitPerSecond < VPU_ENC_MIN_BITRATE)
-      {
-        // workaround to set check bitrate, calculate bitPerSecond = bitPerFrame * pInParam->nFrameRate / compression,
-        // so that resolution from max - min can get a approprite bitrate
-        int bitPerFrame = pObj->config.cfg.width * pObj->config.cfg.height * 8;
-        int compression = 50;
-        pObj->config.rcCfg.bitPerSecond = bitPerFrame / compression  * pInParam->nFrameRate / 1000 * 1000;
-      }
+      AdjustBitrate(pObj);
 
       pObj->codec = VCEnc_encoder_create(&pObj->config, &pInParam->sColorAspects);
       if (IS_H264(pObj->config.cfg.codecFormat)) {
@@ -2302,6 +2307,7 @@ VpuEncRetCode VPU_EncConfig(VpuEncHandle InHandle, VpuEncConfig InEncConf, void*
         return VPU_ENC_RET_INVALID_PARAM;
       }
       pObj->config.rcCfg.bitPerSecond = para * 1000;  //kbps->bps
+      AdjustBitrate(pObj);
       break;
     case VPU_ENC_CONF_INTRA_REFRESH:
       para = *((int*)pInParam);
