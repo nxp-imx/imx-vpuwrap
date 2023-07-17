@@ -1,6 +1,6 @@
 /*
  *  Copyright (c) 2010-2016, Freescale Semiconductor Inc.,
- *  Copyright 2017-2020 NXP
+ *  Copyright 2017-2020,2023 NXP
  *
  *  The following programs are the sole property of NXP,
  *  and contain its proprietary and confidential information.
@@ -579,6 +579,8 @@ typedef struct {
 	int nIntraQP;				/*0: auto, >0: qp value*/
 	int nUserQpMax;
 	int nUserQpMin;
+	int nProfile;
+	int nLevel;
 	int nChromaInterleave;	/*should be set to 1 when (nMapType!=0)*/
 	VpuEncMirrorDirection sMirror;
 	//int nQuantParam;
@@ -654,6 +656,8 @@ typedef struct {
 	int nUserQpMin;
 	int nUserQpMinEnable;
 	int nUserQpMaxEnable;
+	int nProfile;
+	int nLevel;
 
 	int nIntraRefresh;
 	int nRcIntraQp;

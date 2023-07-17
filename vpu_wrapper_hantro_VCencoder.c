@@ -1,5 +1,5 @@
 /**
- *	Copyright 2019-2020 NXP
+ *	Copyright 2019-2020,2023 NXP
  *
  *  The following programs are the sole property of NXP,
  *  and contain its proprietary and confidential information.
@@ -393,7 +393,11 @@ static const EncLevelSizeMap H264LevelSizeMapTable[] = {
     {VCENC_H264_LEVEL_4_1, 8192},
     {VCENC_H264_LEVEL_4_2, 8704},
     {VCENC_H264_LEVEL_5,  22080},
-    {VCENC_H264_LEVEL_5_1, 65025},
+    {VCENC_H264_LEVEL_5_1, 36864},
+    {VCENC_H264_LEVEL_5_2, 36864},
+    {VCENC_H264_LEVEL_6, 35651854},
+    {VCENC_H264_LEVEL_6_1, 35651854},
+    {VCENC_H264_LEVEL_6_2, 35651854},
 };
 
 static int calculateH264Level(int width, int height)
@@ -416,6 +420,106 @@ static int calculateH264Level(int width, int height)
   }
 
   return level;
+}
+
+static int selectH264Level(level1, level2) {
+  int i, tableLen, seq1, seq2;
+  tableLen = sizeof(H264LevelSizeMapTable)/sizeof(H264LevelSizeMapTable[0]);
+  for (i = 0; i < tableLen; i++) {
+    if (level1 == H264LevelSizeMapTable[i].level)
+      seq1 = i;
+    if (level2 == H264LevelSizeMapTable[i].level)
+      seq2 = i;
+  }
+  return (seq1 > seq2) ? level1 : level2;
+}
+
+static bool isProfileValid(VpuCodStd format, int profile)
+{
+  bool ret = FALSE;
+
+  if (format == VPU_V_HEVC) {
+    switch (profile)
+    {
+      case VCENC_HEVC_MAIN_PROFILE:
+      case VCENC_HEVC_MAIN_STILL_PICTURE_PROFILE:
+      case VCENC_HEVC_MAIN_10_PROFILE:
+        ret = TRUE;
+        break;
+      default:
+        break;
+    }
+  } else if (format == VPU_V_AVC) {
+    switch (profile)
+    {
+      case VCENC_H264_BASE_PROFILE:
+      case VCENC_H264_MAIN_PROFILE:
+      case VCENC_H264_HIGH_PROFILE:
+      case VCENC_H264_HIGH_10_PROFILE:
+        ret = TRUE;
+        break;
+      default:
+        break;
+    }
+  }
+
+  return ret;
+}
+
+static bool isLevelValid(VpuCodStd format, int level)
+{
+  bool ret = FALSE;
+
+  if (format == VPU_V_HEVC) {
+    switch (level)
+    {
+      case VCENC_HEVC_LEVEL_1:
+      case VCENC_HEVC_LEVEL_2:
+      case VCENC_HEVC_LEVEL_2_1:
+      case VCENC_HEVC_LEVEL_3:
+      case VCENC_HEVC_LEVEL_3_1:
+      case VCENC_HEVC_LEVEL_4:
+      case VCENC_HEVC_LEVEL_4_1:
+      case VCENC_HEVC_LEVEL_5:
+      case VCENC_HEVC_LEVEL_5_1:
+      case VCENC_HEVC_LEVEL_5_2:
+      case VCENC_HEVC_LEVEL_6:
+        ret = TRUE;
+        break;
+      default:
+        break;
+    }
+  } else if (format == VPU_V_AVC) {
+    switch (level)
+    {
+      case VCENC_H264_LEVEL_1:
+      case VCENC_H264_LEVEL_1_b:
+      case VCENC_H264_LEVEL_1_1:
+      case VCENC_H264_LEVEL_1_2:
+      case VCENC_H264_LEVEL_1_3:
+      case VCENC_H264_LEVEL_2:
+      case VCENC_H264_LEVEL_2_1:
+      case VCENC_H264_LEVEL_2_2:
+      case VCENC_H264_LEVEL_3:
+      case VCENC_H264_LEVEL_3_1:
+      case VCENC_H264_LEVEL_3_2:
+      case VCENC_H264_LEVEL_4:
+      case VCENC_H264_LEVEL_4_1:
+      case VCENC_H264_LEVEL_4_2:
+      case VCENC_H264_LEVEL_5:
+      case VCENC_H264_LEVEL_5_1:
+      case VCENC_H264_LEVEL_5_2:
+      case VCENC_H264_LEVEL_6:
+      case VCENC_H264_LEVEL_6_1:
+      case VCENC_H264_LEVEL_6_2:
+        ret = TRUE;
+        break;
+      default:
+        break;
+    }
+  }
+
+  return ret;
 }
 
 static void AdjustBitrate(VpuEncObj* pObj)
@@ -1245,7 +1349,14 @@ static VpuEncRetCode VPU_EncSetCodingCtrlDefaults(VpuEncObj* pObj)
   return VPU_ENC_RET_SUCCESS;
 }
 
-static VpuEncRetCode VPU_EncSetConfigDefaults(VpuEncObj* pObj, int frameRate, VpuCodStd format, int width, int height)
+static VpuEncRetCode VPU_EncSetConfigDefaults(
+  VpuEncObj* pObj,
+  int frameRate,
+  VpuCodStd format,
+  int width,
+  int height,
+  int profile,
+  int level)
 {
   VCEncConfig* cfg = 0;
   cfg = &pObj->config.cfg;
@@ -1254,7 +1365,6 @@ static VpuEncRetCode VPU_EncSetConfigDefaults(VpuEncObj* pObj, int frameRate, Vp
     cfg->codecFormat = VCENC_VIDEO_CODEC_H264;
   if (format == VPU_V_HEVC)
     cfg->codecFormat = VCENC_VIDEO_CODEC_HEVC;
-  cfg->profile = (IS_H264(cfg->codecFormat) ? VCENC_H264_BASE_PROFILE : VCENC_HEVC_MAIN_PROFILE);
   cfg->tier = VCENC_HEVC_MAIN_TIER;
 
   if (pObj->config.preProcCfg.rotation && pObj->config.preProcCfg.rotation != 3)
@@ -1267,7 +1377,20 @@ static VpuEncRetCode VPU_EncSetConfigDefaults(VpuEncObj* pObj, int frameRate, Vp
     cfg->width = AlignWidth(width, VPU_ENC_DEFAULT_ALIGNMENT_H);
     cfg->height = AlignHeight(height, VPU_ENC_DEFAULT_ALIGNMENT_V);
   }
-  cfg->level = (IS_H264(cfg->codecFormat) ? calculateH264Level(cfg->width, cfg->height) : VCENC_HEVC_LEVEL_5_1);
+
+  if (isProfileValid (format, profile))
+    cfg->profile = profile;
+  else
+    cfg->profile = (IS_H264(cfg->codecFormat) ? VCENC_H264_BASE_PROFILE : VCENC_HEVC_MAIN_PROFILE);
+
+  if (isLevelValid (format, level)) {
+    if (IS_H264(cfg->codecFormat))
+      cfg->level = selectH264Level (level, calculateH264Level(cfg->width, cfg->height));
+    else
+      cfg->level = level;
+  }
+  else
+    cfg->level = (IS_H264(cfg->codecFormat) ? calculateH264Level(cfg->width, cfg->height) : VCENC_HEVC_LEVEL_5_1);
   cfg->frameRateNum = frameRate;
   cfg->frameRateDenom = 1;
   cfg->maxTLayers = 1;         /*will be recalculated after InitGopConfigs*/
@@ -2128,7 +2251,8 @@ VpuEncRetCode VPU_EncOpen(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEn
         pInParam->nRotAngle, pInParam->eColorFormat, pInParam->nChromaInterleave);
       VPU_EncSetRateCtrlDefaults(pObj, pInParam->nBitRate, pInParam->eFormat,
         pInParam->nRcIntraQp, pInParam->nUserQpMin, pInParam->nUserQpMax);
-      VPU_EncSetConfigDefaults(pObj, pInParam->nFrameRate, pInParam->eFormat, pInParam->nPicWidth, pInParam->nPicHeight);
+      VPU_EncSetConfigDefaults(pObj, pInParam->nFrameRate, pInParam->eFormat, pInParam->nPicWidth,
+        pInParam->nPicHeight, pInParam->nProfile, pInParam->nLevel);
       VPU_EncSetCodingCtrlDefaults(pObj);
 
       pObj->config.codingCfg.videoFullRange = pInParam->sColorAspects.nFullRange;
@@ -2246,6 +2370,8 @@ VpuEncRetCode VPU_EncOpenSimp(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,V
   sEncOpenParamMore.nUserQpMin = pInParam->nUserQpMin;
   sEncOpenParamMore.nUserQpMinEnable = 0;
   sEncOpenParamMore.nUserQpMaxEnable = 0;
+  sEncOpenParamMore.nProfile = pInParam->nProfile;
+  sEncOpenParamMore.nLevel = pInParam->nLevel;
 
   sEncOpenParamMore.nUserGamma = (int)(0.75*32768);         /*  (0*32768 <= gamma <= 1*32768) */
   sEncOpenParamMore.nRcIntervalMode = 0;        /* 0:normal, 1:frame_level, 2:slice_level, 3: user defined Mb_level */
