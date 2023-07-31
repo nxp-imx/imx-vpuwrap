@@ -422,7 +422,7 @@ static int calculateH264Level(int width, int height)
   return level;
 }
 
-static int selectH264Level(level1, level2) {
+static int selectH264Level(int level1, int level2) {
   int i, tableLen, seq1, seq2;
   tableLen = sizeof(H264LevelSizeMapTable)/sizeof(H264LevelSizeMapTable[0]);
   for (i = 0; i < tableLen; i++) {
