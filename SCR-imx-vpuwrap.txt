@@ -3,7 +3,7 @@ NXP Software Content Register
 --------------------------------------------
 
 Outgoing License:          LA_OPT_NXP_Software_License - Production Use, Section 2.3 applies
-License File:              COPYING
+License File:              LICENSE.txt
 Package Category:          Multimedia
 Type of content:           Source code
 Description and comments:  i.MX VPU wrapper library
