@@ -7304,7 +7304,7 @@ VpuEncRetCode VPU_EncOpen(VpuEncHandle *pOutHandle, VpuMemInfo* pInMemInfo,VpuEn
 	}
 
 	if(pInParam->nFrameRate <=0){
-		VPU_ENC_ERROR("%s: failure: invalid frame rate !\r\n",pInParam->nFrameRate);
+		VPU_ENC_ERROR("%s: failure: invalid frame rate: %d !\r\n", __FUNCTION__, pInParam->nFrameRate);
 		return VPU_ENC_RET_INVALID_PARAM;
 	}
 	nValidWidth=pInParam->nPicWidth;
