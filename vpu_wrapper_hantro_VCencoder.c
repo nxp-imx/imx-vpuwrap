@@ -1392,8 +1392,8 @@ static VpuEncRetCode VPU_EncSetConfigDefaults(
   }
   else
     cfg->level = (IS_H264(cfg->codecFormat) ? calculateH264Level(cfg->width, cfg->height) : VCENC_HEVC_LEVEL_5_1);
-  cfg->frameRateNum = frameRate;
-  cfg->frameRateDenom = 1;
+  cfg->frameRateNum = frameRate & 0xffffUL;
+  cfg->frameRateDenom = (frameRate >> 16) + 1;
   cfg->maxTLayers = 1;         /*will be recalculated after InitGopConfigs*/
   cfg->refFrameAmount = 1;     /*will be recalculated after InitGopConfigs*/
   cfg->bitDepthLuma = 8;
