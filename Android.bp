@@ -69,6 +69,7 @@ bootstrap_go_package {
     pkgPath: "android/soong/vendor/nxp-opensource/vpu_wrapper",
     deps: [
         "blueprint",
+        "blueprint-proptools",
         "blueprint-pathtools",
         "soong",
         "soong-android",
