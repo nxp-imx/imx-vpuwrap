@@ -1,19 +1,8 @@
 /*
  *  Copyright (c) 2010-2014, Freescale Semiconductor Inc.,
- *  Copyright 2019-2020 NXP
+ *  Copyright 2019-2020, 2026 NXP
+ *  SPDX-License-Identifier: BSD-3-Clause
  *
- *  The following programs are the sole property of NXP,
- *  and contain its proprietary and confidential information.
- *
- */
-
-/*
- *	encode_stream.c
- *	this file is the interface between unit test and vpu wrapper
- *
- *	History :
- *	Date	(y.m.d)		Author			Version			Description
- *	2010-12-31		eagle zhou		0.1				Created
  */
 
 #include "stdio.h"

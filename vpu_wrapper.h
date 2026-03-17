@@ -1,24 +1,8 @@
 /*
  *  Copyright (c) 2010-2016, Freescale Semiconductor Inc.,
- *  Copyright 2017-2020,2023 NXP
+ *  Copyright 2017-2020, 2023, 2026 NXP
+ *  SPDX-License-Identifier: BSD-3-Clause
  *
- *  The following programs are the sole property of NXP,
- *  and contain its proprietary and confidential information.
- *
- */
-
-/*
- *	Vpu_wrapper.h
- *	header file contain all related vpu interface info
- *
- *	History :
- *	Date	(y.m.d)		Author			Version			Description
- *	2010-09-07		eagle zhou		0.1				Created
- *	2011-02-17		eagle zhou		0.2				Add encoder part
- *	2011-12-22		eagle zhou		1.0				refine api
- *	2012-01-**		eagle zhou		1.0.*			add new features: including tile format,etc
- *	2016-12-30	  Song Bing			2.0.0			Add Hantro video decoder support
- *	2017-11-20	  Song Bing			3.0.0			Add Amphion video decoder support
  */
 
 #ifndef VPU_WRAPPER_H

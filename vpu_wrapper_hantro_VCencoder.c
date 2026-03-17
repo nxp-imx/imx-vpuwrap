@@ -1,12 +1,6 @@
 /**
- *	Copyright 2019-2020,2023 NXP
- *
- *  The following programs are the sole property of NXP,
- *  and contain its proprietary and confidential information.
- *
- *	History :
- *	Date	(y.m.d)		Author			Version			Description
- *	2019-07-10		  Hou Qi		    0.1		    Created
+ *	Copyright 2019-2020, 2023, 2026 NXP
+ *	SPDX-License-Identifier: BSD-3-Clause
  */
 
 /** Vpu_wrapper_hantro_VCencoder.c

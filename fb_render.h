@@ -1,19 +1,8 @@
 /*
  *  Copyright (c) 2010-2012, Freescale Semiconductor Inc.,
- *  Copyright 2020 NXP
+ *  Copyright 2020, 2026 NXP
+ *  SPDX-License-Identifier: BSD-3-Clause
  *
- *  The following programs are the sole property of NXP,
- *  and contain its proprietary and confidential information.
- *
- */
-
-/*
- *  fb_render.h
- *	header file for fb_render.c 
- *
- *	History :
- *	Date	(y.m.d)		Author			Version			Description
- *	2010-09-14		eagle zhou		0.1				Created
  */
 
 

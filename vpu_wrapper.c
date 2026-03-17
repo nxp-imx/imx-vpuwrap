@@ -1,20 +1,8 @@
 /*
  *  Copyright (c) 2010-2016, Freescale Semiconductor Inc.,
- *  Copyright 2020 NXP
+ *  Copyright 2020, 2026 NXP
+ *  SPDX-License-Identifier: BSD-3-Clause
  *
- *  The following programs are the sole property of NXP,
- *  and contain its proprietary and confidential information.
- *
- */
-
-/*
- *	Vpu_wrapper.c
- *	vpu wrapper file contain all related vpu api exposed to application
- *	
- *	History :
- *	Date	(y.m.d)		Author			Version			Description
- *	2010-09-07		eagle zhou		0.1				Created
- *	2011-12-22		eagle zhou		1.0				refine
  */
 
 #include "stdio.h"
@@ -966,13 +954,13 @@ CODE	HEIGHT/WIDTH	COMMENT
 /*	
 		aspect_ratio_information 	Sample Aspect Ratio 		DAR
 		0000 					Forbidden 				Forbidden			
-		0001					1.0 (Square Sample) 		¨C
-		0010 					¨C 						3 ¡Â 4
-		0011 					¨C 						9 ¡Â 16
-		0100 					¨C 						1 ¡Â 2.21		
-		0101 					¨C 						Reserved
-		¡­ 												¡­
-		1111 					¨C 						Reserved		
+		0001					1.0 (Square Sample) 		ï¿½C
+		0010 					ï¿½C 						3 ï¿½ï¿½ 4
+		0011 					ï¿½C 						9 ï¿½ï¿½ 16
+		0100 					ï¿½C 						1 ï¿½ï¿½ 2.21		
+		0101 					ï¿½C 						Reserved
+		ï¿½ï¿½ 												ï¿½ï¿½
+		1111 					ï¿½C 						Reserved		
 */
 				switch(InRatio)
 				{
@@ -1005,7 +993,7 @@ CODE	HEIGHT/WIDTH	COMMENT
 	sar_height = aspectRateInfo [15:0]
 		aspect_ratio_idc 	Sample aspect ratio 		(informative)Examples of use
 		0 				Unspecified
-		1 				1:1(¡°square¡±)		1280x720 16:9 frame without overscan
+		1 				1:1(ï¿½ï¿½squareï¿½ï¿½)		1280x720 16:9 frame without overscan
 												1920x1080 16:9 frame without overscan (cropped from 1920x1088)
 												640x480 4:3 frame without overscan
 		2 				12:11 					720x576 4:3 frame with horizontal overscan

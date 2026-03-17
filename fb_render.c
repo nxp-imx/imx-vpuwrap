@@ -1,15 +1,8 @@
 /*
  *  Copyright (c) 2010-2013, Freescale Semiconductor Inc.,
- *  Copyright 2020 NXP
+ *  Copyright 2020, 2026 NXP
+ *  SPDX-License-Identifier: BSD-3-Clause
  *
- *  The following programs are the sole property of NXP,
- *  and contain its proprietary and confidential information.
- *
- */
-
-/*
- *  fb_render.c
- *	this file is responsible for rendering video frame through ipu's fb
  */
 
 #ifdef IMX5

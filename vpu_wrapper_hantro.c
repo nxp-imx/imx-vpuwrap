@@ -1,13 +1,7 @@
 /**
  *	Copyright (c) 2016, Freescale Semiconductor Inc.,
- *	Copyright 2017-2020 NXP
- *
- *	The following programs are the sole property of NXP,
- *	and contain its proprietary and confidential information.
- *
- *	History :
- *	Date	(y.m.d)		Author			Version			Description
- *	2016-12-20		Song Bing		0.1				Created
+ *	Copyright 2017-2020, 2026 NXP
+ *	SPDX-License-Identifier: BSD-3-Clause
  */
 
 /** Vpu_wrapper_hantro.c

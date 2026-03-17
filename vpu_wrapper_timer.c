@@ -1,19 +1,9 @@
 /*
  *  Copyright (c) 2010-2012, Freescale Semiconductor Inc.,
- *	Copyright 2020 NXP
+ *	Copyright 2020, 2026 NXP
+ *  SPDX-License-Identifier: BSD-3-Clause
  *
- *  The following programs are the sole property of NXP,
- *  and contain its proprietary and confidential information.
  *
- */
-
-/* 
- *  vpu_wrapper_timer.c
- *	this file is used for get the system time
- *
- *	History :
- *	Date	(y.m.d)		Author			Version			Description
- *	2010-12-10		eagle zhou		0.1				Created
  */
 
 

@@ -1,12 +1,7 @@
 /**
- *  Copyright 2018-2020 NXP
+ *  Copyright 2018-2020, 2026 NXP
+ *  SPDX-License-Identifier: BSD-3-Clause
  *
- *  The following programs are the sole property of NXP,
- *  and contain its proprietary and confidential information.
- *
- *  History :
- *  Date    (y.m.d)     Author          Version         Description
- *  2018-06-10        Bao Xiahong       0.1             Created
  */
 
 /** Vpu_wrapper_hantro_encoder.c
