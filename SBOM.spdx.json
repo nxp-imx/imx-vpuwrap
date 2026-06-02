@@ -1,0 +1,65 @@
+{
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "spdxVersion": "SPDX-2.3",
+  "creationInfo": {
+    "created": "2026-06-02T02:52:15Z",
+    "creators": [
+      "Organization: NXP"
+    ],
+    "licenseListVersion": "3.26"
+  },
+  "name": "imx-vpuwrap-lf-6.18.20-2.0.0",
+  "dataLicense": "CC0-1.0",
+  "documentNamespace": "https://nxp.com/spdx/d48b3a12-5d34-4f9d-ab6b-0c4495a94844",
+  "packages": [
+    {
+      "SPDXID": "SPDXRef-package-d48b3a12-5d34-4f9d-ab6b-0c4495a94844",
+      "name": "imx-vpuwrap",
+      "versionInfo": "lf-6.18.20-2.0.0",
+      "licenseConcluded": "BSD-3-Clause",
+      "licenseDeclared": "BSD-3-Clause",
+      "downloadLocation": "https://github.com/nxp-imx/imx-vpuwrap.git -b lf-6.18.20-2.0.0",
+      "originator": "Organization: NXP",
+      "supplier": "NOASSERTION",
+      "externalRefs": [],
+      "filesAnalyzed": false
+    },
+    {
+      "SPDXID": "SPDXRef-package-d48b3a12-5d34-4f9d-ab6b-0c4495a94844---e17bcb97-7ef5-4e97-83e8-41fa17aca0de",
+      "name": "GNU Automake",
+      "versionInfo": "1.9",
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "GPL-2.0-or-later",
+      "homepage": "http://www.gnu.org/software/automake/",
+      "downloadLocation": "NOASSERTION",
+      "originator": "Organization: gnu",
+      "supplier": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "OTHER",
+          "referenceLocator": "425c18ca-4e2c-4f6a-a5f8-b135aeaf30e0",
+          "referenceType": "BlackDuck-ComponentOrigin"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceLocator": "cpe:2.3:a:gnu:automake:1.9:*:*:*:*:*:*:*",
+          "referenceType": "cpe23Type"
+        }
+      ],
+      "filesAnalyzed": false
+    }
+  ],
+  "relationships": [
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-package-d48b3a12-5d34-4f9d-ab6b-0c4495a94844"
+    },
+    {
+      "spdxElementId": "SPDXRef-package-d48b3a12-5d34-4f9d-ab6b-0c4495a94844",
+      "relationshipType": "OTHER",
+      "relatedSpdxElement": "SPDXRef-package-d48b3a12-5d34-4f9d-ab6b-0c4495a94844---e17bcb97-7ef5-4e97-83e8-41fa17aca0de",
+      "comment": "Separate Work"
+    }
+  ]
+}
