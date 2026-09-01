@@ -1,0 +1,65 @@
+{
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "spdxVersion": "SPDX-2.3",
+  "creationInfo": {
+    "created": "2026-08-25T03:41:33Z",
+    "creators": [
+      "Organization: NXP"
+    ],
+    "licenseListVersion": "3.28"
+  },
+  "name": "imx-vpuwrap-lf-6.18.37-2.1.0",
+  "dataLicense": "CC0-1.0",
+  "documentNamespace": "https://nxp.com/spdx/8f1468d2-8967-4fad-959d-261f52120880",
+  "packages": [
+    {
+      "SPDXID": "SPDXRef-package-8f1468d2-8967-4fad-959d-261f52120880",
+      "name": "imx-vpuwrap",
+      "versionInfo": "lf-6.18.37-2.1.0",
+      "licenseConcluded": "BSD-3-Clause",
+      "licenseDeclared": "BSD-3-Clause",
+      "downloadLocation": "https://github.com/nxp-imx/imx-vpuwrap.git -b lf-6.18.37-2.1.0",
+      "originator": "Organization: NXP",
+      "supplier": "NOASSERTION",
+      "externalRefs": [],
+      "filesAnalyzed": false
+    },
+    {
+      "SPDXID": "SPDXRef-package-8f1468d2-8967-4fad-959d-261f52120880---e17bcb97-7ef5-4e97-83e8-41fa17aca0de",
+      "name": "GNU Automake",
+      "versionInfo": "1.9",
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "GPL-2.0-or-later",
+      "homepage": "http://www.gnu.org/software/automake/",
+      "downloadLocation": "NOASSERTION",
+      "originator": "Organization: gnu",
+      "supplier": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "OTHER",
+          "referenceLocator": "425c18ca-4e2c-4f6a-a5f8-b135aeaf30e0",
+          "referenceType": "BlackDuck-ComponentOrigin"
+        },
+        {
+          "referenceCategory": "SECURITY",
+          "referenceLocator": "cpe:2.3:a:gnu:automake:1.9:*:*:*:*:*:*:*",
+          "referenceType": "cpe23Type"
+        }
+      ],
+      "filesAnalyzed": false
+    }
+  ],
+  "relationships": [
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-package-8f1468d2-8967-4fad-959d-261f52120880"
+    },
+    {
+      "spdxElementId": "SPDXRef-package-8f1468d2-8967-4fad-959d-261f52120880",
+      "relationshipType": "OTHER",
+      "relatedSpdxElement": "SPDXRef-package-8f1468d2-8967-4fad-959d-261f52120880---e17bcb97-7ef5-4e97-83e8-41fa17aca0de",
+      "comment": "Separate Work"
+    }
+  ]
+}
